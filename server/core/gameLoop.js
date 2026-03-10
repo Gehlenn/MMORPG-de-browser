@@ -2,7 +2,16 @@
  * Game Loop System - MMO Server Tick Architecture
  * Handles server ticks, player updates, combat, AI, and events
  * Version 0.3.4 - Dynamic World Events and MMO Game Loop
+ * Version 0.4.0 - ECS Integration
  */
+
+const { getECSManager } = require('../ecs/ECSManager');
+const MovementSystem = require('../systems/MovementSystem');
+const CombatSystem = require('../systems/CombatSystem');
+const AISystem = require('../systems/AISystem');
+const InterestManager = require('../network/InterestManager');
+const SnapshotSystem = require('../network/SnapshotSystem');
+const DeltaCompressor = require('../network/DeltaCompressor');
 
 class GameLoop {
     constructor(server) {
@@ -42,13 +51,61 @@ class GameLoop {
         // Spatial indexing for optimization
         this.spatialGrid = new SpatialGrid(100); // 100px grid cells
         
+        // ECS System
+        this.ecsManager = null;
+        
+        // Network Systems
+        this.interestManager = null;
+        this.snapshotSystem = null;
+        this.deltaCompressor = null;
+        
         // Initialize
         this.initialize();
     }
     
-    initialize() {
+    async initialize() {
+        // Initialize ECS Manager
+        this.ecsManager = getECSManager();
+        await this.ecsManager.initialize();
+        
+        // Register ECS systems
+        const movementSystem = new MovementSystem(
+            this.ecsManager.entityManager,
+            this.ecsManager.componentManager
+        );
+        
+        const combatSystem = new CombatSystem(
+            this.ecsManager.entityManager,
+            this.ecsManager.componentManager
+        );
+        
+        const aiSystem = new AISystem(
+            this.ecsManager.entityManager,
+            this.ecsManager.componentManager
+        );
+        
+        // Add systems to ECS manager with priorities
+        this.ecsManager.addSystem(movementSystem, 1); // Movement first
+        this.ecsManager.addSystem(combatSystem, 2);    // Combat second
+        this.ecsManager.addSystem(aiSystem, 3);       // AI third
+        
+        // Initialize Network Systems
+        this.interestManager = new InterestManager(
+            this.ecsManager.spatialGrid,
+            this.ecsManager.componentManager
+        );
+        
+        this.snapshotSystem = new SnapshotSystem(
+            this.ecsManager.componentManager,
+            this.interestManager
+        );
+        
+        this.deltaCompressor = new DeltaCompressor();
+        
+        // Setup event handlers
         this.setupEventHandlers();
-        console.log('Game Loop System initialized');
+        
+        console.log('Game Loop System initialized with ECS and Networking');
     }
     
     setupEventHandlers() {
@@ -117,15 +174,28 @@ class GameLoop {
             // Increment tick counter
             this.tickCount++;
             
+            // Calculate delta time in milliseconds
+            const deltaTime = this.tickCount > 1 ? 
+                Date.now() - this.lastTickTime : 
+                this.config.tickInterval;
+            
+            // Update ECS systems
+            if (this.ecsManager) {
+                this.ecsManager.update(deltaTime);
+            }
+            
             // Update spatial grid
             this.updateSpatialGrid();
             
-            // Process game systems
+            // Process game systems (legacy - will be migrated to ECS)
             this.updatePlayers();
             this.updateCombat();
             this.updateAI();
             this.updateEvents();
             this.updateSpawns();
+            
+            // Network Update Loop
+            this.updateNetworkLoop();
             
             // Process queued updates
             this.processUpdateQueues();
@@ -136,12 +206,64 @@ class GameLoop {
             }
             
             // Record performance
-            const tickTime = Date.now() - tickStartTime;
+            this.lastTickTime = Date.now();
+            const tickTime = this.lastTickTime - tickStartTime;
             this.recordTickPerformance(tickTime);
             
         } catch (error) {
             console.error('Error in game loop tick:', error);
             this.performanceStats.droppedTicks++;
+        }
+    }
+    
+    /**
+     * Network Update Loop
+     * Handles interest management, snapshots, and delta compression
+     */
+    updateNetworkLoop() {
+        // Get all connected players
+        const playerIds = Array.from(this.server.players.keys());
+        
+        if (playerIds.length === 0) return;
+        
+        // Update interest management
+        this.interestManager.updateAllPlayers(playerIds);
+        
+        // Check if snapshot should be created
+        if (this.snapshotSystem.shouldCreateSnapshot(Date.now())) {
+            // Create world snapshots
+            const snapshots = this.snapshotSystem.createWorldSnapshot(playerIds);
+            
+            // Compress and send snapshots
+            this.sendSnapshotsToClients(snapshots);
+        }
+    }
+    
+    /**
+     * Send compressed snapshots to clients
+     * @param {Map<number, object>} snapshots - Player snapshots
+     */
+    sendSnapshotsToClients(snapshots) {
+        for (const [playerId, snapshot] of snapshots) {
+            // Compress snapshot
+            const compressedSnapshot = this.deltaCompressor.compressSnapshot(snapshot, playerId);
+            
+            if (compressedSnapshot) {
+                // Send to client
+                this.sendSnapshotToClient(playerId, compressedSnapshot);
+            }
+        }
+    }
+    
+    /**
+     * Send snapshot to specific client
+     * @param {number} playerId - Player ID
+     * @param {object} snapshot - Snapshot data
+     */
+    sendSnapshotToClient(playerId, snapshot) {
+        const player = this.server.players.get(playerId);
+        if (player && player.socket) {
+            player.socket.emit('worldSnapshot', snapshot);
         }
     }
     
@@ -896,20 +1018,89 @@ class SpatialGrid {
         return `${cellX},${cellY}`;
     }
     
-    optimize() {
-        // Remove empty cells
-        for (const [cellKey, cell] of this.grid) {
-            if (cell.size === 0) {
-                this.grid.delete(cellKey);
-            }
+    /**
+     * Spawn ECS entities (helper functions)
+     */
+    spawnECSPlayer(playerId, x, y) {
+        if (!this.ecsManager) return null;
+        
+        const ecsEntityId = this.ecsManager.spawnPlayer(x, y, {
+            combat: { level: 1, attack: 15, defense: 10 },
+            health: { hp: 100, maxHp: 100 }
+        });
+        
+        // Map player ID to ECS entity ID
+        this.playerECSMapping = this.playerECSMapping || new Map();
+        this.playerECSMapping.set(playerId, ecsEntityId);
+        
+        console.log(`Spawned ECS player ${ecsEntityId} for player ${playerId} at (${x}, ${y})`);
+        return ecsEntityId;
+    }
+    
+    spawnECSMob(x, y, level = 1) {
+        if (!this.ecsManager) return null;
+        
+        const ecsEntityId = this.ecsManager.spawnMob(x, y, level);
+        console.log(`Spawned ECS mob ${ecsEntityId} at (${x}, ${y}) level ${level}`);
+        return ecsEntityId;
+    }
+    
+    spawnECSNPC(x, y, npcType = 'merchant') {
+        if (!this.ecsManager) return null;
+        
+        const ecsEntityId = this.ecsManager.spawnNPC(x, y, {
+            combat: { level: 1, attack: 0, defense: 0 },
+            health: { hp: 100, maxHp: 100 }
+        });
+        
+        console.log(`Spawned ECS NPC ${ecsEntityId} (${npcType}) at (${x}, ${y})`);
+        return ecsEntityId;
+    }
+    
+    /**
+     * Get ECS entity ID for player
+     */
+    getPlayerECSId(playerId) {
+        return this.playerECSMapping ? this.playerECSMapping.get(playerId) : null;
+    }
+    
+    /**
+     * Remove player from ECS
+     */
+    removePlayerFromECS(playerId) {
+        if (!this.playerECSMapping) return;
+        
+        const ecsEntityId = this.playerECSMapping.get(playerId);
+        if (ecsEntityId && this.ecsManager) {
+            this.ecsManager.removeEntity(ecsEntityId);
+            this.playerECSMapping.delete(playerId);
+            console.log(`Removed ECS entity ${ecsEntityId} for player ${playerId}`);
         }
     }
     
-    getStats() {
+    /**
+     * Get ECS statistics
+     */
+    getECSStats() {
+        if (!this.ecsManager) return null;
+        
         return {
-            totalCells: this.grid.size,
-            totalEntities: Array.from(this.grid.values())
-                .reduce((sum, cell) => sum + cell.size, 0)
+            ecs: this.ecsManager.getStats(),
+            systems: this.ecsManager.getSystemInfo(),
+            spatial: this.ecsManager.spatialGrid.getStats()
+        };
+    }
+    
+    /**
+     * Get performance statistics
+     */
+    getPerformanceStats() {
+        return {
+            ...this.performanceStats,
+            tickCount: this.tickCount,
+            isRunning: this.isRunning,
+            config: this.config,
+            ecs: this.getECSStats()
         };
     }
 }

@@ -418,19 +418,19 @@ class DungeonGenerator {
             
             // Place guaranteed features
             for (const feature of roomTypeConfig.guaranteedFeatures) {
-                this.placeFeature(room, feature, true);
+                this.placeFeature(room, feature, true, dungeon);
             }
             
             // Place possible features
             for (const feature of roomTypeConfig.possibleFeatures) {
                 if (Math.random() < 0.3) { // 30% chance for each possible feature
-                    this.placeFeature(room, feature, false);
+                    this.placeFeature(room, feature, false, dungeon);
                 }
             }
         }
     }
     
-    placeFeature(room, featureType, guaranteed) {
+    placeFeature(room, featureType, guaranteed, dungeon) {
         const feature = {
             id: this.generateFeatureId(),
             type: featureType,
@@ -445,7 +445,14 @@ class DungeonGenerator {
             feature.x = position.x;
             feature.y = position.y;
             room.features.push(feature);
-            dungeon.features.push(feature);
+            
+            // Only add to dungeon features if dungeon exists and has features array
+            if (dungeon && typeof dungeon === 'object') {
+                if (!dungeon.features) {
+                    dungeon.features = [];
+                }
+                dungeon.features.push(feature);
+            }
         }
     }
     

@@ -201,21 +201,6 @@ server/
 ### Database Schema
 - **Characters** - Player data, stats, progression
 - **Player Inventory** - Item storage with stacking
-- **Player Quests** - Active and completed quests
-- **Player PvP Stats** - Combat statistics and ratings
-- **Player Crafting** - Professions and known recipes
-- **Guilds** - Guild data, members, banks
-- **Guild Wars** - War declarations and progress
-- **Guild Alliances** - Alliance formations
-- **Auctions** - Market listings and bids
-- **Admin Accounts** - Server administration
-- **Player Bans/Mutes/Warnings** - Moderation data
-- **Server Settings** - Configuration and status
-- **Market Stats** - Economic data and trends
-- **Item Price History** - Historical pricing data
-
-## 📁 Project Structure
-
 ```
 client/
 ├── engine/           # Core engine systems

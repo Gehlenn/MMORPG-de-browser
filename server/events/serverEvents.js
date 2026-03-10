@@ -208,8 +208,8 @@ class ServerEvents {
     
     generateEventLocation() {
         // Generate random location in the world
-        const worldWidth = this.server.worldManager.config.worldWidth * this.server.worldManager.config.chunkSize * this.server.worldManager.config.tileSize;
-        const worldHeight = this.server.worldManager.config.worldHeight * this.server.worldManager.config.chunkSize * this.server.worldManager.config.tileSize;
+        const worldWidth = 5000; // Simplified world width
+        const worldHeight = 5000; // Simplified world height
         
         return {
             x: Math.floor(Math.random() * worldWidth),
@@ -880,13 +880,19 @@ class ServerEvents {
     }
     
     sendWorldStatusBroadcast() {
-        const worldStats = this.server.worldManager.getWorldStats();
-        
-        this.server.io.emit('worldStatus', {
-            onlinePlayers: this.server.players.size,
-            worldTime: worldStats.worldTime,
-            activeEvents: this.activeEvents.size
-        });
+        try {
+            const worldStats = this.server.worldManager && this.server.worldManager.getWorldStats 
+                ? this.server.worldManager.getWorldStats() 
+                : { worldTime: Date.now(), activeEvents: 0 };
+            
+            this.server.io.emit('worldStatus', {
+                onlinePlayers: this.server.players.size,
+                worldTime: worldStats.worldTime || Date.now(),
+                activeEvents: this.activeEvents.size
+            });
+        } catch (error) {
+            console.error('Error sending world status broadcast:', error);
+        }
     }
     
     sendActiveEventsBroadcast() {

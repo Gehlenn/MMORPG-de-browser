@@ -1274,16 +1274,92 @@ function setupForms() {
         event.preventDefault();
         const username = byId("loginUser").value.trim();
         const password = byId("loginPass").value.trim();
+        const statusDiv = byId("loginStatus");
+
+        // Mostrar status de carregamento
+        statusDiv.className = 'login-status info';
+        statusDiv.textContent = '🔄 Conectando ao servidor...';
 
         try {
-            const result = await authLogin(username, password);
-            if (!result.ok) {
-                logMessage(result.error || "Login invalido.");
-                return;
+            console.log('Tentando login com:', username);
+            
+            // Use NetworkManager for login
+            if (window.game && window.game.networkManager) {
+                console.log('Usando NetworkManager para login');
+                window.game.networkManager.send('login', { username, password });
+            } else {
+                // Fallback: try to connect first
+                if (window.io) {
+                    console.log('Conectando diretamente com Socket.IO');
+                    statusDiv.textContent = '🔄 Estabelecendo conexão...';
+                    
+                    const socket = io('http://localhost:3002');
+                    
+                    socket.on('connect', () => {
+                        console.log('Socket conectado, fazendo login...');
+                        statusDiv.textContent = '🔐 Autenticando...';
+                        socket.emit('login', { username, password });
+                    });
+                    
+                    socket.on('loginSuccess', (data) => {
+                        console.log('Login successful:', data);
+                        statusDiv.className = 'login-status success';
+                        statusDiv.textContent = `✅ Bem-vindo, ${data.character.name}!`;
+                        
+                        // Atualizar informações da sessão
+                        state.sessionUser = data.character.name;
+                        byId("sessionInfo").textContent = `Online: ${data.character.name}`;
+                        
+                        // Atualizar interface do jogo com dados do personagem
+                        updateGameUI(data.character);
+                        
+                        // Esconder tela de login
+                        setTimeout(() => {
+                            byId("loginScreen").classList.remove("visible");
+                            byId("gameScreen").classList.add("visible");
+                            
+                            // Inicializar sistema do novo engine se disponível
+                            if (window.game && window.game.initialize) {
+                                window.game.initialize();
+                            }
+                            
+                            // Inicializar nova interface
+                            addChatMessage("Bem-vindo ao MMORPG Browser!", "system");
+                            initializeModernGameInterface();
+                            
+                            // Log de sucesso
+                            logMessage(`Bem-vindo ao jogo, ${data.character.name}!`);
+                            
+                            // Carregar dados do personagem
+                            if (window.game && window.game.loadPlayer) {
+                                window.game.loadPlayer(data.character);
+                            }
+                        }, 1000);
+                    });
+                    
+                    socket.on('loginError', (data) => {
+                        console.error('Login failed:', data.message);
+                        statusDiv.className = 'login-status error';
+                        statusDiv.textContent = `❌ Erro: ${data.message}`;
+                        logMessage("Login invalido: " + data.message);
+                    });
+                    
+                    socket.on('connect_error', (error) => {
+                        console.error('Connection error:', error);
+                        statusDiv.className = 'login-status error';
+                        statusDiv.textContent = '❌ Falha de conexão com o servidor';
+                    });
+                    
+                } else {
+                    statusDiv.className = 'login-status error';
+                    statusDiv.textContent = '❌ Socket.IO não disponível';
+                    logMessage("Conexao nao disponivel.");
+                }
             }
-            state.sessionUser = result.user.username;
-            setScreen("character");
-        } catch {
+        } catch (error) {
+            console.error('Login error:', error);
+            statusDiv.className = 'login-status error';
+            statusDiv.textContent = '❌ Erro inesperado ao fazer login';
             logMessage("Falha de conexao no login.");
         }
     };
@@ -1293,16 +1369,161 @@ function setupForms() {
         const username = byId("registerUser").value.trim();
         const email = byId("registerEmail").value.trim();
         const password = byId("registerPass").value.trim();
+        const statusDiv = byId("loginStatus");
+
+        // Validação
+        if (!username || !password) {
+            statusDiv.className = 'login-status error';
+            statusDiv.textContent = '❌ Preencha nome de usuário e senha!';
+            return;
+        }
+
+        // Mostrar status de carregamento
+        statusDiv.className = 'login-status info';
+        statusDiv.textContent = '🔄 Criando conta...';
 
         try {
-            const result = await authRegister(username, email, password);
-            if (!result.ok) {
-                logMessage(result.error || "Falha ao criar conta.");
-                return;
+            console.log('Tentando criar conta para:', username);
+            
+            // Conectar ao servidor
+            const socket = io('http://localhost:3002');
+            
+            socket.on('connect', () => {
+                console.log('Socket conectado, criando conta...');
+                statusDiv.textContent = '🔐 Criando sua conta...';
+                
+                // Criar CONTA (não personagem)
+                socket.emit('createAccount', { 
+                    username: username, 
+                    email: email || `${username}@example.com`, 
+                    password: password 
+                });
+            });
+            
+            socket.on('createSuccess', (data) => {
+                console.log('Conta criada:', data);
+                statusDiv.className = 'login-status success';
+                statusDiv.textContent = '✅ ' + data.message;
+                
+                // Limpar formulário
+                byId("registerUser").value = '';
+                byId("registerEmail").value = '';
+                byId("registerPass").value = '';
+                
+                // Mudar para aba de login após 2 segundos
+                setTimeout(() => {
+                    showLoginTab();
+                    byId("loginUser").value = username;
+                    byId("loginUser").focus();
+                }, 2000);
+                
+                logMessage("Conta criada! Faça login.");
+            });
+            
+            socket.on('createError', (data) => {
+                console.error('Erro ao criar conta:', data);
+                statusDiv.className = 'login-status error';
+                
+                if (data.code === 'DUPLICATE_KEY') {
+                    statusDiv.textContent = `❌ ${data.shortExplanation || 'Nome já em uso!'}`;
+                    
+                    // Gerar sugestões
+                    const suggestions = generateNameSuggestions(username);
+                    if (suggestions.length > 0) {
+                        showNameSuggestions(suggestions);
+                    }
+                } else {
+                    statusDiv.textContent = `❌ ${data.message || 'Erro ao criar conta'}`;
+                }
+            });
+            
+            socket.on('connect_error', (error) => {
+                console.error('Erro de conexão:', error);
+                statusDiv.className = 'login-status error';
+                statusDiv.textContent = '❌ Falha ao conectar ao servidor';
+            });
+            
+        } catch (error) {
+            console.error('Erro no registro:', error);
+            statusDiv.className = 'login-status error';
+            statusDiv.textContent = '❌ Erro ao criar conta';
+        }
+    };                
+                            // Gerar sugestões de nomes
+                            const suggestions = generateNameSuggestions(heroName);
+                            const suggestionText = data.suggestion || 
+                                (suggestions.length > 0 ? `Sugestões: ${suggestions.join(', ')}` : 'Tente outro nome.');
+                            
+                            logMessage(`${data.shortExplanation || 'Nome indisponível'}. ${suggestionText}`);
+                            
+                            // Adicionar sugestões na interface
+                            if (suggestions.length > 0) {
+                                showNameSuggestions(suggestions);
+                            }
+                        } else if (data.code === 'TABLE_NOT_FOUND') {
+                            statusDiv.textContent = `❌ ${data.shortExplanation || 'Erro no banco de dados'}`;
+                            logMessage(`${data.shortExplanation}: ${data.message}`);
+                            logMessage('Solução: Reinicie o servidor para criar as tabelas.');
+                        } else if (data.code === 'DATABASE_CONNECTION_FAILED') {
+                            statusDiv.textContent = `❌ ${data.shortExplanation || 'Falha no servidor'}`;
+                            logMessage(`${data.shortExplanation}: ${data.message}`);
+                            logMessage('Solução: Verifique se o servidor está online.');
+                        } else {
+                            // Erro genérico com informações detalhadas
+                            const explanation = data.shortExplanation || 'Erro desconhecido';
+                            const message = data.message || 'Tente novamente.';
+                            
+                            statusDiv.textContent = `❌ ${explanation}`;
+                            logMessage(`Erro (${data.code || 'UNKNOWN'}): ${explanation}`);
+                            logMessage(`Detalhes: ${message}`);
+                            
+                            if (data.suggestion) {
+                                logMessage(`Sugestão: ${data.suggestion}`);
+                            }
+                        }
+                    });
+                    
+                    // Account creation events
+                    socket.on('createSuccess', (data) => {
+                        console.log('Account/Character created successfully:', data);
+                        statusDiv.className = 'login-status success';
+                        statusDiv.textContent = '✅ ' + data.message;
+                        
+                        if (data.character) {
+                            // Character created - proceed to game
+                            setTimeout(() => {
+                                showScreen('gameScreen');
+                                initializeModernGameInterface();
+                                addChatMessage("Bem-vindo ao MMORPG Browser!", "system");
+                                updateGameUI(data.character);
+                            }, 1500);
+                        } else {
+                            // Account created - switch to login
+                            setTimeout(() => {
+                                loginTab.click();
+                                byId("loginUser").focus();
+                            }, 1500);
+                        }
+                        
+                        logMessage(data.message);
+                    });
+                    
+                    socket.on('connect_error', (error) => {
+                        console.error('Connection error:', error);
+                        statusDiv.className = 'login-status error';
+                        statusDiv.textContent = '❌ Falha de conexão com o servidor';
+                    });
+                    
+                } else {
+                    statusDiv.className = 'login-status error';
+                    statusDiv.textContent = '❌ Socket.IO não disponível';
+                    logMessage("Conexao nao disponivel.");
+                }
             }
-            logMessage("Conta criada. Agora faca login.");
-            showLogin();
-        } catch {
+        } catch (error) {
+            console.error('Registration error:', error);
+            statusDiv.className = 'login-status error';
+            statusDiv.textContent = '❌ Erro inesperado ao criar conta';
             logMessage("Falha de conexao no cadastro.");
         }
     };

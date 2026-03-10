@@ -715,5 +715,8 @@ class HUDManager {
     }
 }
 
-// Global instance
+// Export for ES6 modules
+export { HUDManager };
+
+// Global instance for legacy compatibility
 window.hudManager = new HUDManager();

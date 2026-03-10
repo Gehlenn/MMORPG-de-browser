@@ -779,4 +779,4 @@ class PlayerMovement {
     }
 }
 
-export default PlayerMovement;
+module.exports = PlayerMovement;

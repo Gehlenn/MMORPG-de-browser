@@ -44,7 +44,7 @@ export const GAME_CONFIG = {
     ANIMATION_SPEED: 1.0,
     
     // Network settings (for future multiplayer)
-    SERVER_URL: 'http://localhost:3000',
+    SERVER_URL: 'http://localhost:3002',
     API_VERSION: 'v1',
     TIMEOUT: 5000,
     

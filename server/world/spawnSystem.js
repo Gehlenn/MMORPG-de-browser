@@ -7,7 +7,7 @@
 class SpawnSystem {
     constructor(worldManager) {
         this.worldManager = worldManager;
-        this.database = database;
+        this.database = worldManager.server.database;
         
         // Spawn configuration
         this.config = {
@@ -1081,4 +1081,4 @@ class SpawnSystem {
     }
 }
 
-export default SpawnSystem;
+module.exports = SpawnSystem;
