@@ -1,7 +1,7 @@
 /**
  * Gameplay Engine - Sistema de Jogo Principal
  * Responsável pelo loop de gameplay, renderização e física
- * Version 0.3 - Gameplay Loop Funcional
+ * Version 0.4 - Gameplay Loop Limpo e Funcional
  */
 
 // Importar sistema completo do game.js
@@ -44,6 +44,8 @@ class GameplayEngine {
         
         // Game state
         this.isRunning = false;
+        this.isInitialized = false;
+        this.worldData = null;
         this.player = null;
         this.mobs = [];
         this.keys = {};
@@ -57,47 +59,10 @@ class GameplayEngine {
         // Configuration
         this.config = {
             playerSpeed: 200,
-            mobCount: 12, // Aumentado para mais variedade
+            mobCount: 12,
             attackRange: 20,
             attackDamage: 10,
-            currentTheme: 'plains' // Tema do mundo
-        };
-        
-        // Sprites
-        this.sprites = {
-            player: {
-                draw: (x, y, size) => {
-                    // Player body (verde)
-                    this.ctx.fillStyle = '#4CAF50';
-                    this.ctx.fillRect(x - size/2, y - size/2, size, size);
-                    
-                    // Player border
-                    this.ctx.strokeStyle = '#2E7D32';
-                    this.ctx.lineWidth = 2;
-                    this.ctx.strokeRect(x - size/2, y - size/2, size, size);
-                    
-                    // Player direction indicator
-                    this.ctx.fillStyle = '#FFFFFF';
-                    this.ctx.fillRect(x - 2, y - size/2 - 5, 4, 3);
-                }
-            },
-            mob: {
-                draw: (mob) => {
-                    // Mob body (vermelho)
-                    this.ctx.fillStyle = mob.color || '#FF6B6B';
-                    this.ctx.fillRect(mob.x - mob.size/2, mob.y - mob.size/2, mob.size, mob.size);
-                    
-                    // Mob border
-                    this.ctx.strokeStyle = '#C62828';
-                    this.ctx.lineWidth = 2;
-                    this.ctx.strokeRect(mob.x - mob.size/2, mob.y - mob.size/2, mob.size, mob.size);
-                    
-                    // Mob eyes
-                    this.ctx.fillStyle = '#FFFFFF';
-                    this.ctx.fillRect(mob.x - 6, mob.y - 4, 4, 4);
-                    this.ctx.fillRect(mob.x + 2, mob.y - 4, 4, 4);
-                }
-            }
+            currentTheme: 'plains'
         };
         
         this.initialize();
@@ -112,13 +77,33 @@ class GameplayEngine {
         // Keyboard input
         if (typeof document !== 'undefined') {
             document.addEventListener('keydown', (e) => {
-                this.keys[e.key.toLowerCase()] = true;
-                e.preventDefault();
+                // Check if we're in an input field - if so, don't handle game keys
+                const activeElement = document.activeElement;
+                const isInputField = activeElement && (
+                    activeElement.tagName === 'INPUT' || 
+                    activeElement.tagName === 'TEXTAREA' || 
+                    activeElement.tagName === 'SELECT'
+                );
+                
+                if (!isInputField) {
+                    this.keys[e.key.toLowerCase()] = true;
+                    e.preventDefault();
+                }
             });
             
             document.addEventListener('keyup', (e) => {
-                this.keys[e.key.toLowerCase()] = false;
-                e.preventDefault();
+                // Check if we're in an input field - if so, don't handle game keys
+                const activeElement = document.activeElement;
+                const isInputField = activeElement && (
+                    activeElement.tagName === 'INPUT' || 
+                    activeElement.tagName === 'TEXTAREA' || 
+                    activeElement.tagName === 'SELECT'
+                );
+                
+                if (!isInputField) {
+                    this.keys[e.key.toLowerCase()] = false;
+                    e.preventDefault();
+                }
             });
         }
         
@@ -131,99 +116,100 @@ class GameplayEngine {
     }
     
     startGame(characterData) {
-        console.log('🎮🎮🎮 startGame chamado! characterData:', characterData);
-        console.log('🎮🎮🎮 this.mobs.length:', this.mobs.length);
+        console.log('🎮 Iniciando gameplay com character:', characterData);
         
         // Setup canvas
-        if (typeof document !== 'undefined') {
-            console.log('📋 Document disponível, buscando canvas...');
-            this.canvas = document.getElementById('gameCanvas');
-            console.log('📋 Canvas encontrado:', this.canvas);
-            this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
-            console.log('📋 Context encontrado:', this.ctx);
-            this.minimap = document.getElementById('minimap');
-            this.minimapCtx = this.minimap ? this.minimap.getContext('2d') : null;
-        } else {
-            console.error('❌ Document não disponível');
-        }
+        this.setupCanvas();
         
         if (!this.canvas || !this.ctx) {
             console.error('❌ Canvas não encontrado');
             return false;
         }
         
-        console.log(`📐 Canvas encontrado: ${this.canvas.width}x${this.canvas.height}`);
-        console.log(`📐 Canvas position:`, this.canvas.getBoundingClientRect());
-        console.log(`📐 Canvas style:`, this.canvas.style.cssText);
-        console.log(`📐 Canvas parent:`, this.canvas.parentElement);
+        // Spawn player
+        this.spawnPlayer(characterData);
         
-        // Configure canvas
-        this.resizeCanvas();
-        console.log(`📐 Canvas configurado: ${this.canvas.width}x${this.canvas.height}`);
+        // Spawn mobs
+        this.spawnMobs();
         
-        // Forçar visibilidade do canvas
-        this.canvas.style.display = 'block';
-        this.canvas.style.position = 'absolute';
-        this.canvas.style.top = '0';
-        this.canvas.style.left = '0';
-        this.canvas.style.width = '100%';
-        this.canvas.style.height = '100%';
-        this.canvas.style.zIndex = '999';
-        this.canvas.style.background = '#FF0000';
-        this.canvas.style.border = '5px solid #00FF00';
+        // Start game loop
+        this.startGameLoop();
         
-        console.log('🎨 Canvas style forçado:', this.canvas.style.cssText);
+        console.log('✅ Gameplay iniciado com sucesso');
+        return true;
+    }
+    
+    setupCanvas() {
+        if (typeof document !== 'undefined') {
+            console.log('📋 Configurando canvas...');
+            this.canvas = document.getElementById('gameCanvas');
+            this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
+            this.minimap = document.getElementById('minimap');
+            this.minimapCtx = this.minimap ? this.minimap.getContext('2d') : null;
+            
+            if (!this.canvas || !this.ctx) {
+                console.error('❌ Canvas não encontrado');
+                return false;
+            }
+            
+            // Configure canvas
+            this.resizeCanvas();
+            
+            // Forçar visibilidade do canvas
+            this.canvas.style.display = 'block';
+            this.canvas.style.position = 'absolute';
+            this.canvas.style.top = '0';
+            this.canvas.style.left = '0';
+            this.canvas.style.width = '100%';
+            this.canvas.style.height = '100%';
+            this.canvas.style.zIndex = '999';
+            
+            console.log('✅ Canvas configurado com sucesso');
+            return true;
+        }
         
-        // Initialize player
+        console.error('❌ Document não disponível');
+        return false;
+    }
+    
+    spawnPlayer(characterData) {
+        console.log('🦸 Spawning player:', characterData);
+        
+        if (!this.canvas || !this.ctx) {
+            console.error('❌ Cannot spawn player: canvas not available');
+            return;
+        }
+        
         this.player = {
+            id: characterData.id || Date.now().toString(),
+            name: characterData.name || 'Player',
             x: this.canvas.width / 2,
             y: this.canvas.height / 2,
             size: 32,
             speed: this.config.playerSpeed,
-            ...characterData
+            health: 100,
+            maxHealth: 100,
+            level: characterData.level || 1,
+            class: characterData.class || 'Guerreiro',
+            race: characterData.race || 'human'
         };
         
-        console.log(`🦸 Player criado:`, this.player);
-        
-        // Initialize mobs
-        console.log('👾 Chamando spawnMobs...');
-        this.spawnMobs();
-        console.log(`👾 SpawnMobs finalizado. Total mobs: ${this.mobs.length}`);
-        
-        // Forçar render inicial
-        console.log('🎨 Forçando render inicial...');
-        this.render();
-        
-        // Start game loop
-        this.isRunning = true;
-        this.lastTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
-        this.gameLoop();
-        
-        console.log('🎮 Game loop iniciado');
-        return true;
-    }
-    
-    resizeCanvas() {
-        if (!this.canvas) return;
-        
-        if (typeof window !== 'undefined') {
-            this.canvas.width = window.innerWidth;
-            this.canvas.height = window.innerHeight;
-        }
-        
-        // Reposition player if outside bounds
-        if (this.player) {
-            this.player.x = Math.max(this.player.size/2, Math.min(this.canvas.width - this.player.size/2, this.player.x));
-            this.player.y = Math.max(this.player.size/2, Math.min(this.canvas.height - this.player.size/2, this.player.y));
-        }
+        console.log('✅ Player spawned:', this.player);
     }
     
     spawnMobs() {
+        console.log('👾 Spawning mobs...');
+        
+        if (!this.canvas || !this.ctx) {
+            console.error('❌ Cannot spawn mobs: canvas not available');
+            return;
+        }
+        
         this.mobs = [];
         const mobTypes = Object.keys(MOBS);
         
         for (let i = 0; i < this.config.mobCount; i++) {
-            const mobType = mobTypes[i % mobTypes.length]; // Rotacionar tipos
+            const mobType = mobTypes[i % mobTypes.length];
             const mobData = MOBS[mobType];
             
             this.mobs.push({
@@ -240,21 +226,21 @@ class GameplayEngine {
                 def: mobData.def,
                 exp: mobData.exp,
                 gold: mobData.gold,
-                speed: 30 + Math.random() * 40, // Velocidade variada
+                speed: 30 + Math.random() * 40,
                 direction: Math.random() * Math.PI * 2,
                 
                 // AI System
-                aiState: 'patrolling', // idle, patrolling, aggro, fleeing, attacking
+                aiState: 'patrolling',
                 lastDecision: 0,
-                decisionCooldown: 1000, // ms
+                decisionCooldown: 1000,
                 target: null,
-                fleeThreshold: 0.3, // 30% HP para fugir
+                fleeThreshold: 0.3,
                 aggroRange: 100,
                 attackRange: 30,
                 patrolCenter: null,
                 patrolRadius: 150,
                 lastAttack: 0,
-                attackCooldown: 2000 // ms
+                attackCooldown: 2000
             });
         }
         
@@ -263,7 +249,7 @@ class GameplayEngine {
             mob.patrolCenter = { x: mob.x, y: mob.y };
         });
         
-        console.log(`👾 Spawned ${this.mobs.length} mobs with AI system`);
+        console.log(`✅ Spawned ${this.mobs.length} mobs with AI system`);
     }
     
     getMobColor(mobType) {
@@ -275,29 +261,45 @@ class GameplayEngine {
         return colors[mobType] || '#FF6B6B';
     }
     
-    gameLoop(currentTime) {
+    startGameLoop() {
+        console.log('🔄 Starting game loop...');
+        
+        if (!this.player || !this.ctx) {
+            console.error('❌ Cannot start game loop: missing dependencies');
+            return;
+        }
+        
+        this.isRunning = true;
+        this.lastTime = performance.now();
+        this.frameCount = 0;
+        this.fpsTime = performance.now();
+        
+        this.gameLoop();
+    }
+    
+    gameLoop() {
         if (!this.isRunning) return;
         
-        // Calculate delta time
-        const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.1); // Cap at 100ms
+        const currentTime = performance.now();
+        const deltaTime = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
         
-        // Update FPS
-        this.updateFPS(currentTime);
-        
-        // Update game state
+        // Update
         this.update(deltaTime);
         
         // Render
         this.render();
         
-        // Update HUD
-        this.updateHUD();
+        // FPS
+        this.frameCount++;
+        if (currentTime - this.fpsTime >= 1000) {
+            this.fps = this.frameCount;
+            this.frameCount = 0;
+            this.fpsTime = currentTime;
+        }
         
         // Continue loop
-        if (this.isRunning && typeof requestAnimationFrame !== 'undefined') {
-            requestAnimationFrame((time) => this.gameLoop(time));
-        }
+        requestAnimationFrame((time) => this.gameLoop(time));
     }
     
     update(deltaTime) {
@@ -350,13 +352,25 @@ class GameplayEngine {
     }
     
     attackMob(mob) {
-        mob.hp -= this.config.attackDamage;
-        this.addChatMessage(`⚔️ Você atacou ${mob.name}! (-${this.config.attackDamage} HP)`, '#FFD700');
+        const damage = this.config.attackDamage + (this.player.level || 1) * 2;
+        mob.hp -= damage;
+        
+        const expGained = mob.exp || 20;
+        const goldGained = mob.gold || 10;
+        
+        this.addChatMessage(`⚔️ Você atacou ${mob.name}! (-${damage} HP)`, '#FFD700');
+        this.addChatMessage(`📊 +${expGained} EXP, +${goldGained} Gold`, '#FFD700');
         
         if (mob.hp <= 0) {
-            // Mob defeated
+            // Mob derrotado
             this.addChatMessage(`⚔️ Você derrotou ${mob.name}!`, '#FFD700');
             this.respawnMob(mob);
+            
+            // Atualizar stats do player
+            if (this.player.exp !== undefined) {
+                this.player.exp += expGained;
+                this.player.gold = (this.player.gold || 0) + goldGained;
+            }
         }
     }
     
@@ -364,6 +378,15 @@ class GameplayEngine {
         mob.hp = mob.maxHp;
         mob.x = Math.random() * (this.canvas.width - 100) + 50;
         mob.y = Math.random() * (this.canvas.height - 100) + 50;
+        mob.aiState = 'patrolling';
+        mob.target = null;
+    }
+    
+    updateMobs(deltaTime) {
+        this.mobs.forEach(mob => {
+            this.updateMobAI(mob, deltaTime);
+            this.updateMobPosition(mob, deltaTime);
+        });
     }
     
     updateMobAI(mob, deltaTime) {
@@ -420,29 +443,23 @@ class GameplayEngine {
     }
     
     handleIdleState(mob) {
-        // Mudar para patrulha após um tempo
         if (Math.random() < 0.3) {
             mob.aiState = 'patrolling';
         }
     }
     
     handlePatrolState(mob) {
-        // Movimento aleatório dentro do raio de patrulha
         if (!mob.patrolCenter) {
             mob.patrolCenter = { x: mob.x, y: mob.y };
         }
         
-        // Mudar direção ocasionalmente
         if (Math.random() < 0.1) {
             const angle = Math.random() * Math.PI * 2;
-            const distance = Math.random() * mob.patrolRadius;
             mob.direction = angle;
         }
         
-        // Manter dentro do raio de patrulha
         const distFromCenter = this.getDistance(mob, mob.patrolCenter);
         if (distFromCenter > mob.patrolRadius) {
-            // Voltar para o centro
             const angleToCenter = Math.atan2(
                 mob.patrolCenter.y - mob.y,
                 mob.patrolCenter.x - mob.x
@@ -459,7 +476,6 @@ class GameplayEngine {
         
         const distance = this.getDistance(mob, mob.target);
         
-        // Perseguir player
         if (distance > mob.attackRange) {
             const angle = Math.atan2(
                 mob.target.y - mob.y,
@@ -467,13 +483,11 @@ class GameplayEngine {
             );
             mob.direction = angle;
         } else {
-            // Dentro do range de ataque
             mob.aiState = 'attacking';
         }
     }
     
     handleFleeState(mob) {
-        // Fugir na direção oposta ao player
         if (this.player) {
             const angle = Math.atan2(
                 mob.y - this.player.y,
@@ -482,7 +496,6 @@ class GameplayEngine {
             mob.direction = angle;
         }
         
-        // Parar de fugir se HP recuperar
         const hpPercent = mob.hp / mob.maxHp;
         if (hpPercent > mob.fleeThreshold * 2) {
             mob.aiState = 'patrolling';
@@ -499,34 +512,46 @@ class GameplayEngine {
         const now = Date.now();
         const distance = this.getDistance(mob, mob.target);
         
-        // Atacar se estiver no range e cooldown acabou
         if (distance <= mob.attackRange && now - mob.lastAttack >= mob.attackCooldown) {
             this.mobAttackPlayer(mob, mob.target);
             mob.lastAttack = now;
         } else if (distance > mob.attackRange) {
-            // Perseguir se sair do range
             mob.aiState = 'aggro';
         }
     }
     
+    mobAttackPlayer(mob, player) {
+        const baseDamage = mob.atk;
+        const variance = 0.2;
+        const damage = Math.round(baseDamage * (1 + (Math.random() - 0.5) * variance));
+        
+        const knockbackAngle = Math.atan2(player.y - mob.y, player.x - mob.x);
+        const knockbackDistance = 20;
+        player.x += Math.cos(knockbackAngle) * knockbackDistance;
+        player.y += Math.sin(knockbackAngle) * knockbackDistance;
+        
+        // Apply knockback boundaries
+        player.x = Math.max(player.size/2, Math.min(this.canvas.width - player.size/2, player.x));
+        player.y = Math.max(player.size/2, Math.min(this.canvas.height - player.size/2, player.y));
+        
+        console.log(`⚔️ Mob ${mob.name} attacked player for ${damage} damage`);
+        this.addChatMessage(`⚔️ ${mob.name} atacou você! (-${damage} HP)`, '#FF6B6B');
+    }
+    
     updateMobPosition(mob, deltaTime) {
-        // Calcular movimento baseado no estado
-        let speed = mob.speed;
+        const speed = mob.speed * deltaTime;
         
-        // Aumentar velocidade quando fugindo
-        if (mob.aiState === 'fleeing') {
-            speed *= 1.5;
+        switch (mob.aiState) {
+            case 'patrolling':
+                this.handlePatrolMovement(mob, speed);
+                break;
+            case 'aggro':
+                this.handleAggroMovement(mob, speed);
+                break;
+            case 'fleeing':
+                this.handleFleeMovement(mob, speed);
+                break;
         }
-        
-        // Reduzir velocidade quando perseguindo
-        if (mob.aiState === 'aggro') {
-            speed *= 0.8;
-        }
-        
-        // Mover na direção atual
-        const moveDistance = speed * deltaTime;
-        mob.x += Math.cos(mob.direction) * moveDistance;
-        mob.y += Math.sin(mob.direction) * moveDistance;
         
         // Manter dentro dos limites do canvas
         mob.x = Math.max(mob.size/2, Math.min(this.canvas.width - mob.size/2, mob.x));
@@ -539,69 +564,27 @@ class GameplayEngine {
         }
     }
     
-    mobAttackPlayer(mob, player) {
-        // Calcular dano
-        const baseDamage = mob.atk;
-        const variance = 0.2; // 20% de variação
-        const damage = Math.round(baseDamage * (1 + (Math.random() - 0.5) * variance));
-        
-        // Aplicar dano (sistema visual por enquanto)
-        console.log(`⚔️ ${mob.name} atacou player! (-${damage} HP)`);
-        this.addChatMessage(`⚔️ ${mob.name} atacou você! (-${damage} HP)`, '#FF6B6B');
-        
-        // Knockback visual
-        const knockbackAngle = Math.atan2(player.y - mob.y, player.x - mob.x);
-        const knockbackDistance = 20;
-        player.x += Math.cos(knockbackAngle) * knockbackDistance;
-        player.y += Math.sin(knockbackAngle) * knockbackDistance;
-        
-        // Manter player nos limites
-        player.x = Math.max(player.size/2, Math.min(this.canvas.width - player.size/2, player.x));
-        player.y = Math.max(player.size/2, Math.min(this.canvas.height - player.size/2, player.y));
+    handlePatrolMovement(mob, speed) {
+        mob.x += Math.cos(mob.direction) * speed;
+        mob.y += Math.sin(mob.direction) * speed;
     }
     
-    getDistance(obj1, obj2) {
-        const dx = obj1.x - obj2.x;
-        const dy = obj1.y - obj2.y;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-    
-    calculatePath(mob, target) {
-        // Pathfinding simples (linha reta por enquanto)
-        return [
-            { x: mob.x, y: mob.y },
-            { x: target.x, y: target.y }
-        ];
-    }
-    
-    avoidObstacles(mob, obstacles) {
-        // Sistema simples de evasão de obstáculos
-        let nextPos = {
-            x: mob.x + Math.cos(mob.direction) * mob.speed * 0.016,
-            y: mob.y + Math.sin(mob.direction) * mob.speed * 0.016
-        };
-        
-        // Verificar colisões com obstáculos
-        for (const obs of obstacles) {
-            if (this.checkRectCollision(nextPos, mob.size, obs)) {
-                // Mudar direção para evitar obstáculo
-                mob.direction += Math.PI / 2; // Virar 90 graus
-                nextPos = {
-                    x: mob.x + Math.cos(mob.direction) * mob.speed * 0.016,
-                    y: mob.y + Math.sin(mob.direction) * mob.speed * 0.016
-                };
-                break;
+    handleAggroMovement(mob, speed) {
+        if (this.player) {
+            const dx = this.player.x - mob.x;
+            const dy = this.player.y - mob.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance > mob.attackRange) {
+                mob.x += Math.cos(mob.direction) * speed;
+                mob.y += Math.sin(mob.direction) * speed;
             }
         }
-        
-        return nextPos;
     }
     
-    checkRectCollision(pos, size, obstacle) {
-        return pos.x < obstacle.x + obstacle.width &&
-               pos.x + size > obstacle.x &&
-               pos.y < obstacle.y + obstacle.height &&
-               pos.y + size > obstacle.y;
+    handleFleeMovement(mob, speed) {
+        mob.x += Math.cos(mob.direction) * speed * 1.5; // 1.5x speed when fleeing
+        mob.y += Math.sin(mob.direction) * speed * 1.5;
     }
     
     checkCollisions() {
@@ -622,142 +605,71 @@ class GameplayEngine {
             return;
         }
         
-        console.log('🎨🎨🎨 RENDER CHAMADO!');
-        
-        // Clear canvas com cor forte
-        this.ctx.fillStyle = '#FF0000';
+        // Clear canvas
+        this.ctx.fillStyle = THEMES[this.config.currentTheme].floor;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // Texto gigante no centro
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.font = '72px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('GAMEPLAY VISÍVEL', this.canvas.width / 2, this.canvas.height / 2);
-        
-        // Informações
-        this.ctx.font = '32px Arial';
-        this.ctx.fillText(`MOBS: ${this.mobs.length}`, this.canvas.width / 2, this.canvas.height / 2 + 80);
-        this.ctx.fillText(`PLAYER: ${this.player?.name || 'N/A'}`, this.canvas.width / 2, this.canvas.height / 2 + 120);
-        
-        // Desenhar mobs se existirem
-        this.mobs.forEach((mob, index) => {
-            console.log(`👾 Desenhando mob ${index}: ${mob.name}`);
-            
-            this.ctx.fillStyle = mob.color || '#FFFF00';
-            this.ctx.fillRect(mob.x - 50, mob.y - 50, 100, 100);
-            
-            this.ctx.fillStyle = '#000000';
-            this.ctx.font = '24px Arial';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText(mob.name, mob.x, mob.y);
-        });
-        
-        // Desenhar player se existir
-        if (this.player) {
-            console.log(`🦸 Desenhando player: ${this.player.name}`);
-            
-            this.ctx.fillStyle = '#00FF00';
-            this.ctx.fillRect(this.player.x - 50, this.player.y - 50, 100, 100);
-            
-            this.ctx.fillStyle = '#000000';
-            this.ctx.font = '24px Arial';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText(this.player.name, this.player.x, this.player.y);
-        }
-        
-        console.log('🎨🎨🎨 RENDER FINALIZADO!');
-    }
-    
-    getAIStateColor(aiState) {
-        const colors = {
-            idle: '#808080',
-            patrolling: '#4169E1',
-            aggro: '#FF4500',
-            fleeing: '#FFD700',
-            attacking: '#FF0000'
-        };
-        return colors[aiState] || '#FFFFFF';
-    }
-    
-    drawMinimap() {
-        if (!this.minimap || !this.minimapCtx) return;
-        
-        // Clear minimap
-        this.minimapCtx.fillStyle = '#1a1a2e';
-        this.minimapCtx.fillRect(0, 0, this.minimap.width, this.minimap.height);
-        
-        // Draw player on minimap
-        if (this.player) {
-            const scaleX = this.minimap.width / this.canvas.width;
-            const scaleY = this.minimap.height / this.canvas.height;
-            
-            this.minimapCtx.fillStyle = '#4CAF50';
-            this.minimapCtx.fillRect(
-                this.player.x * scaleX - 2,
-                this.player.y * scaleY - 2,
-                4, 4
-            );
-        }
-        
-        // Draw mobs on minimap
-        this.mobs.forEach(mob => {
-            const scaleX = this.minimap.width / this.canvas.width;
-            const scaleY = this.minimap.height / this.canvas.height;
-            
-            this.minimapCtx.fillStyle = mob.color || '#FF6B6B';
-            this.minimapCtx.fillRect(
-                mob.x * scaleX - 1,
-                mob.y * scaleY - 1,
-                2, 2
-            );
-        });
-    }
-    
-    drawGrid(theme) {
-        this.ctx.strokeStyle = theme.grid;
+        // Render grid
+        this.ctx.strokeStyle = THEMES[this.config.currentTheme].grid;
         this.ctx.lineWidth = 1;
         
-        for (let x = 0; x < this.canvas.width; x += 50) {
+        for (let x = 0; x < this.canvas.width; x += 32) {
             this.ctx.beginPath();
             this.ctx.moveTo(x, 0);
             this.ctx.lineTo(x, this.canvas.height);
             this.ctx.stroke();
         }
         
-        for (let y = 0; y < this.canvas.height; y += 50) {
+        for (let y = 0; y < this.canvas.height; y += 32) {
             this.ctx.beginPath();
             this.ctx.moveTo(0, y);
             this.ctx.lineTo(this.canvas.width, y);
             this.ctx.stroke();
         }
-    }
-    
-    drawMobHUD(mob) {
-        // HP bar
-        const hpPercent = mob.hp / mob.maxHp;
-        this.ctx.fillStyle = '#FF0000';
-        this.ctx.fillRect(mob.x - mob.size/2, mob.y - mob.size/2 - 15, mob.size, 4);
-        this.ctx.fillStyle = '#00FF00';
-        this.ctx.fillRect(mob.x - mob.size/2, mob.y - mob.size/2 - 15, mob.size * hpPercent, 4);
         
-        // Name com tipo
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText(`${mob.name} (${mob.type})`, mob.x, mob.y - mob.size/2 - 20);
+        // Render mobs
+        this.mobs.forEach(mob => {
+            this.ctx.fillStyle = mob.color || '#FF6B6B';
+            this.ctx.fillRect(mob.x - mob.size/2, mob.y - mob.size/2, mob.size, mob.size);
+            
+            // Mob border
+            this.ctx.strokeStyle = '#C62828';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(mob.x - mob.size/2, mob.y - mob.size/2, mob.size, mob.size);
+            
+            // Mob eyes
+            this.ctx.fillStyle = '#FFFFFF';
+            this.ctx.fillRect(mob.x - 6, mob.y - 4, 4, 4);
+            this.ctx.fillRect(mob.x + 2, mob.y - 4, 4, 4);
+            
+            // HP bar
+            const hpPercent = mob.hp / mob.maxHp;
+            this.ctx.fillStyle = '#FF0000';
+            this.ctx.fillRect(mob.x - mob.size/2, mob.y - mob.size/2 - 15, mob.size, 4);
+            this.ctx.fillStyle = '#00FF00';
+            this.ctx.fillRect(mob.x - mob.size/2, mob.y - mob.size/2 - 15, mob.size * hpPercent, 4);
+        });
         
-        // Stats adicionais
-        this.ctx.font = '10px Arial';
-        this.ctx.fillStyle = '#FFD700';
-        this.ctx.fillText(`⚔${mob.atk} 🛡${mob.def}`, mob.x, mob.y - mob.size/2 - 35);
-    }
-    
-    drawPlayerHUD() {
-        // Name
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.font = '14px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText(this.player.name, this.player.x, this.player.y - this.player.size/2 - 5);
+        // Render player
+        if (this.player) {
+            this.ctx.fillStyle = '#4CAF50';
+            this.ctx.fillRect(this.player.x - this.player.size/2, this.player.y - this.player.size/2, this.player.size, this.player.size);
+            
+            // Player border
+            this.ctx.strokeStyle = '#2E7D32';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(this.player.x - this.player.size/2, this.player.y - this.player.size/2, this.player.size, this.player.size);
+            
+            // Player direction indicator
+            this.ctx.fillStyle = '#FFFFFF';
+            this.ctx.fillRect(this.player.x - 2, this.player.y - this.player.size/2 - 5, 4, 3);
+        }
+        
+        // Update UI
+        this.updateUI();
+        
+        // Draw minimap
+        this.drawMinimap();
     }
     
     drawMinimap() {
@@ -788,17 +700,19 @@ class GameplayEngine {
         }
         
         // Draw mobs
-        this.minimapCtx.fillStyle = '#FF6B6B';
         this.mobs.forEach(mob => {
+            this.minimapCtx.fillStyle = mob.color || '#FF6B6B';
             this.minimapCtx.fillRect(mob.x * scale - 1, mob.y * scale - 1, 2, 2);
         });
         
         // Draw player
-        this.minimapCtx.fillStyle = '#4CAF50';
-        this.minimapCtx.fillRect(this.player.x * scale - 2, this.player.y * scale - 2, 4, 4);
+        if (this.player) {
+            this.minimapCtx.fillStyle = '#4CAF50';
+            this.minimapCtx.fillRect(this.player.x * scale - 2, this.player.y * scale - 2, 4, 4);
+        }
     }
     
-    updateHUD() {
+    updateUI() {
         if (!this.player || typeof document === 'undefined') return;
         
         // Update HUD elements
@@ -813,26 +727,37 @@ class GameplayEngine {
         if (playerName) playerName.textContent = this.player.name;
         if (playerLevel) playerLevel.textContent = `Lv. ${this.player.level || 1}`;
         if (healthFill) {
-            const hpPercent = this.player.hp / this.player.maxHp;
+            const hpPercent = this.player.health / this.player.maxHealth;
             healthFill.style.width = `${hpPercent * 100}%`;
         }
-        if (hpText) hpText.textContent = `${this.player.hp}/${this.player.maxHp}`;
+        if (hpText) hpText.textContent = `${this.player.health || 100}/${this.player.maxHealth || 100}`;
         if (positionText) positionText.textContent = `${Math.round(this.player.x)}, ${Math.round(this.player.y)}`;
-        if (mobCount) mobCount.textContent = this.mobs.length;
+        if (mobCount) mobCount.textContent = `${this.mobs.length} mobs`;
         if (fpsText) fpsText.textContent = `${Math.round(this.fps)} FPS`;
     }
     
-    updateFPS(currentTime) {
-        this.frameCount++;
-        if (currentTime - this.fpsTime >= 1000) {
-            this.fps = this.frameCount;
-            this.frameCount = 0;
-            this.fpsTime = currentTime;
+    getDistance(obj1, obj2) {
+        const dx = obj1.x - obj2.x;
+        const dy = obj1.y - obj2.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    resizeCanvas() {
+        if (!this.canvas) return;
+        
+        if (typeof window !== 'undefined') {
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+        }
+        
+        // Reposition player if outside bounds
+        if (this.player) {
+            this.player.x = Math.max(this.player.size/2, Math.min(this.canvas.width - this.player.size/2, this.player.x));
+            this.player.y = Math.max(this.player.size/2, Math.min(this.canvas.height - this.player.size/2, this.player.y));
         }
     }
     
     addChatMessage(message, color = '#FFFFFF') {
-        // Add message to chat (implementation depends on UI)
         if (typeof document !== 'undefined') {
             const chatBox = document.getElementById('chatMessages');
             if (chatBox) {
@@ -841,39 +766,6 @@ class GameplayEngine {
                 msgElement.textContent = message;
                 chatBox.appendChild(msgElement);
                 chatBox.scrollTop = chatBox.scrollHeight;
-            }
-        }
-    }
-    
-    // Sistema de temas
-    changeTheme(themeName) {
-        if (THEMES[themeName]) {
-            this.config.currentTheme = themeName;
-            this.addChatMessage(`🌍 Tema alterado para: ${themeName}`, '#00FF00');
-            console.log(`🎨 Theme changed to: ${themeName}`);
-        }
-    }
-    
-    // Sistema de combate melhorado
-    attackMob(mob) {
-        const damage = this.config.attackDamage + (this.player.level || 1) * 2;
-        mob.hp -= damage;
-        
-        const expGained = mob.exp || 20;
-        const goldGained = mob.gold || 10;
-        
-        this.addChatMessage(`⚔️ Você atacou ${mob.name}! (-${damage} HP)`, '#FFD700');
-        this.addChatMessage(`📊 +${expGained} EXP, +${goldGained} Gold`, '#FFD700');
-        
-        if (mob.hp <= 0) {
-            // Mob derrotado
-            this.addChatMessage(`⚔️ Você derrotou ${mob.name}!`, '#FFD700');
-            this.respawnMob(mob);
-            
-            // Atualizar stats do player
-            if (this.player.exp) {
-                this.player.exp += expGained;
-                this.player.gold = (this.player.gold || 0) + goldGained;
             }
         }
     }

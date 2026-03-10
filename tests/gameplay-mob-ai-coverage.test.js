@@ -60,254 +60,21 @@ global.performance = {
 };
 global.requestAnimationFrame = vi.fn((cb) => setTimeout(cb, 16));
 
-// Importar GameplayEngine de forma compatível
+// Importar GameplayEngine
 let GameplayEngine;
 try {
-    GameplayEngine = require('../client/GameplayEngine.js').default;
+    const fs = require('fs');
+    const path = require('path');
+    const gameplayCode = fs.readFileSync(path.join(__dirname, '../client/GameplayEngine.js'), 'utf8');
+    
+    // Criar ambiente window para o código
+    global.window = { ...global.window };
+    
+    // Executar o código
+    eval(gameplayCode);
+    GameplayEngine = global.window.GameplayEngine;
 } catch (error) {
-    // Fallback para ambiente de teste
-    GameplayEngine = class MockGameplayEngine {
-        constructor() {
-            this.mobs = [];
-            this.player = null;
-            this.canvas = mockCanvas;
-            this.ctx = mockCanvas.getContext();
-        }
-        
-        startGame(characterData) {
-            this.player = {
-                x: 400,
-                y: 300,
-                size: 32,
-                speed: 100,
-                ...characterData
-            };
-            
-            this.mobs = [];
-            for (let i = 0; i < 12; i++) {
-                this.mobs.push({
-                    id: `mob_${i}`,
-                    type: ['goblin', 'wolf', 'orc'][i % 3],
-                    x: Math.random() * 700 + 50,
-                    y: Math.random() * 500 + 50,
-                    size: 32,
-                    color: ['#FF6B6B', '#8B4513', '#4B0082'][i % 3],
-                    name: ['Goblin', 'Wolf', 'Orc'][i % 3],
-                    hp: 20,
-                    maxHp: 20,
-                    atk: 5,
-                    def: 2,
-                    exp: 10,
-                    gold: 5,
-                    speed: 30 + Math.random() * 40,
-                    direction: Math.random() * Math.PI * 2,
-                    
-                    // AI System
-                    aiState: 'patrolling',
-                    lastDecision: 0,
-                    decisionCooldown: 1000,
-                    target: null,
-                    fleeThreshold: 0.3,
-                    aggroRange: 100,
-                    attackRange: 30,
-                    patrolCenter: null,
-                    patrolRadius: 150,
-                    lastAttack: 0,
-                    attackCooldown: 2000
-                });
-            }
-            
-            // Inicializar centros de patrulha
-            this.mobs.forEach(mob => {
-                mob.patrolCenter = { x: mob.x, y: mob.y };
-            });
-            
-            return true;
-        }
-        
-        updateMobAI(mob, deltaTime) {
-            const now = Date.now();
-            
-            if (now - mob.lastDecision < mob.decisionCooldown) {
-                return;
-            }
-            
-            mob.lastDecision = now;
-            
-            // Verificar HP para flee
-            const hpPercent = mob.hp / mob.maxHp;
-            if (hpPercent < mob.fleeThreshold && mob.aiState !== 'fleeing') {
-                mob.aiState = 'fleeing';
-                mob.target = null;
-                return;
-            }
-            
-            // Verificar aggro do player
-            if (this.player && mob.aiState !== 'fleeing') {
-                const distance = this.getDistance(mob, this.player);
-                
-                if (distance <= mob.aggroRange && mob.aiState !== 'aggro') {
-                    mob.aiState = 'aggro';
-                    mob.target = this.player;
-                } else if (distance > mob.aggroRange * 1.5 && mob.aiState === 'aggro') {
-                    mob.aiState = 'patrolling';
-                    mob.target = null;
-                }
-            }
-            
-            // Executar comportamento baseado no estado
-            switch (mob.aiState) {
-                case 'idle':
-                    this.handleIdleState(mob);
-                    break;
-                case 'patrolling':
-                    this.handlePatrolState(mob);
-                    break;
-                case 'aggro':
-                    this.handleAggroState(mob);
-                    break;
-                case 'fleeing':
-                    this.handleFleeState(mob);
-                    break;
-                case 'attacking':
-                    this.handleAttackState(mob);
-                    break;
-            }
-        }
-        
-        handleIdleState(mob) {
-            if (Math.random() < 0.3) {
-                mob.aiState = 'patrolling';
-            }
-        }
-        
-        handlePatrolState(mob) {
-            if (!mob.patrolCenter) {
-                mob.patrolCenter = { x: mob.x, y: mob.y };
-            }
-            
-            if (Math.random() < 0.1) {
-                const angle = Math.random() * Math.PI * 2;
-                mob.direction = angle;
-            }
-            
-            const distFromCenter = this.getDistance(mob, mob.patrolCenter);
-            if (distFromCenter > mob.patrolRadius) {
-                const angleToCenter = Math.atan2(
-                    mob.patrolCenter.y - mob.y,
-                    mob.patrolCenter.x - mob.x
-                );
-                mob.direction = angleToCenter;
-            }
-        }
-        
-        handleAggroState(mob) {
-            if (!mob.target || !this.player) {
-                mob.aiState = 'patrolling';
-                return;
-            }
-            
-            const distance = this.getDistance(mob, mob.target);
-            
-            if (distance > mob.attackRange) {
-                const angle = Math.atan2(
-                    mob.target.y - mob.y,
-                    mob.target.x - mob.x
-                );
-                mob.direction = angle;
-            } else {
-                mob.aiState = 'attacking';
-            }
-        }
-        
-        handleFleeState(mob) {
-            if (this.player) {
-                const angle = Math.atan2(
-                    mob.y - this.player.y,
-                    mob.x - this.player.x
-                );
-                mob.direction = angle;
-            }
-            
-            const hpPercent = mob.hp / mob.maxHp;
-            if (hpPercent > mob.fleeThreshold * 2) {
-                mob.aiState = 'patrolling';
-                mob.target = null;
-            }
-        }
-        
-        handleAttackState(mob) {
-            if (!mob.target || !this.player) {
-                mob.aiState = 'patrolling';
-                return;
-            }
-            
-            const now = Date.now();
-            const distance = this.getDistance(mob, mob.target);
-            
-            if (distance <= mob.attackRange && now - mob.lastAttack >= mob.attackCooldown) {
-                this.mobAttackPlayer(mob, mob.target);
-                mob.lastAttack = now;
-            } else if (distance > mob.attackRange) {
-                mob.aiState = 'aggro';
-            }
-        }
-        
-        mobAttackPlayer(mob, player) {
-            const baseDamage = mob.atk;
-            const variance = 0.2;
-            const damage = Math.round(baseDamage * (1 + (Math.random() - 0.5) * variance));
-            
-            const knockbackAngle = Math.atan2(player.y - mob.y, player.x - mob.x);
-            const knockbackDistance = 20;
-            player.x += Math.cos(knockbackAngle) * knockbackDistance;
-            player.y += Math.sin(knockbackAngle) * knockbackDistance;
-        }
-        
-        getDistance(obj1, obj2) {
-            const dx = obj1.x - obj2.x;
-            const dy = obj1.y - obj2.y;
-            return Math.sqrt(dx * dx + dy * dy);
-        }
-        
-        calculatePath(mob, target) {
-            return [
-                { x: mob.x, y: mob.y },
-                { x: target.x, y: target.y }
-            ];
-        }
-        
-        avoidObstacles(mob, obstacles) {
-            let nextPos = {
-                x: mob.x + Math.cos(mob.direction) * mob.speed * 0.016,
-                y: mob.y + Math.sin(mob.direction) * mob.speed * 0.016
-            };
-            
-            for (const obs of obstacles) {
-                if (this.checkRectCollision(nextPos, mob.size, obs)) {
-                    mob.direction += Math.PI / 2;
-                    nextPos = {
-                        x: mob.x + Math.cos(mob.direction) * mob.speed * 0.016,
-                        y: mob.y + Math.sin(mob.direction) * mob.speed * 0.016
-                    };
-                    break;
-                }
-            }
-            
-            return nextPos;
-        }
-        
-        checkRectCollision(pos, size, obstacle) {
-            return pos.x < obstacle.x + obstacle.width &&
-                   pos.x + size > obstacle.x &&
-                   pos.y < obstacle.y + obstacle.height &&
-                   pos.y + size > obstacle.y;
-        }
-        
-        addChatMessage(message, color) {
-            // Mock para teste
-        }
-    };
+    console.error('Erro ao carregar GameplayEngine:', error);
 }
 
 describe('GameplayEngine - Mob AI System', () => {
@@ -663,7 +430,7 @@ describe('GameplayEngine - Mob AI System', () => {
             const frameTime = 1000 / 60; // 16.67ms
             
             const startTime = performance.now();
-            engine.update(frameTime / 1000);
+            engine.update(0.016);
             engine.render();
             const endTime = performance.now();
             

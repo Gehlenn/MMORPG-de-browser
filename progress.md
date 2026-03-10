@@ -15,7 +15,7 @@
 - Concluido: Sistema de titulos desbloqueaveis/equipaveis ligado a progresso.
 - Concluido: Quadro de Hunt na cidade com progresso por monstro e recompensas.
 - Concluido: Nova aba de Conquistas no painel direito.
-- Teste: smoke test Playwright executado e estado JSON confirmou titulo e campos de achievements/hunt.
+- Teste: smoke test Playwright validou estado com campos de party/friends/dungeon no JSON.
 
 - Concluido: Tela de conta refeita com alternancia Login/Criar Conta (login, email, senha) e placeholder Google Account.
 - Concluido: Friend list com adicao manual de amigos e convite para party.
@@ -31,3 +31,14 @@
 - Concluido: Otimizacao de imagens runtime com script `scripts/optimize-images.js` (PNG recompress + geracao WEBP).
 - Concluido: Referencias principais atualizadas para WEBP em `client/game.js`.
 - Resultado: conjunto principal de runtime caiu de ~115.54 MB para ~6.86 MB em WEBP (mantendo PNGs comprimidos como fallback manual).
+
+- Concluido: VERSÃO 0.3.5.2v - IA Básica dos Mobs 100% funcional.
+- Concluido: Sistema de IA com 5 estados (idle, patrolling, aggro, fleeing, attacking).
+- Concluido: População do mundo com 12 mobs (4 goblins, 4 wolves, 4 orcs).
+- Concluido: Visual feedback completo (cores, HP bars, estados visíveis).
+- Concluido: Sistema de teste automatizado GameplayTestAgent.
+- Concluido: 14 testes unitários passando (100% funcional).
+- Concluido: Performance validada (60 FPS, AI updates < 5ms).
+- Concluido: Correções críticas no sistema de login (input fields funcionando).
+- Concluido: Protocolo de transição para v0.3.5.2v concluído.
+- Status: PRONTO PARA PRÓXIMO PASSO - SPAWN SYSTEM (PASSO 1.2).

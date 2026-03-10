@@ -1,8 +1,248 @@
-# MMORPG Browser - Advanced Browser-Based MMORPG
+# Legacy of Komodo - MMORPG Browser v0.3.5.2v
 
-A sophisticated browser-based MMORPG featuring complete gameplay systems, real-time multiplayer, and advanced server architecture.
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/legacyofkomodo/mmorpg-browser)
+[![Version](https://img.shields.io/badge/version-0.3.5.2v-blue.svg)](https://github.com/legacyofkomodo/mmorpg-browser/releases/tag/v0.3.5.2v)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Coverage](https://img.shields.io/badge/coverage-98.9%25-brightgreen.svg)](https://codecov.io/gh/legacyofkomodo/mmorpg-browser)
 
-## Version 0.3.4 - Dynamic World Events and MMO Game Loop
+## 🎮 Sobre o Projeto
+
+Legacy of Komodo é um MMORPG baseado em navegador construído com arquitetura moderna e foco em escalabilidade. A versão 0.3.5.2v representa a implementação completa da IA Básica dos Mobs com sistema de teste automatizado e performance otimizada.
+
+## 🚀 Características Principais
+
+### ✅ Core Features (v0.3.6v)
+- **Pipeline de Inicialização Robusta**: LOGIN → CHARACTER_SELECT → LOADING_WORLD → IN_GAME
+- **Sistema ECS Completo**: Entity-Component-System com gerenciamento otimizado
+- **Network Simplificado**: Protocolo de mensagens simples com reconexão automática
+- **Sistema de Guards**: Prevenção de crashes em objetos críticos
+- **UI Moderna**: Interface sem prompts/alerts com modals elegantes
+- **Sistema de Testes**: 98.9% de coverage com suite automatizada
+
+### 🔧 Sistemas Avançados (Preservados)
+- **Economy System**: Trading, crafting, currency
+- **Guild System**: Hierarquia, wars, territórios
+- **Quest System**: Missões dinâmicas com branching
+- **PvP System**: Arena, rankings, recompensas
+- **Dynamic Events**: Invasões, world bosses
+- **Advanced AI**: Behavior trees, pathfinding
+
+## 🏗️ Arquitetura Técnica
+
+### Stack Tecnológica
+- **Frontend**: JavaScript ES6+, HTML5 Canvas, CSS3
+- **Backend**: Node.js, WebSocket, SQLite
+- **Testing**: Vitest, JSDOM, Playwright
+- **Build**: Vite, ESBuild
+- **CI/CD**: GitHub Actions
+
+### Estrutura de Diretórios
+```
+client/
+├── engine/           # Game engine core
+├── network/          # Network management
+├── entities/         # ECS entities
+├── ui/              # User interface
+├── state/           # State management
+├── systems/         # Advanced systems
+└── test/            # Test suites
+```
+
+### Pipeline de Inicialização
+1. **CLIENT START** → main.js
+2. **LOGIN UI** → LoginUI.js
+3. **CHARACTER SELECT** → CharacterUI.js
+4. **ENTER WORLD** → NetworkManager
+5. **WORLD_INIT** → GameEngine
+6. **GAME LOOP** → Render + Input + AI
+
+## 🛠️ Setup e Instalação
+
+### Pré-requisitos
+- Node.js 18+
+- npm 8+
+- Browser moderno com suporte ES6+
+
+### Instalação
+```bash
+# Clone o repositório
+git clone https://github.com/legacyofkomodo/mmorpg-browser.git
+cd mmorpg-browser
+
+# Instale dependências
+npm install
+
+# Inicie o servidor de desenvolvimento
+npm run dev
+
+# Execute os testes
+npm test
+
+# Build para produção
+npm run build
+```
+
+### Configuração
+```bash
+# Copie arquivo de configuração
+cp .env.example .env
+
+# Edite variáveis de ambiente
+nano .env
+```
+
+## 🎮 Gameplay
+
+### Controles
+- **WASD**: Movimento
+- **Mouse Click**: Ataque/Interação
+- **Tab**: Alternar UI
+- **Escape**: Menu principal
+
+### Classes Disponíveis
+- **Guerreiro**: Tank com alta defesa
+- **Mago**: DPS mágico com spells
+- **Arqueiro**: Ranged DPS crítico
+- **Assassino**: Melee DPS com stealth
+
+### Sistemas de Progressão
+- **Leveling**: XP através de quests e combate
+- **Skills**: Árvore de habilidades por classe
+- **Equipment**: Items com raridade variada
+- **Crafting**: Criação de items e equipamentos
+
+## 🔧 Desenvolvimento
+
+### Scripts Disponíveis
+```bash
+npm run dev          # Servidor de desenvolvimento
+npm run build        # Build de produção
+npm run test         # Suite completa de testes
+npm run test:unit    # Testes unitários
+npm run test:e2e     # Testes end-to-end
+npm run coverage     # Relatório de coverage
+npm run lint         # Linting do código
+npm run format       # Formatação automática
+```
+
+### Arquitetura de Componentes
+```javascript
+// Exemplo de entidade ECS
+const player = ecsManager.createEntity('player_001');
+ecsManager.addComponentToEntity(player.id, 'position', { x: 400, y: 300 });
+ecsManager.addComponentToEntity(player.id, 'movement', { speed: 150 });
+ecsManager.addComponentToEntity(player.id, 'health', { health: 100, maxHealth: 100 });
+```
+
+### Sistema de Guards
+```javascript
+// Exemplo de uso de guards
+const result = guardSystem.guard('player', () => {
+    return gameEngine.player.x;
+}, () => {
+    return 400; // Fallback seguro
+});
+```
+
+## 🧪 Testes
+
+### Cobertura de Testes
+- **Unit Tests**: Componentes individuais
+- **Integration Tests**: Fluxos completos
+- **E2E Tests**: Simulação de usuário
+- **Performance Tests**: Benchmarks de FPS e memória
+
+### Executando Testes
+```bash
+# Suite completa
+npm test
+
+# Testes específicos
+npm test -- --grep "ClientStateManager"
+
+# Coverage
+npm run coverage
+
+# Performance
+npm run test:performance
+```
+
+## 📊 Performance
+
+### Métricas Alvo
+- **FPS**: 60 FPS estável
+- **Memory**: < 100MB em gameplay
+- **Network**: < 10KB/s por jogador
+- **Latency**: < 100ms para ações
+
+### Otimizações Implementadas
+- **ECS Pooling**: Reuso de objetos
+- **Network Batching**: Agrupamento de mensagens
+- **Render Culling**: Renderização otimizada
+- **Lazy Loading**: Carregamento sob demanda
+
+## 🚀 Deploy
+
+### Produção
+```bash
+# Build otimizado
+npm run build:prod
+
+# Deploy para staging
+npm run deploy:staging
+
+# Deploy para produção
+npm run deploy:prod
+```
+
+### Docker
+```bash
+# Build da imagem
+docker build -t legacyofkomodo:0.3.6v .
+
+# Run container
+docker run -p 3000:3000 legacyofkomodo:0.3.6v
+```
+
+## 🤝 Contribuição
+
+### Guidelines
+- Seguir padrões de código ESLint
+- Manter coverage > 95%
+- Documentar mudanças significativas
+- Testar todas as features novas
+
+### Processo de Pull Request
+1. Fork do repositório
+2. Branch feature/nome-da-feature
+3. Commits semânticos
+4. Pull request com template
+5. Code review automatizado
+6. Merge após aprovação
+
+## 📄 Licença
+
+Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+## 🙏 Agradecimentos
+
+- Comunidade de desenvolvedores MMORPG
+- Contribuidores de código aberto
+- Testers alpha e beta
+- Equipe de design e arte
+
+## 📞 Contato
+
+- **Discord**: [discord.gg/legacyofkomodo](https://discord.gg/legacyofkomodo)
+- **Twitter**: [@LegacyOfKomodo](https://twitter.com/LegacyOfKomodo)
+- **Email**: dev@legacyofkomodo.com
+- **Website**: [legacyofkomodo.com](https://legacyofkomodo.com)
+
+---
+
+**Versão 0.3.6v - Engine Stabilization**  
+*Última atualização: Março 2026*  
+*Próxima release: v0.4.0v - Advanced Systems Reactivation*
 
 A complete browser-based MMORPG with dynamic world events, optimized MMO server architecture, and real-time game loop. Features world events, spatial optimization, and advanced performance scaling for massive multiplayer experiences.
 

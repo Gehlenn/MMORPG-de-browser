@@ -1,8 +1,450 @@
-# MMORPG de Browser - Game Design Document
+# Legacy of Komodo - Game Design Document v0.3.6v
 
-## Version 0.3.1 - First Playable Gameplay Build
+## 📋 Visão Geral
 
-*Last Updated: March 2026*
+**Título**: Legacy of Komodo  
+**Versão**: v0.3.6v - Engine Stabilization  
+**Gênero**: MMORPG Browser-based  
+**Plataforma**: Web (Chrome, Firefox, Safari, Edge)  
+**Target Audience**: 16-35 anos, fãs de MMORPG  
+**Monetização**: Free-to-Play com microtransações cosméticas  
+
+---
+
+## 🎮 Conceito Central
+
+### 🌍 Mundo do Jogo
+Legacy of Komodo é um mundo de fantasia medieval com elementos tecnológicos avançados. Jogadores exploram um continente vasto cheio de segredos antigos, criaturas místicas e civilizações perdidas.
+
+### 📖 Lore Principal
+No mundo de Aethelgard, uma antiga civilização conhecida como "Os Construtores" deixou para trás tecnologia avançada e conhecimento proibido. Jogadores descobrem que podem harnessar este poder através de "Fragmentos de Komodo" - artefatos antigos que concedem habilidades extraordinárias.
+
+---
+
+## 🎯 Objetivos de Design
+
+### 🎮 Gameplay
+- **Acessibilidade**: Fácil aprender, difícil dominar
+- **Progressão**: Sistema claro de crescimento do personagem
+- **Social**: Incentivar cooperação e competição
+- **Exploração**: Recompensar descoberta e curiosidade
+
+### 🏗️ Técnico
+- **Performance**: 60 FPS estável em hardware modesto
+- **Escalabilidade**: Suportar 1000+ jogadores simultâneos
+- **Confiabilidade**: 99.9% uptime
+- **Segurança**: Proteção contra cheats e explorações
+
+---
+
+## 🎮 Gameplay Core
+
+### 🚀 Pipeline de Inicialização
+```
+1. LOGIN → Autenticação segura
+2. CHARACTER_SELECT → Escolha/personalização
+3. LOADING_WORLD → Carregamento assíncrono
+4. IN_GAME → Gameplay principal
+```
+
+### 🎮 Controles e Interface
+#### Controles Principais
+- **WASD**: Movimento do personagem
+- **Mouse**: Camera e interação
+- **Espaço**: Ação principal (ataque/interagir)
+- **Tab**: Alternar entre targets
+- **I**: Inventário
+- **M**: Mapa
+- **Escape**: Menu principal
+
+#### Interface Principal
+- **Health Bar**: HP/MP/XP visíveis
+- **Minimap**: Navegação local
+- **Chat**: Canais de comunicação
+- **Action Bar**: Habilidades rápidas
+- **Target Info**: Informações do alvo
+
+### 👥 Sistema de Personagens
+
+#### Classes Disponíveis
+1. **Guerreiro** (Tank)
+   - High HP e defesa
+   - Habilidades de proteção
+   - Especializações: Guardian, Berserker, Paladin
+
+2. **Mago** (DPS Mágico)
+   - High dano mágico
+   - Controle de multidão
+   - Especializações: Elementalist, Necromancer, Chronomancer
+
+3. **Arqueiro** (DPS Ranged)
+   - High dano à distância
+   - Mobilidade superior
+   - Especializações: Ranger, Hunter, Marksman
+
+4. **Assassino** (DPS Melee)
+   - High dano crítico
+   - Stealth e engano
+   - Especializações: Shadow, Poison, Blade
+
+#### Sistema de Progressão
+- **Levels**: 1-100 com XP requirements crescentes
+- **Skill Points**: 3 pontos por level para distribuir
+- **Talent Trees**: Árvores de habilidades por classe
+- **Mastery System**: Desbloqueio de habilidades avançadas
+
+### ⚔️ Sistema de Combate
+
+#### Mecânicas Principais
+- **Real-time Action**: Combate em tempo real sem turnos
+- **Skill Combos**: Combinações de habilidades para efeitos especiais
+- **Positioning**: Posicionamento tático importante
+- **Environmental**: Uso de terreno e obstáculos
+
+#### Tipos de Dano
+- **Physical**: Armas e habilidades físicas
+- **Magical**: Spells e habilidades mágicas
+- **Fire**: Dano elemental fogo
+- **Ice**: Dano elemental gelo
+- **Lightning**: Dano elemental relâmpago
+- **Poison**: Dano ao longo do tempo
+- **Holy**: Dano sagrado
+
+#### Status Effects
+- **Stun**: Imobilização temporária
+- **Slow**: Redução de velocidade
+- **Bleed**: Dano contínuo
+- **Burn**: Dano ao longo do tempo
+- **Fear**: Fuga incontrolável
+- **Buff**: Efeitos positivos
+- **Debuff**: Efeitos negativos
+
+---
+
+## 🌍 Sistema de Mundo
+
+### 🗺️ Geografia
+#### Continentes Principais
+1. **Aethelgard Central**: Área inicial, 1-30
+2. **Northern Wastes**: Área congelada, 30-50
+3. **Southern Deserts**: Área desértica, 50-70
+4. **Eastern Islands**: Área tropical, 70-90
+5. **Western Mountains**: Área montanhosa, 90-100
+
+#### Cidades Principais
+- **Novus**: Capital principal, hub social
+- **Forgeheart**: Centro de crafting
+- **Sanctum**: Área de treinamento
+- **Tradewinds**: Centro comercial
+- **Shadowmere**: Área PvP
+
+### 🏰 Dungeons e Instâncias
+#### Tipos de Instâncias
+- **Story Dungeons**: Progressão da história principal
+- **Side Dungeons**: Missões opcionais
+- **Raids**: 10-40 jogadores, bosses épicos
+- **PvP Arenas**: Batalhas competitivas
+- **Temporal Dungeons**: Desafios limitados por tempo
+
+#### Sistema de Matchmaking
+- **Auto-match**: Sistema automático de grupos
+- **Manual**: Criação manual de grupos
+- **Guild Groups**: Grupos de guild prioritários
+- **Cross-server**: Matchmaking entre servidores
+
+---
+
+## 💰 Sistema de Economia
+
+### 🪙 Moedas
+- **Gold**: Moeda principal do jogo
+- **Silver**: Moeda secundária (100 silver = 1 gold)
+- **Platinum**: Moeda premium (compra real)
+- **Karma**: Moeda de reputação
+
+### 🛒 Sistema de Trading
+#### Player Trading
+- **Direct Trade**: Troca direta entre jogadores
+- **Mail System**: Envio de items via correio
+- **Auction House**: Leilões de items raros
+- **Player Shops**: Lojas individuais
+
+#### NPC Vendors
+- **General Goods**: Items básicos
+- **Crafting Materials**: Recursos para crafting
+- **Equipment**: Equipamentos básicos
+- **Specialty**: Items específicos por área
+
+### 🔨 Sistema de Crafting
+#### Profissões Disponíveis
+1. **Blacksmithing**: Armas e armaduras
+2. **Alchemy**: Poções e consumíveis
+3. **Enchanting**: Encantamentos de equipamentos
+4. **Cooking**: Comida e buffs
+5. **Tailoring**: Roupas e tecidos
+6. **Jewelry**: Anéis e amuletos
+7. **Leatherworking**: Couro e armaduras leves
+8. **Engineering**: Dispositivos mecânicos
+9. **Inscription**: Scrolls e glyphs
+10. **Mining**: Coleta de minérios
+
+#### Sistema de Qualidade
+- **Normal**: Items básicos
+- **Uncommon**: Items com stats extras
+- **Rare**: Items significativamente melhores
+- **Epic**: Items excepcionais
+- **Legendary**: Items únicos e poderosos
+
+---
+
+## 🤝 Sistema Social
+
+### 👥 Guilds
+#### Estrutura de Guild
+- **Guild Master**: Líder absoluto
+- **Officers**: 5 oficiais máximos
+- **Veterans**: Membros veteranos
+- **Members**: Membros regulares
+- **Recruits**: Novos membros
+
+#### Funcionalidades de Guild
+- **Guild Hall**: Base personalizada
+- **Guild Bank**: Armazenamento compartilhado
+- **Guild Wars**: Batalhas entre guilds
+- **Guild Events**: Eventos exclusivos
+- **Guild Chat**: Canal de comunicação privado
+
+### 📞 Sistema de Comunicação
+#### Canais de Chat
+- **World**: Todos os jogadores do servidor
+- **Trade**: Canal de comércio
+- **Guild**: Apenas membros da guild
+- **Party**: Apenas membros do grupo
+- **Whisper**: Conversa privada
+- **System**: Mensagens do sistema
+
+#### Sistema de Amigos
+- **Friend List**: Lista de amigos adicionados
+- **Ignore List**: Lista de jogadores ignorados
+- **Presence**: Status online/offline
+- **Group Invite**: Convites para grupos
+
+---
+
+## 🎯 Sistema de Progressão
+
+### 📈 Character Progression
+#### Level System
+- **XP Gain**: Combate, missões, exploração
+- **Level Rewards**: Stats aumentam automaticamente
+- **Skill Points**: 3 pontos por level
+- **Talent Points**: 1 ponto a cada 2 levels
+
+#### Attribute System
+- **Strength**: Aumenta dano físico
+- **Intelligence**: Aumenta dano mágico
+- **Agility**: Aumenta velocidade e esquiva
+- **Vitality**: Aumenta HP e defesa
+- **Wisdom**: Aumenta MP e regeneração
+- **Luck**: Aumenta chance de drops raros
+
+### 🏆 Achievement System
+#### Categorias de Conquistas
+- **Exploration**: Descobrir áreas e segredos
+- **Combat**: Derrotar inimigos e bosses
+- **Social**: Interações com outros jogadores
+- **Crafting**: Criar items raros
+- **Economy**: Acumular riqueza
+- **PvP**: Vitórias em jogador vs jogador
+
+#### Recompensas
+- **Title System**: Títulos exclusivos
+- **Cosmetic Items**: Skins e aparências
+- **Mounts**: Montarias especiais
+- **Housing Items**: Decorações para casa
+
+---
+
+## 🎨 Sistema Visual e Áudio
+
+### 🎨 Estilo Artístico
+#### Direção Visual
+- **Stylized Realism**: Realismo estilizado
+- **Color Palette**: Cores vibrantes mas consistentes
+- **Character Design**: Proporções heroicas
+- **Environment**: Ambientes detalhados e imersivos
+
+#### UI/UX Design
+- **Clean Interface**: Interface limpa e intuitiva
+- **Responsive**: Adaptável a diferentes resoluções
+- **Accessibility**: Suporte para daltônicos
+- **Customization**: Opções de personalização
+
+### 🎵 Sistema de Áudio
+#### Music
+- **Dynamic Music**: Música adaptativa à situação
+- **Area Themes**: Temas musicais por região
+- **Combat Music**: Música intensa durante combate
+- **Ambient Sounds**: Sons ambientais imersivos
+
+#### Sound Effects
+- **Ability Sounds**: Sons únicos por habilidade
+- **Weapon Sounds**: Sons realistas de armas
+- **Environment Sounds**: Sons do ambiente
+- **UI Sounds**: Sons de feedback da interface
+
+---
+
+## 🔧 Sistema Técnico
+
+### 🏗️ Arquitetura
+#### Client-Side
+- **Engine**: Custom JavaScript game engine
+- **Rendering**: HTML5 Canvas com otimizações
+- **Network**: WebSocket para comunicação real-time
+- **Storage**: IndexedDB para cache local
+- **Performance**: 60 FPS target em hardware modesto
+
+#### Server-Side
+- **Backend**: Node.js com Express
+- **Database**: PostgreSQL com Redis cache
+- **Networking**: Socket.IO para real-time
+- **Scalability**: Microservices architecture
+- **Security**: Rate limiting e validação
+
+### 🛡️ Sistema de Segurança
+#### Anti-Cheat Measures
+- **Server Validation**: Validação de ações no servidor
+- **Speed Detection**: Detecção de speed hacks
+- **Position Validation**: Validação de posição
+- **Packet Analysis**: Análise de pacotes suspeitos
+
+#### Account Security
+- **Two-Factor Auth**: Autenticação de dois fatores
+- **Password Encryption**: Hashing seguro de senhas
+- **Session Management**: Gerenciamento seguro de sessões
+- **IP Tracking**: Monitoramento de IPs suspeitos
+
+---
+
+## 🎮 Sistema de Monetização
+
+### 💳 Modelo de Monetização
+#### Free-to-Play Core
+- **Full Game**: Jogo completo gratuito
+- **No Pay-to-Win**: Sem vantagens pagas
+- **Fair Progression**: Progressão justa para todos
+
+#### Microtransactions
+- **Cosmetics**: Skins, aparências, mounts
+- **Convenience**: Itens de conveniência
+- **Time Savers**: Opções para economizar tempo
+- **Premium**: Assinatura com benefícios
+
+### 🛍️ Itens Premium
+#### Categorias
+- **Character Skins**: Aparências exclusivas
+- **Weapon Skins**: Skins de armas
+- **Mounts**: Montarias especiais
+- **Pets**: Companheiros cosméticos
+- **Housing**: Decorações para casa
+
+---
+
+## 🎯 Sistema de Endgame
+
+### 🏰 Raids
+#### Raid Design
+- **Multi-Boss**: Instâncias com múltiplos bosses
+- **Mechanics Complex**: Mecânicas que exigem coordenação
+- **Difficulty Scaling**: Dificuldade adaptável
+- **Loot Tables**: Drops raros e exclusivos
+
+#### Raid Progression
+- **Tier 1**: Raids iniciais (10-20 jogadores)
+- **Tier 2**: Raids intermediários (20-30 jogadores)
+- **Tier 3**: Raids avançados (30-40 jogadores)
+- **Mythic**: Raids extremos (40 jogadores)
+
+### ⚔️ Sistema de PvP
+#### Arenas
+- **2v2**: Duelos 2 contra 2
+- **3v3**: Batalhas 3 contra 3
+- **5v5**: Batalhas 5 contra 5
+- **Ranked**: Sistema de ranking com recompensas
+
+#### World PvP
+- **Open World**: PvP em áreas específicas
+- **Territory Control**: Controle de territórios
+- **Guild Wars**: Guerras entre guilds
+- **Bounty System**: Sistema de recompensas
+
+---
+
+## 📊 Métricas e Analytics
+
+### 📈 Player Metrics
+#### Engagement Metrics
+- **Daily Active Users**: Usuários ativos diários
+- **Session Duration**: Duração média das sessões
+- **Retention Rate**: Taxa de retenção de jogadores
+- **Churn Rate**: Taxa de abandono do jogo
+
+#### Gameplay Metrics
+- **Level Distribution**: Distribuição de levels
+- **Class Distribution**: Distribuição de classes
+- **Economy Flow**: Fluxo econômico do jogo
+- **Social Interactions**: Interações sociais
+
+### 🎯 Balance Metrics
+#### Class Balance
+- **Win Rates**: Taxas de vitória por classe
+- **Usage Rates**: Taxas de uso por classe
+- **Performance**: Desempenho em diferentes situações
+- **Feedback**: Feedback dos jogadores
+
+#### Economy Balance
+- **Inflation**: Controle de inflação
+- **Item Values**: Valores relativos dos items
+- **Drop Rates**: Taxas de drops balanceadas
+- **Market Activity**: Atividade do mercado
+
+---
+
+## 🚀 Roadmap de Features
+
+### 📅 Curto Prazo (Próximos 3 meses)
+- **Economy System**: Trading e crafting completo
+- **Guild System**: Funcionalidades básicas de guild
+- **Quest System**: Missões dinâmicas e branching
+- **Party System**: Grupos e compartilhamento
+
+### 📅 Médio Prazo (3-6 meses)
+- **Advanced AI**: NPCs com machine learning
+- **Dynamic Events**: Eventos mundiais episódicos
+- **Housing System**: Casas personalizáveis
+- **PvP System**: Arenas e rankings
+
+### 📅 Longo Prazo (6+ meses)
+- **World Bosses**: Bosses mundiais com IA avançada
+- **Bank Integration**: Sistema financeiro completo
+- **VR Support**: Suporte para realidade virtual
+- **Mobile Version**: Aplicativos móveis nativos
+
+---
+
+## 🎯 Conclusão
+
+Legacy of Komodo v0.3.6v representa uma base sólida e estável para um MMORPG de browser moderno. Com arquitetura robusta, sistemas de segurança avançados e pipeline de inicialização otimizado, o projeto está pronto para evoluir para um jogo completo e comercialmente viável.
+
+A estabilização da engine nesta versão garante que futuras expansões e features possam ser implementadas sobre uma base técnica confiável, permitindo foco no desenvolvimento de conteúdo e mecânicas de gameplay inovadoras.
+
+---
+
+**Documento versão**: v2.0  
+**Última atualização**: Março 2026  
+**Próxima revisão**: Junho 2026  
+**Autores**: Equipe de Design do Legacy of Komodo
 
 ## Table of Contents
 1. [Game Vision](#game-vision)

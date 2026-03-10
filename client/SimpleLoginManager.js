@@ -7,6 +7,9 @@ class SimpleLoginManager {
     
     // Inicializar elementos DOM
     this.initializeElements();
+    
+    // Configurar event listeners
+    this.initializeEventListeners();
   }
   
   initializeElements() {
@@ -111,7 +114,7 @@ class SimpleLoginManager {
     console.log('👥 Exibindo tela de personagens...');
     
     if (this.loginScreen) this.loginScreen.style.display = 'none';
-    if (this.characterScreen) this.characterScreen.style.display = 'block';
+    if (this.characterScreen) this.characterScreen.style.display = 'flex';
     if (this.gameScreen) this.gameScreen.style.display = 'none';
     this.clearMessages();
     this.loadCharacters();
@@ -120,7 +123,7 @@ class SimpleLoginManager {
   }
 
   showLogin() {
-    if (this.loginScreen) this.loginScreen.style.display = 'block';
+    if (this.loginScreen) this.loginScreen.style.display = 'flex';
     if (this.characterScreen) this.characterScreen.style.display = 'none';
     if (this.gameScreen) this.gameScreen.style.display = 'none';
     this.clearMessages();
@@ -129,7 +132,7 @@ class SimpleLoginManager {
   showGame() {
     if (this.loginScreen) this.loginScreen.style.display = 'none';
     if (this.characterScreen) this.characterScreen.style.display = 'none';
-    if (this.gameScreen) this.gameScreen.style.display = 'block';
+    if (this.gameScreen) this.gameScreen.style.display = 'flex';
     this.clearMessages();
     this.startGame();
   }
@@ -185,7 +188,7 @@ class SimpleLoginManager {
     this.showGame();
   }
 
-  createCharacter(name, race) {
+  createCharacter(name, race, characterClass) {
     if (!this.currentUser) return;
     
     const characters = JSON.parse(localStorage.getItem('eldoria_characters') || '{}');
@@ -200,7 +203,7 @@ class SimpleLoginManager {
       id: Date.now().toString(),
       name,
       race,
-      class: 'Aprendiz',
+      class: characterClass,
       level: 1,
       hp: 100,
       maxHp: 100,
@@ -288,6 +291,18 @@ class SimpleLoginManager {
 
   handleKeyDown(event, keys) {
     const key = event.key.toLowerCase();
+    
+    // Check if we're in an input field - if so, don't handle game keys
+    const activeElement = document.activeElement;
+    const isInputField = activeElement && (
+        activeElement.tagName === 'INPUT' || 
+        activeElement.tagName === 'TEXTAREA' || 
+        activeElement.tagName === 'SELECT'
+    );
+    
+    if (isInputField) {
+      return; // Allow normal typing in input fields
+    }
     
     if (['w', 'a', 's', 'd', ' '].includes(key)) {
       keys[key] = true;

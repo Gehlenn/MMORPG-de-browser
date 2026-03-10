@@ -116,17 +116,8 @@ export default class LoginManager {
     // === CRIAÇÃO DE CONTA ===
     
     showCreateAccountForm() {
-        // Simples prompt por enquanto
-        const username = prompt('Digite o nome de usuário:');
-        const password = prompt('Digite a senha:');
-        const email = prompt('Digite o email:');
-        
-        if (!username || !password || !email) {
-            this.showMessage('error', 'Todos os campos são obrigatórios');
-            return;
-        }
-        
-        this.createAccount(username, password, email);
+        // Mostrar formulário de criação de conta
+        this.showAccountCreationModal();
     }
     
     createAccount(username, password, email) {
@@ -207,14 +198,127 @@ export default class LoginManager {
     }
     
     createCharacter() {
-        const name = prompt('Nome do personagem:');
-        if (!name) return;
+        // Mostrar formulário de criação de personagem
+        this.showCharacterCreationModal();
+    }
+    
+    // === ENTRAR NO MUNDO ===
+    
+    enterWorld() {
+        if (!this.currentCharacter) {
+            this.showMessage('error', 'Selecione um personagem primeiro');
+            return;
+        }
         
+        console.log('🌍 Entering world with:', this.currentCharacter.name);
+        this.showGame();
+        
+        if (this.game) {
+            this.game.startGame(this.currentCharacter);
+        }
+    }
+    
+    // === MODAIS UI ===
+    
+    showAccountCreationModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h2>Criar Nova Conta</h2>
+                <div class="form-group">
+                    <label>Nome de Usuário:</label>
+                    <input type="text" id="newUsername" placeholder="Digite o nome de usuário">
+                </div>
+                <div class="form-group">
+                    <label>Senha:</label>
+                    <input type="password" id="newPassword" placeholder="Digite a senha">
+                </div>
+                <div class="form-group">
+                    <label>Email:</label>
+                    <input type="email" id="newEmail" placeholder="Digite o email">
+                </div>
+                <div class="form-buttons">
+                    <button id="confirmCreateAccount">Criar Conta</button>
+                    <button id="cancelCreateAccount">Cancelar</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Event listeners
+        document.getElementById('confirmCreateAccount').addEventListener('click', () => {
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value.trim();
+            const email = document.getElementById('newEmail').value.trim();
+            
+            if (!username || !password || !email) {
+                this.showMessage('error', 'Todos os campos são obrigatórios');
+                return;
+            }
+            
+            this.createAccount(username, password, email);
+            this.hideModal();
+        });
+        
+        document.getElementById('cancelCreateAccount').addEventListener('click', () => {
+            this.hideModal();
+        });
+    }
+    
+    showCharacterCreationModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h2>Criar Novo Personagem</h2>
+                <div class="form-group">
+                    <label>Nome do Personagem:</label>
+                    <input type="text" id="characterName" placeholder="Digite o nome do personagem">
+                </div>
+                <div class="form-group">
+                    <label>Classe:</label>
+                    <select id="characterClass">
+                        <option value="Guerreiro">Guerreiro</option>
+                        <option value="Mago">Mago</option>
+                        <option value="Arqueiro">Arqueiro</option>
+                    </select>
+                </div>
+                <div class="form-buttons">
+                    <button id="confirmCreateCharacter">Criar Personagem</button>
+                    <button id="cancelCreateCharacter">Cancelar</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Event listeners
+        document.getElementById('confirmCreateCharacter').addEventListener('click', () => {
+            const name = document.getElementById('characterName').value.trim();
+            const characterClass = document.getElementById('characterClass').value;
+            
+            if (!name) {
+                this.showMessage('error', 'Nome do personagem é obrigatório');
+                return;
+            }
+            
+            this.createCharacterWithDetails(name, characterClass);
+            this.hideModal();
+        });
+        
+        document.getElementById('cancelCreateCharacter').addEventListener('click', () => {
+            this.hideModal();
+        });
+    }
+    
+    createCharacterWithDetails(name, characterClass) {
         const character = {
             id: Date.now().toString(),
             name: name,
+            class: characterClass,
             level: 1,
-            class: 'Guerreiro',
             hp: 100,
             maxHp: 100,
             x: 400,
@@ -233,19 +337,10 @@ export default class LoginManager {
         this.loadCharacters();
     }
     
-    // === ENTRAR NO MUNDO ===
-    
-    enterWorld() {
-        if (!this.currentCharacter) {
-            this.showMessage('error', 'Selecione um personagem primeiro');
-            return;
-        }
-        
-        console.log('🌍 Entering world with:', this.currentCharacter.name);
-        this.showGame();
-        
-        if (this.game) {
-            this.game.startGame(this.currentCharacter);
+    hideModal() {
+        const modal = document.querySelector('.modal-overlay');
+        if (modal) {
+            modal.remove();
         }
     }
     
