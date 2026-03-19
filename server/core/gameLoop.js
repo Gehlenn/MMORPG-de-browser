@@ -12,6 +12,10 @@ const AISystem = require('../systems/AISystem');
 const InterestManager = require('../network/InterestManager');
 const SnapshotSystem = require('../network/SnapshotSystem');
 const DeltaCompressor = require('../network/DeltaCompressor');
+const ModuleManager = require('./ModuleManager');
+const RegionManager = require('../world/regions/RegionManager');
+const moduleManager = new ModuleManager();
+const regionManager = new RegionManager();
 
 class GameLoop {
     constructor(server) {
@@ -59,6 +63,9 @@ class GameLoop {
         this.snapshotSystem = null;
         this.deltaCompressor = null;
         
+        // World Streaming System
+        this.regionManager = regionManager;
+        
         // Initialize
         this.initialize();
     }
@@ -102,10 +109,13 @@ class GameLoop {
         
         this.deltaCompressor = new DeltaCompressor();
         
+        // Initialize all modules
+        await moduleManager.initAll(this.server);
+        
         // Setup event handlers
         this.setupEventHandlers();
         
-        console.log('Game Loop System initialized with ECS and Networking');
+        console.log('Game Loop System initialized with ECS, Networking and Modules');
     }
     
     setupEventHandlers() {
@@ -183,6 +193,9 @@ class GameLoop {
             if (this.ecsManager) {
                 this.ecsManager.update(deltaTime);
             }
+            
+            // Update all modules
+            moduleManager.updateAll(deltaTime);
             
             // Update spatial grid
             this.updateSpatialGrid();
@@ -268,7 +281,50 @@ class GameLoop {
     }
     
     updateSpatialGrid() {
-        // Clear spatial grid
+        // Update RegionManager with all entities
+        // Add players to RegionManager
+        for (const [playerId, player] of this.server.players) {
+            if (!player.name) continue;
+            
+            this.regionManager.addEntity({
+                id: playerId,
+                x: player.x,
+                y: player.y,
+                type: 'player',
+                data: player
+            });
+        }
+        
+        // Add mobs to RegionManager
+        if (this.server.systems.spawnSystem) {
+            for (const mob of this.server.systems.spawnSystem.getMobs()) {
+                this.regionManager.addEntity({
+                    id: mob.id,
+                    x: mob.x,
+                    y: mob.y,
+                    type: 'mob',
+                    data: mob
+                });
+            }
+        }
+        
+        // Add event entities to RegionManager
+        if (this.server.systems.worldEvents) {
+            for (const event of this.server.systems.worldEvents.getActiveEvents()) {
+                this.regionManager.addEntity({
+                    id: event.id,
+                    x: event.x,
+                    y: event.y,
+                    type: 'event',
+                    data: event
+                });
+            }
+        }
+        
+        // Update RegionManager
+        this.regionManager.update(this.config.tickInterval);
+        
+        // Also update spatial grid for backward compatibility
         this.spatialGrid.clear();
         
         // Add players to spatial grid

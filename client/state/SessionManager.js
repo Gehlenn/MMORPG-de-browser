@@ -1,19 +1,22 @@
-// === SESSION MANAGER ===
-
 /**
- * Gerenciador de Sessão
+ * SessionManager - Gerenciador de Sessão Refatorado
  * Armazena dados do usuário e personagem selecionado
+ * Parte do STEP 2 - Refatoração do Sistema de Login
  */
 
-export class SessionManager {
+class SessionManager {
     constructor() {
         this.currentUser = null;
         this.currentCharacter = null;
         this.sessionData = {};
+        this.isAuthenticated = false;
         
         this.initialize();
     }
     
+    /**
+     * Inicializa o SessionManager
+     */
     initialize() {
         console.log('👤 Initializing SessionManager...');
         this.loadFromStorage();
@@ -22,32 +25,364 @@ export class SessionManager {
     
     // === USER MANAGEMENT ===
     
+    /**
+     * Define o usuário atual
+     * @param {object} userData - Dados do usuário
+     */
     setCurrentUser(userData) {
         this.currentUser = userData;
+        this.isAuthenticated = !!userData;
         this.saveToStorage();
         console.log('👤 Current user set:', userData?.username);
     }
     
+    /**
+     * Obtém o usuário atual
+     * @returns {object|null}
+     */
     getCurrentUser() {
         return this.currentUser;
     }
     
+    /**
+     * Verifica se está autenticado
+     * @returns {boolean}
+     */
     isLoggedIn() {
-        return this.currentUser !== null;
+        return this.isAuthenticated && this.currentUser !== null;
     }
     
+    /**
+     * Realiza logout
+     */
     logout() {
         console.log('👤 Logging out user:', this.currentUser?.username);
         this.currentUser = null;
         this.currentCharacter = null;
         this.sessionData = {};
+        this.isAuthenticated = false;
         this.clearStorage();
     }
     
     // === CHARACTER MANAGEMENT ===
     
+    /**
+     * Define o personagem atual
+     * @param {object} characterData - Dados do personagem
+     */
     setCurrentCharacter(characterData) {
         this.currentCharacter = characterData;
+        this.saveToStorage();
+        console.log('👥 Current character set:', characterData?.name);
+    }
+    
+    /**
+     * Obtém o personagem atual
+     * @returns {object|null}
+     */
+    getCurrentCharacter() {
+        return this.currentCharacter;
+    }
+    
+    /**
+     * Verifica se tem personagem selecionado
+     * @returns {boolean}
+     */
+    hasSelectedCharacter() {
+        return this.currentCharacter !== null;
+    }
+    
+    /**
+     * Limpa personagem selecionado
+     */
+    clearSelectedCharacter() {
+        console.log('👥 Clearing selected character:', this.currentCharacter?.name);
+        this.currentCharacter = null;
+        this.saveToStorage();
+    }
+    
+    // === SESSION DATA MANAGEMENT ===
+    
+    /**
+     * Define dados da sessão
+     * @param {string} key - Chave
+     * @param {any} value - Valor
+     */
+    setSessionData(key, value) {
+        this.sessionData[key] = value;
+        this.saveToStorage();
+    }
+    
+    /**
+     * Obtém dados da sessão
+     * @param {string} key - Chave
+     * @param {any} defaultValue - Valor padrão
+     * @returns {any}
+     */
+    getSessionData(key, defaultValue = null) {
+        return this.sessionData[key] ?? defaultValue;
+    }
+    
+    /**
+     * Remove dados da sessão
+     * @param {string} key - Chave
+     */
+    removeSessionData(key) {
+        delete this.sessionData[key];
+        this.saveToStorage();
+    }
+    
+    /**
+     * Limpa todos os dados da sessão
+     */
+    clearSessionData() {
+        this.sessionData = {};
+        this.saveToStorage();
+    }
+    
+    // === STORAGE MANAGEMENT ===
+    
+    /**
+     * Carrega dados do localStorage
+     */
+    loadFromStorage() {
+        try {
+            const sessionData = localStorage.getItem('mmorpg_session');
+            if (sessionData) {
+                const parsed = JSON.parse(sessionData);
+                this.currentUser = parsed.currentUser || null;
+                this.currentCharacter = parsed.currentCharacter || null;
+                this.sessionData = parsed.sessionData || {};
+                this.isAuthenticated = !!parsed.currentUser;
+                console.log('📦 Session data loaded from storage');
+            }
+        } catch (error) {
+            console.error('❌ Error loading session data:', error);
+            this.clearStorage();
+        }
+    }
+    
+    /**
+     * Salva dados no localStorage
+     */
+    saveToStorage() {
+        try {
+            const sessionData = {
+                currentUser: this.currentUser,
+                currentCharacter: this.currentCharacter,
+                sessionData: this.sessionData,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('mmorpg_session', JSON.stringify(sessionData));
+        } catch (error) {
+            console.error('❌ Error saving session data:', error);
+        }
+    }
+    
+    /**
+     * Limpa localStorage
+     */
+    clearStorage() {
+        try {
+            localStorage.removeItem('mmorpg_session');
+            console.log('🗑️ Session storage cleared');
+        } catch (error) {
+            console.error('❌ Error clearing session storage:', error);
+        }
+    }
+    
+    // === VALIDATION ===
+    
+    /**
+     * Valida sessão atual
+     * @returns {boolean}
+     */
+    validateSession() {
+        if (!this.isLoggedIn()) {
+            return false;
+        }
+        
+        if (!this.currentUser || !this.currentUser.id) {
+            console.warn('⚠️ Invalid user data in session');
+            return false;
+        }
+        
+        // Validar timestamp (sessão expira em 24h)
+        const sessionData = localStorage.getItem('mmorpg_session');
+        if (sessionData) {
+            try {
+                const parsed = JSON.parse(sessionData);
+                const sessionAge = Date.now() - (parsed.timestamp || 0);
+                const maxAge = 24 * 60 * 60 * 1000; // 24 horas
+                
+                if (sessionAge > maxAge) {
+                    console.warn('⚠️ Session expired');
+                    this.logout();
+                    return false;
+                }
+            } catch (error) {
+                console.error('❌ Error validating session timestamp:', error);
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Renova sessão
+     */
+    refreshSession() {
+        if (this.isLoggedIn()) {
+            this.saveToStorage();
+            console.log('🔄 Session refreshed');
+        }
+    }
+    
+    // === CHARACTER OPERATIONS ===
+    
+    /**
+     * Obtém todos os personagens do usuário
+     * @returns {array}
+     */
+    getUserCharacters() {
+        if (!this.isLoggedIn()) {
+            return [];
+        }
+        
+        try {
+            const charactersData = localStorage.getItem('mmorpg_characters');
+            if (charactersData) {
+                const parsed = JSON.parse(charactersData);
+                return parsed[this.currentUser.username] || [];
+            }
+        } catch (error) {
+            console.error('❌ Error loading user characters:', error);
+        }
+        
+        return [];
+    }
+    
+    /**
+     * Salva personagens do usuário
+     * @param {array} characters - Lista de personagens
+     */
+    saveUserCharacters(characters) {
+        if (!this.isLoggedIn()) {
+            console.warn('⚠️ Cannot save characters: user not logged in');
+            return;
+        }
+        
+        try {
+            const charactersData = localStorage.getItem('mmorpg_characters') || '{}';
+            const parsed = JSON.parse(charactersData);
+            parsed[this.currentUser.username] = characters || [];
+            localStorage.setItem('mmorpg_characters', JSON.stringify(parsed));
+            console.log(`💾 Saved ${characters?.length || 0} characters for user ${this.currentUser.username}`);
+        } catch (error) {
+            console.error('❌ Error saving user characters:', error);
+        }
+    }
+    
+    /**
+     * Adiciona personagem ao usuário
+     * @param {object} character - Dados do personagem
+     */
+    addCharacter(character) {
+        if (!this.isLoggedIn()) {
+            console.warn('⚠️ Cannot add character: user not logged in');
+            return false;
+        }
+        
+        const characters = this.getUserCharacters();
+        
+        // Verificar limite de personagens
+        if (characters.length >= 4) {
+            console.warn('⚠️ Maximum character limit reached');
+            return false;
+        }
+        
+        // Verificar nome duplicado
+        if (characters.some(char => char.name.toLowerCase() === character.name.toLowerCase())) {
+            console.warn('⚠️ Character name already exists');
+            return false;
+        }
+        
+        characters.push(character);
+        this.saveUserCharacters(characters);
+        return true;
+    }
+    
+    // === DEBUG INFO ===
+    
+    /**
+     * Obtém informações de debug
+     * @returns {object}
+     */
+    getDebugInfo() {
+        return {
+            isAuthenticated: this.isAuthenticated,
+            currentUser: this.currentUser ? {
+                username: this.currentUser.username,
+                id: this.currentUser.id
+            } : null,
+            currentCharacter: this.currentCharacter ? {
+                name: this.currentCharacter.name,
+                id: this.currentCharacter.id
+            } : null,
+            sessionDataKeys: Object.keys(this.sessionData),
+            userCharactersCount: this.getUserCharacters().length
+        };
+    }
+    
+    /**
+     * Exporta dados da sessão
+     * @returns {object}
+     */
+    exportSession() {
+        return {
+            currentUser: this.currentUser,
+            currentCharacter: this.currentCharacter,
+            sessionData: this.sessionData,
+            userCharacters: this.getUserCharacters(),
+            timestamp: Date.now()
+        };
+    }
+    
+    /**
+     * Importa dados da sessão
+     * @param {object} sessionData - Dados da sessão
+     */
+    importSession(sessionData) {
+        if (sessionData.currentUser) {
+            this.setCurrentUser(sessionData.currentUser);
+        }
+        
+        if (sessionData.currentCharacter) {
+            this.setCurrentCharacter(sessionData.currentCharacter);
+        }
+        
+        if (sessionData.sessionData) {
+            this.sessionData = { ...this.sessionData, ...sessionData.sessionData };
+        }
+        
+        if (sessionData.userCharacters) {
+            this.saveUserCharacters(sessionData.userCharacters);
+        }
+        
+        console.log('📥 Session data imported');
+    }
+}
+
+// Exportar para uso global
+if (typeof window !== 'undefined') {
+    window.SessionManager = SessionManager;
+}
+
+// Exportar para módulos
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = SessionManager;
+}
         this.saveToStorage();
         console.log('👥 Current character set:', characterData?.name);
     }

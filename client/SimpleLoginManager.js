@@ -1,439 +1,615 @@
-// SimpleLoginManager - Extraído para coverage
+/**
+ * SimpleLoginManager - Sistema de Login e Personagens
+ * Versão corrigida e integrada com sistemas modernos
+ */
+
 class SimpleLoginManager {
   constructor() {
     this.currentUser = null;
     this.currentCharacter = null;
-    this.lastFrameTime = 0;
+    this.gameplayEngine = null;
+    this.dataManager = window.dataManager || null; // LocalDataManager
     
-    // Inicializar elementos DOM
+    // Elementos DOM
+    this.loginScreen = null;
+    this.characterScreen = null;
+    this.gameScreen = null;
+    
+    // Login Form
+    this.loginForm = null;
+    this.createAccountForm = null;
+    this.username = null;
+    this.password = null;
+    this.loginBtn = null;
+    this.showCreateAccountBtn = null;
+    
+    // Create Account Form
+    this.newUsername = null;
+    this.newEmail = null;
+    this.newPassword = null;
+    this.confirmPassword = null;
+    this.createAccountBtn = null;
+    this.backToLoginBtn = null;
+    
+    // Character Screen
+    this.characterList = null;
+    this.characterCreation = null;
+    this.characterName = null;
+    this.characterRace = null;
+    this.characterClass = null;
+    this.createNewCharacterBtn = null;
+    this.createCharacterBtn = null;
+    this.cancelCreationBtn = null;
+    this.enterWorldBtn = null;
+    this.logoutBtn = null;
+    
+    // Messages
+    this.loginMessage = null;
+    this.characterMessage = null;
+    
     this.initializeElements();
-    
-    // Configurar event listeners
-    this.initializeEventListeners();
+    this.setupEventListeners();
   }
   
   initializeElements() {
-    // Obter elementos DOM
+    // Screens
     this.loginScreen = document.getElementById('loginScreen');
     this.characterScreen = document.getElementById('characterScreen');
     this.gameScreen = document.getElementById('gameScreen');
+    
+    // Login Form
+    this.loginForm = document.getElementById('loginForm');
+    this.createAccountForm = document.getElementById('createAccountForm');
     this.username = document.getElementById('username');
     this.password = document.getElementById('password');
     this.loginBtn = document.getElementById('loginBtn');
+    this.showCreateAccountBtn = document.getElementById('showCreateAccountBtn');
+    
+    // Create Account Form
+    this.newUsername = document.getElementById('newUsername');
+    this.newEmail = document.getElementById('newEmail');
+    this.newPassword = document.getElementById('newPassword');
+    this.confirmPassword = document.getElementById('confirmPassword');
     this.createAccountBtn = document.getElementById('createAccountBtn');
-    this.enterWorldBtn = document.getElementById('enterWorldBtn');
+    this.backToLoginBtn = document.getElementById('backToLoginBtn');
+    
+    // Character Screen
     this.characterList = document.getElementById('characterList');
+    this.characterCreation = document.getElementById('characterCreation');
+    this.characterName = document.getElementById('characterName');
+    this.characterRace = document.getElementById('characterRace');
+    this.createNewCharacterBtn = document.getElementById('createNewCharacterBtn');
+    this.createCharacterBtn = document.getElementById('createCharacterBtn');
+    this.cancelCreationBtn = document.getElementById('cancelCreationBtn');
+    this.enterWorldBtn = document.getElementById('enterWorldBtn');
+    this.logoutBtn = document.getElementById('logoutBtn');
+    
+    // Messages
     this.loginMessage = document.getElementById('loginMessage');
     this.characterMessage = document.getElementById('characterMessage');
-    
-    // Elementos do gameplay
-    this.playerName = document.getElementById('playerName');
-    this.playerLevel = document.getElementById('playerLevel');
-    this.healthFill = document.getElementById('healthFill');
-    this.hpText = document.getElementById('hpText');
-    this.positionText = document.getElementById('positionText');
-    this.mobCount = document.getElementById('mobCount');
-    this.fpsText = document.getElementById('fpsText');
-    
-    console.log('🔍 Elementos DOM inicializados:', {
-      loginScreen: !!this.loginScreen,
-      characterScreen: !!this.characterScreen,
-      gameScreen: !!this.gameScreen,
-      loginBtn: !!this.loginBtn,
-      createAccountBtn: !!this.createAccountBtn,
-      enterWorldBtn: !!this.enterWorldBtn
-    });
   }
-
-  login() {
-    console.log('🔍 Iniciando login...');
+  
+  setupEventListeners() {
+    // Login Form Events
+    if (this.loginBtn) this.loginBtn.addEventListener('click', () => this.handleLogin());
+    if (this.showCreateAccountBtn) this.showCreateAccountBtn.addEventListener('click', () => this.showCreateAccountForm());
     
-    const username = this.username?.value?.trim();
-    const password = this.password?.value?.trim();
+    // Create Account Form Events
+    if (this.createAccountBtn) this.createAccountBtn.addEventListener('click', () => this.handleCreateAccount());
+    if (this.backToLoginBtn) this.backToLoginBtn.addEventListener('click', () => this.showLoginForm());
     
-    console.log('📝 Dados do login:', { username, password: password ? '***' : 'vazio' });
+    // Character Screen Events
+    if (this.createNewCharacterBtn) this.createNewCharacterBtn.addEventListener('click', () => this.handleCreateNewCharacter());
+    if (this.createCharacterBtn) this.createCharacterBtn.addEventListener('click', () => this.handleCreateCharacter());
+    if (this.cancelCreationBtn) this.cancelCreationBtn.addEventListener('click', () => this.handleCancelCreation());
+    if (this.enterWorldBtn) this.enterWorldBtn.addEventListener('click', () => this.handleEnterWorld());
+    if (this.logoutBtn) this.logoutBtn.addEventListener('click', () => this.handleLogout());
     
-    if (!username) {
-      console.log('❌ Nome de usuário vazio');
-      this.showMessage('loginMessage', 'Digite um nome de usuário', 'error');
-      return;
-    }
-    
-    const accounts = JSON.parse(localStorage.getItem('eldoria_accounts') || '{}');
-    console.log('📚 Contas encontradas:', Object.keys(accounts));
-    
-    if (accounts[username]) {
-      console.log('✅ Usuário encontrado:', username);
-      this.currentUser = accounts[username];
-      console.log('👤 Usuário atual definido:', this.currentUser);
-      this.showCharacter();
-    } else {
-      console.log('❌ Usuário não encontrado:', username);
-      this.showMessage('loginMessage', 'Usuário não encontrado', 'error');
-    }
-  }
-
-  createAccount() {
-    console.log('👤 Iniciando criação de conta...');
-    
-    const username = this.username?.value?.trim();
-    const password = this.password?.value?.trim();
-    
-    console.log('📝 Dados da conta:', { username, password: password ? '***' : 'vazio' });
-    
-    if (!username) {
-      console.log('❌ Nome de usuário vazio');
-      this.showMessage('loginMessage', 'Digite um nome de usuário', 'error');
-      return;
-    }
-    
-    const accounts = JSON.parse(localStorage.getItem('eldoria_accounts') || '{}');
-    console.log('📚 Contas existentes:', Object.keys(accounts));
-    
-    if (accounts[username]) {
-      console.log('❌ Usuário já existe:', username);
-      this.showMessage('loginMessage', 'Usuário já existe', 'error');
-      return;
-    }
-    
-    const user = {
-      username,
-      password,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-    
-    accounts[username] = user;
-    localStorage.setItem('eldoria_accounts', JSON.stringify(accounts));
-    
-    console.log('✅ Conta criada com sucesso:', username);
-    this.showMessage('loginMessage', 'Conta criada com sucesso!', 'success');
-  }
-
-  showCharacter() {
-    console.log('👥 Exibindo tela de personagens...');
-    
-    if (this.loginScreen) this.loginScreen.style.display = 'none';
-    if (this.characterScreen) this.characterScreen.style.display = 'flex';
-    if (this.gameScreen) this.gameScreen.style.display = 'none';
-    this.clearMessages();
-    this.loadCharacters();
-    
-    console.log('✅ Tela de personagens exibida');
-  }
-
-  showLogin() {
-    if (this.loginScreen) this.loginScreen.style.display = 'flex';
-    if (this.characterScreen) this.characterScreen.style.display = 'none';
-    if (this.gameScreen) this.gameScreen.style.display = 'none';
-    this.clearMessages();
-  }
-
-  showGame() {
-    if (this.loginScreen) this.loginScreen.style.display = 'none';
-    if (this.characterScreen) this.characterScreen.style.display = 'none';
-    if (this.gameScreen) this.gameScreen.style.display = 'flex';
-    this.clearMessages();
-    this.startGame();
-  }
-
-  loadCharacters() {
-    if (!this.currentUser) return;
-    
-    try {
-      const characters = JSON.parse(localStorage.getItem('eldoria_characters') || '{}');
-      const userCharacters = characters[this.currentUser.username] || [];
-      
-      this.characterList.innerHTML = '';
-      
-      if (userCharacters.length === 0) {
-        this.characterList.innerHTML = '<p>Nenhum personagem encontrado. Crie um novo personagem!</p>';
-        return;
-      }
-      
-      userCharacters.forEach(character => {
-        const card = this.createCharacterCard(character);
-        this.characterList.appendChild(card);
+    // Enter key events
+    if (this.username) {
+      this.username.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') this.handleLogin();
       });
-    } catch (error) {
-      this.characterList.innerHTML = '<p>Erro ao carregar personagens.</p>';
+    }
+    
+    if (this.password) {
+      this.password.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') this.handleLogin();
+      });
+    }
+    
+    if (this.newPassword) {
+      this.newPassword.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') this.handleCreateAccount();
+      });
+    }
+    
+    if (this.confirmPassword) {
+      this.confirmPassword.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') this.handleCreateAccount();
+      });
     }
   }
-
-  createCharacterCard(character) {
-    const card = document.createElement('div');
-    card.className = 'character-card';
-    card.innerHTML = `
-      <h3>${character.name}</h3>
-      <p>Level: ${character.level}</p>
-      <p>Class: ${character.class}</p>
-      <p>Race: ${character.race || 'Humano'}</p>
-      <p>HP: ${character.hp}/${character.maxHp}</p>
-    `;
+  
+  handleLogin() {
+    const username = this.sanitizeInput(this.username.value.trim());
+    const password = this.sanitizeInput(this.password.value);
     
-    card.addEventListener('click', () => {
-      this.currentCharacter = character;
-      this.enterWorld();
-    });
+    if (!username || !password) {
+      this.showMessage('loginMessage', 'Preencha todos os campos', 'error');
+      return;
+    }
     
-    return card;
+    this.authenticateUser(username, password);
   }
-
-  enterWorld() {
+  
+  handleCreateAccount() {
+    const username = this.sanitizeInput(this.newUsername.value.trim());
+    const email = this.sanitizeInput(this.newEmail.value.trim());
+    const password = this.sanitizeInput(this.newPassword.value);
+    const confirmPassword = this.sanitizeInput(this.confirmPassword.value);
+    
+    if (!username || !email || !password || !confirmPassword) {
+      this.showMessage('loginMessage', 'Preencha todos os campos', 'error');
+      return;
+    }
+    
+    if (username.length < 3) {
+      this.showMessage('loginMessage', 'Nome de usuário deve ter pelo menos 3 caracteres', 'error');
+      return;
+    }
+    
+    if (password.length < 6) {
+      this.showMessage('loginMessage', 'Senha deve ter pelo menos 6 caracteres', 'error');
+      return;
+    }
+    
+    if (password !== confirmPassword) {
+      this.showMessage('loginMessage', 'As senhas não coincidem', 'error');
+      return;
+    }
+    
+    if (!this.validateEmail(email)) {
+      this.showMessage('loginMessage', 'E-mail inválido', 'error');
+      return;
+    }
+    
+    this.createAccount(username, password, email);
+  }
+  
+  handleEnterWorld() {
     if (!this.currentCharacter) {
       this.showMessage('characterMessage', 'Selecione um personagem', 'error');
       return;
     }
     
-    this.showGame();
+    // Mostrar tela de jogo
+    if (this.characterScreen) this.characterScreen.style.display = 'none';
+    if (this.gameScreen) this.gameScreen.style.display = 'flex';
+    
+    // Inicializar GameplayEngine
+    this.initializeGameplay();
   }
-
-  createCharacter(name, race, characterClass) {
-    if (!this.currentUser) return;
-    
-    const characters = JSON.parse(localStorage.getItem('eldoria_characters') || '{}');
-    const userCharacters = characters[this.currentUser.username] || [];
-    
-    if (userCharacters.length >= 4) {
-      this.showMessage('characterMessage', 'Limite de 4 personagens atingido', 'error');
+  
+  handleCreateNewCharacter() {
+    if (!this.dataManager) {
+      console.error('❌ LocalDataManager não disponível');
+      this.showMessage('characterMessage', 'Erro no sistema de dados', 'error');
       return;
     }
     
-    const character = {
-      id: Date.now().toString(),
-      name,
-      race,
-      class: characterClass,
-      level: 1,
-      hp: 100,
-      maxHp: 100,
-      x: 400,
-      y: 300,
-      createdAt: new Date().toISOString()
-    };
+    const userCharacters = this.dataManager.getCharacters(this.currentUser.username);
     
-    userCharacters.push(character);
-    characters[this.currentUser.username] = userCharacters;
-    localStorage.setItem('eldoria_characters', JSON.stringify(characters));
-    
-    this.showMessage('characterMessage', 'Personagem criado!', 'success');
-    this.loadCharacters();
-  }
-
-  startGame() {
-    console.log('Game started with character:', this.currentCharacter);
-  }
-
-  showMessage(elementId, message, type) {
-    console.log('💬 Exibindo mensagem:', { elementId, message, type });
-    
-    const element = document.getElementById(elementId);
-    if (element) {
-      element.textContent = message;
-      element.className = `message ${type}`;
-      console.log('✅ Mensagem exibida no elemento:', elementId);
-    } else {
-      console.error('❌ Elemento não encontrado para mensagem:', elementId);
-    }
-  }
-
-  clearMessages() {
-    if (this.loginMessage) this.loginMessage.textContent = '';
-    if (this.characterMessage) this.characterMessage.textContent = '';
-  }
-
-  validateCharacter(character) {
-    return character && 
-           typeof character === 'object' &&
-           typeof character.name === 'string' &&
-           character.name.trim().length > 0 &&
-           typeof character.race === 'string'
-           ? true : false;
-  }
-
-  saveCharacter(characterData) {
-    if (!this.currentUser) throw new Error('User not logged in');
-    
-    const characters = JSON.parse(localStorage.getItem('eldoria_characters') || '{}');
-    const userCharacters = characters[this.currentUser.username] || [];
-    
-    if (userCharacters.length >= 4) {
-      throw new Error('Limite de 4 personagens por conta atingido');
+    if (userCharacters.length >= 3) {
+      this.showMessage('characterMessage', 'Limite de 3 personagens por conta atingido', 'error');
+      return;
     }
     
-    const character = {
-      id: Date.now().toString(),
-      ...characterData,
-      level: characterData.level || 1,
-      hp: characterData.hp || 100,
-      maxHp: characterData.maxHp || 100,
-      createdAt: new Date().toISOString()
-    };
+    if (this.characterCreation) this.characterCreation.style.display = 'block';
+    if (this.characterList) this.characterList.style.display = 'none';
+    if (this.createNewCharacterBtn) this.createNewCharacterBtn.style.display = 'none';
+    if (this.enterWorldBtn) this.enterWorldBtn.style.display = 'none';
     
-    userCharacters.push(character);
-    characters[this.currentUser.username] = userCharacters;
-    localStorage.setItem('eldoria_characters', JSON.stringify(characters));
+    // Limpar campos
+    if (this.characterName) this.characterName.value = '';
+    if (this.characterRace) this.characterRace.value = '';
     
-    return character;
+    // Focar no nome
+    setTimeout(() => this.characterName.focus(), 100);
   }
-
-  getRaceIcon(race) {
-    const icons = {
-      'Humano': '👤',
-      'Elfo': '🧝',
-      'Anão': '⛏️',
-      'Orc': '👹',
-      'Morto-Vivo': '🧟',
-      'Fada': '🧚'
-    };
-    return icons[race] || icons['Humano'];
-  }
-
-  handleKeyDown(event, keys) {
-    const key = event.key.toLowerCase();
-    
-    // Check if we're in an input field - if so, don't handle game keys
-    const activeElement = document.activeElement;
-    const isInputField = activeElement && (
-        activeElement.tagName === 'INPUT' || 
-        activeElement.tagName === 'TEXTAREA' || 
-        activeElement.tagName === 'SELECT'
-    );
-    
-    if (isInputField) {
-      return; // Allow normal typing in input fields
-    }
-    
-    if (['w', 'a', 's', 'd', ' '].includes(key)) {
-      keys[key] = true;
-      event.preventDefault();
-    }
-  }
-
-  calculateFPS() {
-    if (!global.performance || !global.performance.now) return 0;
-    
-    const now = global.performance.now();
-    const delta = now - (this.lastFrameTime || now);
-    this.lastFrameTime = now;
-    
-    return delta > 0 ? Math.round(1000 / delta) : 0;
-  }
-
-  sanitizeInput(input) {
-    if (typeof input !== 'string') return '';
-    
-    // Remover tags HTML e protocolos javascript
-    return input.replace(/<[^>]*>/g, '').replace(/javascript:/gi, '');
-  }
-
-  // Métodos adicionais para coverage
-  initializeEventListeners() {
-    console.log('🔧 Configurando event listeners...');
-    
-    if (this.loginBtn) {
-      this.loginBtn.addEventListener('click', () => {
-        console.log('🔑 Botão login clicado');
-        this.login();
-      });
-      console.log('✅ Login button listener adicionado');
-    } else {
-      console.error('❌ Login button não encontrado');
-    }
-    
-    if (this.createAccountBtn) {
-      this.createAccountBtn.addEventListener('click', () => {
-        console.log('👤 Botão criar conta clicado');
-        this.createAccount();
-      });
-      console.log('✅ Create account button listener adicionado');
-    } else {
-      console.error('❌ Create account button não encontrado');
-    }
-    
-    if (this.enterWorldBtn) {
-      this.enterWorldBtn.addEventListener('click', () => {
-        console.log('🌍 Botão entrar no mundo clicado');
-        this.enterWorld();
-      });
-      console.log('✅ Enter world button listener adicionado');
-    } else {
-      console.error('❌ Enter world button não encontrado');
-    }
-    
-    // Botão criar personagem
-    const createCharacterBtn = document.getElementById('createCharacterBtn');
-    if (createCharacterBtn) {
-      createCharacterBtn.addEventListener('click', () => {
-        console.log('👥 Botão criar personagem clicado');
-        this.handleCreateCharacter();
-      });
-      console.log('✅ Create character button listener adicionado');
-    } else {
-      console.error('❌ Create character button não encontrado');
-    }
+  
+  handleCancelCreation() {
+    if (this.characterCreation) this.characterCreation.style.display = 'none';
+    if (this.characterList) this.characterList.style.display = 'grid';
+    if (this.createNewCharacterBtn) this.createNewCharacterBtn.style.display = 'inline-block';
+    if (this.enterWorldBtn) this.enterWorldBtn.style.display = 'inline-block';
   }
   
   handleCreateCharacter() {
-    const nameInput = document.getElementById('characterName');
-    const raceSelect = document.getElementById('characterRace');
-    const classSelect = document.getElementById('characterClass');
-    
-    if (!nameInput || !raceSelect || !classSelect) {
+    if (!this.characterName || !this.characterRace) {
       console.error('❌ Elementos de criação de personagem não encontrados');
       return;
     }
     
-    const name = nameInput.value.trim();
-    const race = raceSelect.value;
-    const characterClass = classSelect.value;
+    const name = this.characterName.value.trim();
+    const race = this.characterRace.value;
     
-    if (!name) {
-      this.showMessage('characterMessage', 'Digite um nome para o personagem', 'error');
+    if (!name || name.length < 3) {
+      this.showMessage('characterMessage', 'Nome deve ter pelo menos 3 caracteres', 'error');
       return;
     }
+    
+    if (!race) {
+      this.showMessage('characterMessage', 'Selecione uma raça', 'error');
+      return;
+    }
+    
+    // Todos personagens começam como aprendiz
+    const characterClass = 'apprentice';
     
     this.createCharacter(name, race, characterClass);
   }
   
-  setupEvents() {
-    // Método alternativo para compatibilidade
-    this.initializeEventListeners();
-  }
-
-  showCharacterCreation() {
-    if (this.currentUser) {
-      this.createCharacter('TestChar', 'Humano');
+  handleDeleteCharacter() {
+    if (!this.currentCharacter) {
+      this.showMessage('characterMessage', 'Nenhum personagem selecionado', 'error');
+      return;
+    }
+    
+    if (!this.dataManager) {
+      console.error('❌ LocalDataManager não disponível');
+      this.showMessage('characterMessage', 'Erro no sistema de dados', 'error');
+      return;
+    }
+    
+    if (confirm(`Tem certeza que deseja excluir "${this.currentCharacter.name}"? Esta ação não pode ser desfeita.`)) {
+      const result = this.dataManager.deleteCharacter(this.currentUser.username, this.currentCharacter.id);
+      
+      if (result.success) {
+        this.currentCharacter = null;
+        if (this.enterWorldBtn) this.enterWorldBtn.disabled = true;
+        if (this.deleteCharacterBtn) this.deleteCharacterBtn.style.display = 'none';
+        
+        this.loadCharacters();
+        
+        this.showMessage('characterMessage', 'Personagem excluído com sucesso', 'success');
+        console.log(`🗑️ Personagem excluído com sucesso`);
+      } else {
+        this.showMessage('characterMessage', result.error || 'Erro ao excluir personagem', 'error');
+        console.error('❌ Erro ao excluir personagem:', result.error);
+      }
     }
   }
-
-  // Métodos de utilidade
-  clampPosition(x, y, size, canvasWidth, canvasHeight) {
-    const clampedX = Math.max(size/2, Math.min(canvasWidth - size/2, x));
-    const clampedY = Math.max(size/2, Math.min(canvasHeight - size/2, y));
-    return { x: clampedX, y: clampedY };
+  
+  authenticateUser(username, password) {
+    // Usar LocalDataManager para gerenciar dados locais
+    if (!this.dataManager) {
+      console.error('❌ LocalDataManager não disponível');
+      this.showMessage('loginMessage', 'Erro no sistema de dados', 'error');
+      return;
+    }
+    
+    const result = this.dataManager.authenticateUser(username, password);
+    
+    if (result.success) {
+      this.currentUser = result.account;
+      this.showMessage('loginMessage', 'Login realizado com sucesso!', 'success');
+      setTimeout(() => this.showCharacter(), 1000);
+      
+      console.log(`👤 Usuário ${username} logado com sucesso`);
+    } else {
+      this.showMessage('loginMessage', result.error || 'Erro no login', 'error');
+      console.error('❌ Erro no login:', result.error);
+    }
   }
-
-  updateHUD(character, position, mobCount, fps) {
+  
+  createAccount(username, password, email) {
+    // Usar LocalDataManager para criar conta
+    if (!this.dataManager) {
+      console.error('❌ LocalDataManager não disponível');
+      this.showMessage('loginMessage', 'Erro no sistema de dados', 'error');
+      return;
+    }
+    
+    const result = this.dataManager.createAccount(username, password, email);
+    
+    if (result.success) {
+      this.showMessage('loginMessage', 'Conta criada com sucesso! Faça login para continuar.', 'success');
+      
+      // Limpar campos após criação
+      this.newUsername.value = '';
+      this.newEmail.value = '';
+      this.newPassword.value = '';
+      this.confirmPassword.value = '';
+      
+      // Voltar para tela de login
+      setTimeout(() => this.showLoginForm(), 1500);
+      
+      console.log(`👤 Conta ${username} criada com sucesso`);
+    } else {
+      this.showMessage('loginMessage', result.error || 'Erro ao criar conta', 'error');
+      console.error('❌ Erro ao criar conta:', result.error);
+    }
+  }
+  
+  showCharacter() {
+    if (this.loginScreen) this.loginScreen.style.display = 'none';
+    if (this.characterScreen) this.characterScreen.style.display = 'flex';
+    
+    this.loadCharacters();
+  }
+  
+  loadCharacters() {
+    if (!this.currentUser || !this.dataManager) return;
+    
+    const userCharacters = this.dataManager.getCharacters(this.currentUser.username);
+    
+    if (this.characterList) this.characterList.innerHTML = '';
+    
+    if (userCharacters.length === 0) {
+      if (this.characterList) {
+        this.characterList.innerHTML = '<div class="empty-state">Nenhum personagem encontrado. Crie um novo personagem para começar!</div>';
+      }
+      if (this.enterWorldBtn) this.enterWorldBtn.style.display = 'none';
+      return;
+    }
+    
+    userCharacters.forEach(character => {
+      const card = this.createCharacterCard(character);
+      if (this.characterList) this.characterList.appendChild(card);
+    });
+    
+    if (this.enterWorldBtn) this.enterWorldBtn.disabled = true;
+    if (this.enterWorldBtn) this.enterWorldBtn.style.display = 'none';
+    
+    console.log(`🎭 Carregados ${userCharacters.length} personagens para ${this.currentUser.username}`);
+  }
+  
+  createCharacterCard(character) {
+    const card = document.createElement('div');
+    card.className = 'character-card';
+    
+    const classIcons = {
+      warrior: '⚔️', mage: '🔮', hunter: '🏹', rogue: '🗡️', priest: '✨', druid: '🌿', apprentice: '🎓'
+    };
+    
+    const classColors = {
+      warrior: '#f44336', mage: '#2196F3', hunter: '#4CAF50', rogue: '#9C27B0', priest: '#FFD700', druid: '#8BC34A', apprentice: '#9E9E9E'
+    };
+    
+    const icon = classIcons[character.class] || '🎓';
+    const color = classColors[character.class] || '#9E9E9E';
+    
+    card.innerHTML = `
+      <div class="character-avatar" style="background: linear-gradient(135deg, ${color} 0%, ${color}88 100%);">
+        ${icon}
+      </div>
+      <div class="character-name">${character.name}</div>
+      <div class="character-info">
+        <div class="character-level">Level ${character.level}</div>
+        <div class="character-class">${this.getClassName(character.class)}</div>
+        <div class="character-race">${this.getRaceName(character.race)}</div>
+        <div class="character-stats">
+          <div class="character-hp">❤️ ${character.hp}/${character.maxHp}</div>
+          <div>⚔️ ${character.attack || 10} ATK</div>
+          <div>🛡️ ${character.defense || 5} DEF</div>
+        </div>
+      </div>
+    `;
+    
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.character-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      this.currentCharacter = character;
+      
+      if (this.enterWorldBtn) {
+        this.enterWorldBtn.disabled = false;
+        this.enterWorldBtn.style.display = 'inline-block';
+      }
+      
+      if (this.characterCreation) this.characterCreation.style.display = 'none';
+    });
+    
+    return card;
+  }
+  
+  getClassName(classKey) {
+    const classNames = {
+      warrior: 'Guerreiro', mage: 'Mago', hunter: 'Caçador', rogue: 'Ladino', priest: 'Sacerdote', druid: 'Druida', apprentice: 'Aprendiz'
+    };
+    return classNames[classKey] || 'Aprendiz';
+  }
+  
+  getRaceName(raceKey) {
+    const raceNames = {
+      human: 'Humano', elf: 'Elfo', dwarf: 'Anão', orc: 'Orc', undead: 'Morto-Vivo'
+    };
+    return raceNames[raceKey] || raceKey || 'Humano';
+  }
+  
+  createCharacter(name, race, characterClass) {
+    if (!this.currentUser || !this.dataManager) {
+      console.error('❌ Usuário ou DataManager não disponível');
+      this.showMessage('characterMessage', 'Erro no sistema de dados', 'error');
+      return;
+    }
+    
+    const characterData = { name, race, class: characterClass };
+    const result = this.dataManager.createCharacter(this.currentUser.username, characterData);
+    
+    if (result.success) {
+      this.handleCancelCreation();
+      this.loadCharacters();
+      
+      this.showMessage('characterMessage', 'Personagem criado com sucesso!', 'success');
+      console.log(`🎭 Personagem ${name} criado para ${this.currentUser.username}`);
+    } else {
+      this.showMessage('characterMessage', result.error || 'Erro ao criar personagem', 'error');
+      console.error('❌ Erro ao criar personagem:', result.error);
+    }
+  }
+  
+  initializeGameplay() {
+    if (!window.IntegratedGameplayEngine) {
+      console.error('❌ IntegratedGameplayEngine não encontrado');
+      this.showMessage('characterMessage', 'Erro ao carregar sistema de jogo', 'error');
+      return;
+    }
+    
+    try {
+      // Inicializar GameplayEngine com dados do personagem
+      this.gameplayEngine = new window.IntegratedGameplayEngine('gameCanvas', this.currentCharacter);
+      
+      // Garantir que window.gameplayEngine aponte para a instância correta
+      window.gameplayEngine = this.gameplayEngine;
+      
+      // Preparar dados para HUD
+      const characterData = {
+        name: this.currentCharacter.name,
+        level: this.currentCharacter.level,
+        health: this.currentCharacter.hp,
+        maxHealth: this.currentCharacter.maxHp,
+        mana: this.currentCharacter.mana,
+        maxMana: this.currentCharacter.maxMana,
+        exp: this.currentCharacter.exp || 0,
+        maxExp: this.currentCharacter.maxExp || 100,
+        gold: this.currentCharacter.gold || 0,
+        position: { x: this.currentCharacter.x, y: this.currentCharacter.y }
+      };
+      
+      // Atualizar HUD se disponível
+      if (window.hudSystem) {
+        window.hudSystem.updatePlayerState(characterData);
+        window.hudSystem.showNotification(`Bem-vindo ao mundo, ${this.currentCharacter.name}!`, 'success');
+      }
+      
+      // Iniciar gameplay
+      this.gameplayEngine.start();
+      
+      console.log(`🎮 Gameplay iniciado para ${this.currentCharacter.name}`);
+      
+    } catch (error) {
+      console.error('❌ Erro ao inicializar gameplay:', error);
+      this.showMessage('characterMessage', 'Erro ao iniciar jogo. Tente novamente.', 'error');
+    }
+  }
+  
+  getClassStats(characterClass) {
+    const classStats = {
+      warrior: { hp: 120, maxHp: 120, attack: 15, defense: 10, mana: 20, maxMana: 20 },
+      mage: { hp: 80, maxHp: 80, attack: 8, defense: 5, mana: 100, maxMana: 100 },
+      hunter: { hp: 100, maxHp: 100, attack: 12, defense: 7, mana: 50, maxMana: 50 },
+      rogue: { hp: 90, maxHp: 90, attack: 14, defense: 6, mana: 30, maxMana: 30 },
+      priest: { hp: 85, maxHp: 85, attack: 6, defense: 8, mana: 80, maxMana: 80 },
+      druid: { hp: 95, maxHp: 95, attack: 10, defense: 8, mana: 70, maxMana: 70 },
+      apprentice: { hp: 100, maxHp: 100, attack: 10, defense: 8, mana: 50, maxMana: 50 }
+    };
+    
+    return classStats[characterClass] || classStats.apprentice;
+  }
+  
+  updatePlayerUI(character) {
+    if (window.hudSystem) {
+      window.hudSystem.updatePlayerState({
+        name: character.name,
+        level: character.level,
+        health: character.hp,
+        maxHealth: character.maxHp,
+        mana: character.mana || 0,
+        maxMana: character.maxMana || 0,
+        exp: character.exp || 0,
+        maxExp: character.maxExp || 100,
+        gold: character.gold || 0,
+        position: { x: character.x || 400, y: character.y || 300 }
+      });
+      return;
+    }
+    
+    // Fallback para HUD antigo
     if (this.playerName) this.playerName.textContent = character.name;
     if (this.playerLevel) this.playerLevel.textContent = `Lv. ${character.level}`;
-    if (this.hpText) this.hpText.textContent = `${character.hp}/${character.maxHp} HP`;
-    if (this.positionText) this.positionText.textContent = `${Math.round(position.x)}, ${Math.round(position.y)}`;
-    if (this.mobCount) this.mobCount.textContent = mobCount;
-    if (this.fpsText) this.fpsText.textContent = fps;
+    if (this.hpText) this.hpText.textContent = `${character.hp}/${character.maxHp}`;
+    if (this.healthFill) this.healthFill.style.width = `${(character.hp / character.maxHp) * 100}%`;
   }
-
-  updateHealthBar(hp, maxHp) {
-    if (this.healthFill) {
-      const hpPercent = hp / maxHp;
-      this.healthFill.style.width = `${hpPercent * 100}%`;
+  
+  showMessage(elementId, message, type = 'info') {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.textContent = message;
+      element.className = `message ${type}`;
+      
+      setTimeout(() => {
+        element.textContent = '';
+        element.className = 'message';
+      }, 3000);
     }
   }
+  
+  sanitizeInput(input) {
+    if (typeof input !== 'string') return '';
+    return input.replace(/<[^>]*>/g, '').replace(/javascript:/gi, '');
+  }
+  
+  validateEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+  
+  showLoginForm() {
+    if (this.loginForm) this.loginForm.style.display = 'block';
+    if (this.createAccountForm) this.createAccountForm.style.display = 'none';
+    this.clearMessage('loginMessage');
+  }
+  
+  showCreateAccountForm() {
+    if (this.loginForm) this.loginForm.style.display = 'none';
+    if (this.createAccountForm) this.createAccountForm.style.display = 'block';
+    this.clearMessage('loginMessage');
+    
+    // Focar no primeiro campo
+    setTimeout(() => this.newUsername.focus(), 100);
+  }
+  
+  handleLogout() {
+    this.currentUser = null;
+    this.currentCharacter = null;
+    
+    // Parar gameplay se estiver rodando
+    if (this.gameplayEngine) {
+      this.gameplayEngine.stop();
+      this.gameplayEngine = null;
+    }
+    
+    // Voltar para tela de login
+    if (this.characterScreen) this.characterScreen.style.display = 'none';
+    if (this.gameScreen) this.gameScreen.style.display = 'none';
+    if (this.loginScreen) this.loginScreen.style.display = 'flex';
+    
+    // Limpar campos
+    if (this.username) this.username.value = '';
+    if (this.password) this.password.value = '';
+    
+    // Mostrar formulário de login
+    this.showLoginForm();
+    
+    this.showMessage('loginMessage', 'Você saiu da conta com sucesso', 'info');
+    console.log('👋 Logout realizado');
+  }
+  
+  clearMessage(elementId) {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.textContent = '';
+      element.className = 'message';
+    }
+  }
+  
+  getFPS() {
+    const now = global.performance.now();
+    const delta = now - (this.lastFrameTime || now);
+    this.lastFrameTime = now;
+    return delta > 0 ? Math.round(1000 / delta) : 0;
+  }
 }
 
-// Exportar para uso nos testes
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = SimpleLoginManager;
-} else if (typeof window !== 'undefined') {
-  window.SimpleLoginManager = SimpleLoginManager;
-}
+window.SimpleLoginManager = SimpleLoginManager;

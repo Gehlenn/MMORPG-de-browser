@@ -17,6 +17,28 @@ const MobSpawner = require("./world/mobSpawner.js");
 const SimpleCombat = require("./combat/simpleCombat.js");
 const startMap = require("./world/maps/startMap.js");
 
+// Import Spawn System v0.3.6v
+const SpawnManager = require("./SpawnManager.js");
+const ZoneManager = require("./ZoneManager.js");
+const BossManager = require("./BossManager.js");
+const EventManager = require("./EventManager.js");
+
+// Import Enhanced AI System v0.3.7v
+const AIMobController = require("./ai/AIMobController.js");
+const PathfindingSystem = require("./ai/PathfindingSystem.js");
+const AIBossController = require("./ai/AIBossController.js");
+const DecisionTree = require("./ai/DecisionTree.js");
+const EventReactions = require("./ai/EventReactions.js");
+
+// Import ModuleManager and CombatModule
+const ModuleManager = require("./core/ModuleManager");
+const CombatModule = require("./modules/combat/CombatModule");
+const InventoryModule = require("./modules/inventory/InventoryModule");
+const SkillModule = require("./modules/skills/SkillModule");
+
+// Global module manager instance
+const moduleManager = new ModuleManager();
+
 // Version 0.3.1 - First Playable Gameplay
 class MMOServer {
     constructor() {
@@ -45,9 +67,28 @@ class MMOServer {
         this.combatSystem = new SimpleCombat();
         this.gameMap = startMap;
         
+        // Initialize Spawn System v0.3.6v
+        this.spawnManager = new SpawnManager();
+        this.zoneManager = new ZoneManager();
+        this.bossManager = new BossManager();
+        this.eventManager = new EventManager();
+        
+        // Initialize Enhanced AI System v0.3.7v
+        this.aiMobController = new AIMobController();
+        this.pathfindingSystem = new PathfindingSystem();
+        this.aiBossController = new AIBossController();
+        this.decisionTree = new DecisionTree();
+        this.eventReactions = new EventReactions();
+        
         // Set server references
         this.mobSpawner.setServer(this);
         this.combatSystem.setServer(this);
+        
+        // Setup Spawn System integration
+        this.setupSpawnSystemIntegration();
+        
+        // Setup Enhanced AI System integration
+        this.setupAIIntegration();
         
         // Simple event emitter
         this.eventEmitter = {
@@ -960,6 +1001,15 @@ class MMOServer {
         try {
             console.log('Starting MMORPG Server...');
             
+            // Register modules
+            console.log('📦 Registering modules...');
+            moduleManager.register('combat', new CombatModule(), 10);
+            moduleManager.register('inventory', new InventoryModule(), 20);
+            moduleManager.register('skills', new SkillModule(), 15);
+            
+            // Initialize all modules
+            await moduleManager.initAll(this);
+            
             // Start server
             this.server.listen(this.port, () => {
                 console.log(`🎮 MMORPG Server running on port ${this.port}`);
@@ -1029,8 +1079,466 @@ class MMOServer {
             items: this.items.size,
             uptime: process.uptime(),
             memory: process.memoryUsage(),
-            isRunning: this.isRunning
+            isRunning: this.isRunning,
+            spawnSystem: {
+                activeMobs: this.spawnManager?.getAllActiveMobs().length || 0,
+                activeBosses: this.bossManager?.getAllActiveBosses().length || 0,
+                activeEvents: this.eventManager?.getAllActiveEvents().length || 0
+            }
         };
+    }
+    
+    // Setup Spawn System Integration v0.3.6v
+    setupSpawnSystemIntegration() {
+        console.log('[Server] Configurando Spawn System v0.3.6v...');
+        
+        // Initialize all spawn systems
+        try {
+            this.spawnManager.initialize();
+            this.zoneManager.initialize();
+            this.bossManager.initialize();
+            this.eventManager.initialize();
+            
+            // Setup event handlers integration
+            this.setupSpawnEventHandlers();
+            
+            // Start initial spawns
+            setTimeout(() => {
+                this.startInitialSpawns();
+            }, 5000); // Aguardar 5s após startup
+            
+            console.log('✅ Spawn System v0.3.6v integrado com sucesso!');
+        } catch (error) {
+            console.error('❌ Erro na integração do Spawn System:', error);
+        }
+    }
+    
+    // Setup event handlers between spawn systems
+    setupSpawnEventHandlers() {
+        // Spawn Manager events
+        this.spawnManager.onMobSpawn = (mobData) => {
+            this.io.emit('mob_spawn', mobData);
+            console.log(`[Spawn] Mob ${mobData.id} spawned in ${mobData.zoneId}`);
+        };
+        
+        this.spawnManager.onMobDespawn = (mobData, cause) => {
+            this.io.emit('mob_despawn', { mobId: mobData.id, cause });
+        };
+        
+        this.spawnManager.onRespawn = (newMob, originalMob) => {
+            this.io.emit('mob_respawn', { newMob, originalMob });
+        };
+        
+        // Zone Manager events
+        this.zoneManager.onZoneEnter = (playerId, zoneId) => {
+            const player = this.players.get(playerId);
+            if (player) {
+                player.currentZone = zoneId;
+                this.io.to(playerId).emit('zone_enter', { zoneId, zoneData: this.zoneManager.getZoneData(zoneId) });
+            }
+        };
+        
+        this.zoneManager.onZoneExit = (playerId, zoneId) => {
+            this.io.to(playerId).emit('zone_exit', { zoneId });
+        };
+        
+        this.zoneManager.onMobPatrol = (mobId, position, patrolData) => {
+            this.io.emit('mob_patrol', { mobId, position });
+        };
+        
+        // Boss Manager events
+        this.bossManager.onBossSpawn = (bossData) => {
+            this.io.emit('boss_spawn', bossData);
+            console.log(`[Boss] Boss ${bossData.name} spawned!`);
+        };
+        
+        this.bossManager.onBossDeath = (bossData) => {
+            this.io.emit('boss_death', bossData);
+            console.log(`[Boss] Boss ${bossData.name} defeated!`);
+        };
+        
+        this.bossManager.onBossAnnouncement = (bossData, message) => {
+            this.io.emit('global_announcement', { message, type: 'boss', data: bossData });
+        };
+        
+        this.bossManager.onDamageDealt = (bossId, playerId, damage, currentHp) => {
+            this.io.emit('boss_damage', { bossId, playerId, damage, currentHp });
+        };
+        
+        // Event Manager events
+        this.eventManager.onEventStart = (eventData) => {
+            this.io.emit('event_start', eventData);
+            console.log(`[Event] Event ${eventData.name} started!`);
+        };
+        
+        this.eventManager.onEventEnd = (eventData, results) => {
+            this.io.emit('event_end', { eventData, results });
+        };
+        
+        this.eventManager.onEventWarning = (scheduleData, message) => {
+            this.io.emit('event_warning', { message, eventData: scheduleData });
+        };
+        
+        this.eventManager.onEventSpawn = (mobData, eventData) => {
+            this.io.emit('event_mob_spawn', { mobData, eventId: eventData.id });
+        };
+        
+        this.eventManager.onRewardDistributed = (playerId, rewards, event) => {
+            this.io.to(playerId).emit('event_rewards', { rewards, event });
+        };
+    }
+    
+    // Start initial spawns
+    startInitialSpawns() {
+        console.log('[Server] Iniciando spawns iniciais...');
+        
+        // Spawn initial mobs
+        this.spawnManager.spawnInitialMobs();
+        
+        // Setup zone monitoring for players
+        this.setupZoneMonitoring();
+        
+        console.log(`[Server] Spawns iniciais concluídos. Mobs ativos: ${this.spawnManager.getAllActiveMobs().length}`);
+    }
+    
+    // Setup zone monitoring for players
+    setupZoneMonitoring() {
+        setInterval(() => {
+            this.updatePlayerZones();
+        }, 5000); // Verificar a cada 5 segundos
+    }
+    
+    // Update player zones
+    updatePlayerZones() {
+        for (const [playerId, player] of this.players) {
+            const currentZone = this.zoneManager.getZoneAtPosition({ x: player.x, y: player.y });
+            const previousZone = player.currentZone;
+            
+            if (currentZone !== previousZone) {
+                if (previousZone) {
+                    this.zoneManager.removeMobFromZone(playerId, previousZone);
+                }
+                
+                if (currentZone) {
+                    this.zoneManager.addMobToZone(playerId, currentZone, { x: player.x, y: player.y });
+                }
+            }
+        }
+    }
+    
+    // Enhanced combat handler with spawn system integration
+    handleCombatAttack(attackerId, targetId) {
+        const attacker = this.players.get(attackerId);
+        const target = this.spawnManager.getAllActiveMobs().find(mob => mob.id === targetId) ||
+                      this.bossManager.getAllActiveBosses().find(boss => boss.id === targetId);
+        
+        if (!attacker || !target) return;
+        
+        // Calculate damage
+        const damage = Math.floor(Math.random() * 20) + 10;
+        
+        // Handle different target types
+        if (this.bossManager.getAllActiveBosses().find(boss => boss.id === targetId)) {
+            // Boss damage
+            this.bossManager.registerDamage(targetId, attackerId, damage);
+        } else {
+            // Regular mob damage
+            target.stats.hp -= damage;
+            
+            if (target.stats.hp <= 0) {
+                this.spawnManager.removeMob(targetId, 'death');
+                
+                // Award experience to player
+                const expGained = Math.floor(target.level * 10);
+                this.io.to(attackerId).emit('experience_gained', { amount: expGained, source: targetId });
+            }
+        }
+        
+        // Broadcast damage
+        this.io.emit('combat_damage', {
+            attackerId,
+            targetId,
+            damage,
+            targetHp: target.stats?.hp || 0
+        });
+    }
+    
+    // Get spawn system statistics
+    getSpawnSystemStats() {
+        return {
+            spawnManager: this.spawnManager.getStatistics(),
+            zoneManager: this.zoneManager.getZoneStatistics(),
+            bossManager: this.bossManager.getBossStatistics(),
+            eventManager: this.eventManager.getEventStatistics()
+        };
+    }
+    
+    // Setup Enhanced AI System Integration v0.3.7v
+    setupAIIntegration() {
+        console.log('[Server] Configurando Enhanced AI System v0.3.7v...');
+        
+        try {
+            // Initialize AI systems
+            this.aiMobController.initialize();
+            this.pathfindingSystem.initialize(1200, 800); // World dimensions
+            this.aiBossController.initialize();
+            this.decisionTree.initialize();
+            this.eventReactions.initialize();
+            
+            // Setup AI event handlers
+            this.setupAIEventHandlers();
+            
+            // Integrate AI with existing systems
+            this.integrateAIWithSpawnSystem();
+            
+            console.log('✅ Enhanced AI System v0.3.7v integrado com sucesso!');
+        } catch (error) {
+            console.error('❌ Erro na integração do Enhanced AI System:', error);
+        }
+    }
+    
+    // Setup AI event handlers
+    setupAIEventHandlers() {
+        // AI Mob Controller events
+        this.aiMobController.onBehaviorChange = (mobId, oldBehavior, newBehavior) => {
+            this.io.emit('mob_behavior_change', { mobId, oldBehavior, newBehavior });
+        };
+        
+        this.aiMobController.onStateChange = (mobId, oldState, newState) => {
+            this.io.emit('mob_state_change', { mobId, oldState, newState });
+        };
+        
+        this.aiMobController.onDecision = (mobId, decision, context) => {
+            this.io.emit('mob_decision', { mobId, decision, context });
+        };
+        
+        // AI Boss Controller events
+        this.aiBossController.onTacticalChange = (bossId, tactic, context) => {
+            this.io.emit('boss_tactical_change', { bossId, tactic, context });
+        };
+        
+        this.aiBossController.onPhaseTransition = (bossId, oldPhase, newPhase, phaseConfig) => {
+            this.io.emit('boss_phase_transition', { bossId, oldPhase, newPhase, phaseConfig });
+        };
+        
+        this.aiBossController.onAdaptiveDifficulty = (bossId, adjustment, newMultiplier) => {
+            this.io.emit('boss_adaptive_difficulty', { bossId, adjustment, newMultiplier });
+        };
+        
+        this.aiBossController.onMinionSpawn = (bossId, count, types) => {
+            this.io.emit('boss_minion_spawn', { bossId, count, types });
+        };
+        
+        this.aiBossController.onSpecialAbility = (bossId, abilityName, abilityData) => {
+            this.io.emit('boss_special_ability', { bossId, abilityName, abilityData });
+        };
+        
+        // Pathfinding System events
+        this.pathfindingSystem.onPathFound = (entityId, path, start, end) => {
+            this.io.emit('path_found', { entityId, path, start, end });
+        };
+        
+        this.pathfindingSystem.onPathBlocked = (entityId, blockedPosition) => {
+            this.io.emit('path_blocked', { entityId, blockedPosition });
+        };
+        
+        this.pathfindingSystem.onPathRecalculated = (entityId) => {
+            this.io.emit('path_recalculated', { entityId });
+        };
+        
+        // Decision Tree events
+        this.decisionTree.onDecisionMade = (treeName, result, context, evaluationTime) => {
+            this.io.emit('ai_decision', { treeName, result, context, evaluationTime });
+        };
+        
+        this.decisionTree.onTreeOptimized = (treeName, tree) => {
+            this.io.emit('decision_tree_optimized', { treeName, tree });
+        };
+        
+        // Event Reactions events
+        this.eventReactions.onReactionTriggered = (entity, event, reaction, activeReaction) => {
+            this.io.emit('event_reaction_triggered', { entity, event, reaction, activeReaction });
+        };
+        
+        this.eventReactions.onReactionCompleted = (reaction) => {
+            this.io.emit('event_reaction_completed', { reaction });
+        };
+        
+        this.eventReactions.onEventProcessed = (event, affectedEntities, processingTime) => {
+            this.io.emit('event_processed', { event, affectedEntities, processingTime });
+        };
+    }
+    
+    // Integrate AI with Spawn System
+    integrateAIWithSpawnSystem() {
+        // Connect Spawn Manager with AI Mob Controller
+        this.spawnManager.onMobSpawn = (mobData) => {
+            // Add mob to AI system
+            this.aiMobController.addMob(mobData);
+            
+            // Register moving entity for pathfinding
+            this.pathfindingSystem.registerMovingEntity(
+                mobData.id, 
+                mobData.position, 
+                20, // width
+                20  // height
+            );
+        };
+        
+        this.spawnManager.onMobDespawn = (mobData, cause) => {
+            // Remove mob from AI system
+            this.aiMobController.removeMob(mobData.id);
+            
+            // Unregister from pathfinding
+            this.pathfindingSystem.unregisterMovingEntity(mobData.id);
+        };
+        
+        // Connect Boss Manager with AI Boss Controller
+        this.bossManager.onBossSpawn = (bossData) => {
+            // Add boss to AI system
+            this.aiBossController.addBoss(bossData);
+            
+            // Register boss for pathfinding
+            this.pathfindingSystem.registerMovingEntity(
+                bossData.id,
+                bossData.position,
+                60, // width (bosses are larger)
+                60  // height
+            );
+        };
+        
+        this.bossManager.onBossDeath = (bossData) => {
+            // Remove boss from AI system
+            this.aiBossController.removeBoss(bossData.id);
+            
+            // Unregister from pathfinding
+            this.pathfindingSystem.unregisterMovingEntity(bossData.id);
+        };
+        
+        this.bossManager.onDamageDealt = (bossId, playerId, damage, currentHp) => {
+            // Update AI boss controller with damage info
+            const bossAI = this.aiBossController.bosses.get(bossId);
+            if (bossAI) {
+                bossAI.currentTarget = playerId;
+            }
+        };
+        
+        // Connect Event Manager with Event Reactions
+        this.eventManager.onEventStart = (eventData) => {
+            // Queue event for AI reactions
+            this.eventReactions.queueEvent({
+                type: eventData.type,
+                sourceId: eventData.id,
+                position: eventData.zoneId ? this.getZoneCenter(eventData.zoneId) : { x: 400, y: 300 },
+                data: eventData,
+                radius: 300
+            });
+        };
+        
+        // Setup world obstacles for pathfinding
+        this.setupWorldObstacles();
+    }
+    
+    // Setup world obstacles for pathfinding
+    setupWorldObstacles() {
+        // Add static obstacles based on zone definitions
+        for (const [zoneId, zone] of this.zoneManager.zones) {
+            // Add zone boundaries as obstacles
+            this.pathfindingSystem.addStaticObstacle(
+                { x: zone.bounds.x, y: zone.bounds.y },
+                zone.bounds.width,
+                10 // boundary thickness
+            );
+        }
+    }
+    
+    // Get zone center position
+    getZoneCenter(zoneId) {
+        const zone = this.zoneManager.zones.get(zoneId);
+        if (!zone) return { x: 400, y: 300 };
+        
+        return {
+            x: zone.bounds.x + zone.bounds.width / 2,
+            y: zone.bounds.y + zone.bounds.height / 2
+        };
+    }
+    
+    // Enhanced AI statistics
+    getAIStatistics() {
+        return {
+            mobController: this.aiMobController.getStatistics(),
+            pathfinding: this.pathfindingSystem.getStatistics(),
+            bossController: this.aiBossController.getStatistics(),
+            decisionTree: this.decisionTree.getStatistics(),
+            eventReactions: this.eventReactions.getStatistics()
+        };
+    }
+    
+    // Enhanced combat handler with AI integration
+    handleCombatAttackWithAI(attackerId, targetId) {
+        const attacker = this.players.get(attackerId);
+        const target = this.spawnManager.getAllActiveMobs().find(mob => mob.id === targetId) ||
+                      this.bossManager.getAllActiveBosses().find(boss => boss.id === targetId);
+        
+        if (!attacker || !target) return;
+        
+        // Calculate damage
+        const damage = Math.floor(Math.random() * 20) + 10;
+        
+        // Handle different target types with AI integration
+        if (this.bossManager.getAllActiveBosses().find(boss => boss.id === targetId)) {
+            // Boss damage with AI
+            this.bossManager.registerDamage(targetId, attackerId, damage);
+            
+            // Trigger AI reaction to player attack
+            this.eventReactions.queueEvent({
+                type: 'player_attack',
+                sourceId: attackerId,
+                position: target.position,
+                data: { damage, targetId },
+                radius: 200
+            });
+        } else {
+            // Regular mob damage with AI
+            const mobAI = this.aiMobController.mobs.get(targetId);
+            if (mobAI) {
+                target.stats.hp -= damage;
+                
+                // Trigger AI reaction to player attack
+                this.eventReactions.queueEvent({
+                    type: 'player_attack',
+                    sourceId: attackerId,
+                    position: target.position,
+                    data: { damage, targetId },
+                    radius: 150
+                });
+                
+                if (target.stats.hp <= 0) {
+                    this.spawnManager.removeMob(targetId, 'death');
+                    
+                    // Trigger death event for AI reactions
+                    this.eventReactions.queueEvent({
+                        type: 'mob_death',
+                        sourceId: attackerId,
+                        position: target.position,
+                        data: { targetId, target },
+                        radius: 200
+                    });
+                    
+                    // Award experience to player
+                    const expGained = Math.floor(target.level * 10);
+                    this.io.to(attackerId).emit('experience_gained', { amount: expGained, source: targetId });
+                }
+            }
+        }
+        
+        // Broadcast damage
+        this.io.emit('combat_damage', {
+            attackerId,
+            targetId,
+            damage,
+            targetHp: target.stats?.hp || 0
+        });
     }
 }
 
