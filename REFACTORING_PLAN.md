@@ -103,11 +103,9 @@ Transformar o projeto atual em uma arquitetura escalável, organizada e otimizad
 #### 🗑️ **1.1 Eliminar Código Duplicado**
 ```bash
 # REMOVER:
-├── 📁 src/ (diretório legado completo)
 ├── 📁 tests/ (manter apenas 5 testes essenciais)
-├── 📁 server.js.backup
-├── 📁 client/index.html.backup
-└── 📁 Arquivos .backup duplicados
+├── 📁 Arquivos .backup duplicados
+└── 📁 Arquivos legacy de IA (bossAI.js, monsterAI.js) - REMOVIDOS ✅
 ```
 
 #### 📁 **1.2 Reestruturar Diretórios**

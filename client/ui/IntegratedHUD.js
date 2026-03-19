@@ -189,26 +189,22 @@ class IntegratedHUD {
     }
     
     render() {
-        if (!this.visible || !this.ctx) return;
+        if (!this.ctx || !this.visible) return;
         
         // Limpar canvas
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // Renderizar elementos base
-        this.renderPlayerInfo();
+        // Renderizar elementos na ordem correta
         this.renderHealthBar();
         this.renderManaBar();
         this.renderExpBar();
         this.renderMinimap();
-        
-        // Renderizar painéis condicionais
-        if (this.uiState.showInventory) this.renderInventory();
-        if (this.uiState.showChat) this.renderChat();
-        if (this.uiState.showQuests) this.renderQuestTracker();
-        if (this.uiState.showSkills) this.renderSkills();
-        
-        // Renderizar diálogo
-        if (this.uiState.currentDialogue) this.renderDialogue();
+        this.renderPlayerInfo();
+        this.renderInventory();
+        this.renderChat();
+        this.renderQuestTracker();
+        this.renderSkills();
+        this.renderRaidInfo();
         
         // Renderizar notificações
         this.renderNotifications();
@@ -336,47 +332,7 @@ class IntegratedHUD {
         const playerMapY = y + (this.playerState.position.y / 600) * height;
         
         this.ctx.fillStyle = '#FF0000';
-        this.ctx.beginPath();
-        this.ctx.arc(playerMapX, playerMapY, 3, 0, Math.PI * 2);
-        this.ctx.fill();
-    }
-    
-    renderInventory() {
-        const { x, y, width, height } = this.elements.inventory;
-        
-        // Background
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-        this.ctx.fillRect(x, y, width, height);
-        
-        // Borda
-        this.ctx.strokeStyle = '#4CAF50';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(x, y, width, height);
-        
-        // Título
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.font = 'bold 12px Arial';
-        this.ctx.fillText('INVENTÁRIO', x + 10, y + 20);
-        
-        // Grid de inventário (4x2)
-        const slotSize = 30;
-        const startX = x + 10;
-        const startY = y + 30;
-        
-        for (let row = 0; row < 2; row++) {
-            for (let col = 0; col < 4; col++) {
-                const slotX = startX + col * (slotSize + 5);
-                const slotY = startY + row * (slotSize + 5);
-                
-                // Slot
-                this.ctx.strokeStyle = '#666';
-                this.ctx.strokeRect(slotX, slotY, slotSize, slotSize);
-                
-                // Ícone placeholder
-                this.ctx.fillStyle = '#333';
-                this.ctx.fillRect(slotX + 2, slotY + 2, slotSize - 4, slotSize - 4);
-            }
-        }
+        this.ctx.fillRect(playerMapX - 2, playerMapY - 2, 4, 4);
     }
     
     renderChat() {
