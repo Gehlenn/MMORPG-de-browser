@@ -1,13 +1,18 @@
-/**
- * SimpleLoginManager - Sistema de Login e Personagens
- * Versão corrigida e integrada com sistemas modernos
- */
+// Legacy of Komodo - Sistema de Login e Personagens
+// Mundo: Aethelgard - Fragmentos de Komodo
 
 class SimpleLoginManager {
   constructor() {
     this.currentUser = null;
     this.currentCharacter = null;
     this.gameplayEngine = null;
+    
+    // Configurações do mundo
+    this.gameWorld = {
+      name: 'Aethelgard',
+      title: 'Legacy of Komodo',
+      lore: 'Mundo de fantasia medieval com Fragmentos de Komodo'
+    };
     this.dataManager = window.dataManager || null; // LocalDataManager
     
     // Elementos DOM

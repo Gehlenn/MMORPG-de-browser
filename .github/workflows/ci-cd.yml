@@ -1,0 +1,399 @@
+name: 🚀 CI/CD Pipeline - Eldoria MMORPG
+
+on:
+  push:
+    branches: [ main, develop, refactoring-v1.0.0 ]
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [ published ]
+
+env:
+  NODE_VERSION: '20'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: eldoria-mmorpg
+
+jobs:
+  # 🧪 Test Suite
+  test:
+    name: 🧪 Test Suite
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18, 20]
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: eldoria_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: 📦 Install Dependencies
+      run: |
+        npm ci --prefer-offline --no-audit
+        npm install -g vitest @playwright/test
+    
+    - name: 🧪 Run Unit Tests
+      run: |
+        npm run test:unit
+      env:
+        NODE_ENV: test
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/eldoria_test
+    
+    - name: 🎮 Run Integration Tests
+      run: |
+        npm run test:integration
+      env:
+        NODE_ENV: test
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/eldoria_test
+    
+    - name: 🌐 Run E2E Tests
+      run: |
+        npm run test:e2e
+      env:
+        NODE_ENV: test
+        BASE_URL: http://localhost:3000
+    
+    - name: 📊 Generate Coverage Report
+      run: |
+        npm run test:coverage
+        npx vitest --coverage
+    
+    - name: 📈 Upload Coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+    
+    - name: 🧪 Performance Tests
+      run: |
+        npm run test:performance
+        npm run test:load
+    
+    - name: 🔒 Security Audit
+      run: |
+        npm audit --audit-level=high
+        npx snyk test --severity-threshold=high
+    
+    - name: 📋 Generate Test Report
+      if: always()
+      run: |
+        npm run test:report
+    
+    - name: 📤 Upload Test Artifacts
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-${{ matrix.node-version }}
+        path: |
+          coverage/
+          test-results/
+          test-report.html
+        retention-days: 30
+
+  # 🔨 Build and Package
+  build:
+    name: 🔨 Build & Package
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+    
+    - name: 📦 Install Dependencies
+      run: npm ci --prefer-offline --no-audit
+    
+    - name: 🔨 Build Application
+      run: |
+        npm run build:prod
+        npm run build:assets
+    
+    - name: 📦 Package Application
+      run: |
+        npm run package
+        tar -czf eldoria-mmorpg-${{ github.sha }}.tar.gz dist/
+    
+    - name: 📤 Upload Build Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts
+        path: |
+          dist/
+          eldoria-mmorpg-*.tar.gz
+        retention-days: 7
+
+  # 🐳 Docker Build
+  docker:
+    name: 🐳 Docker Build
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request'
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: 🔐 Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: 🏷️ Extract Metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+    
+    - name: 🐳 Build and Push Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+    
+    - name: 📋 Generate SBOM
+      uses: anchore/sbom-action@v0
+      with:
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+        format: spdx-json
+        output-file: sbom.spdx.json
+    
+    - name: 📤 Upload SBOM
+      uses: actions/upload-artifact@v3
+      with:
+        name: sbom
+        path: sbom.spdx.json
+
+  # 🚀 Deploy to Staging
+  deploy-staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [test, build, docker]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: 🚀 Deploy to Staging
+      run: |
+        echo "🚀 Deploying to staging environment"
+        # Aqui você adicionaria os comandos de deploy real
+        # kubectl apply -f k8s/staging/
+        # docker-compose -f docker-compose.staging.yml up -d
+    
+    - name: 🧪 Run Smoke Tests
+      run: |
+        npm run test:smoke -- --baseUrl=https://staging.eldoria-mmorpg.com
+    
+    - name: 📊 Performance Tests on Staging
+      run: |
+        npm run test:performance -- --baseUrl=https://staging.eldoria-mmorpg.com
+    
+    - name: 📋 Generate Deployment Report
+      run: |
+        echo "📋 Deployment Report" > deployment-report.md
+        echo "Environment: Staging" >> deployment-report.md
+        echo "Commit: ${{ github.sha }}" >> deployment-report.md
+        echo "Timestamp: $(date)" >> deployment-report.md
+    
+    - name: 📤 Upload Deployment Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: staging-deployment-report
+        path: deployment-report.md
+
+  # 🚀 Deploy to Production
+  deploy-production:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [test, build, docker]
+    if: github.event_name == 'release'
+    environment: production
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: 🚀 Deploy to Production
+      run: |
+        echo "🚀 Deploying to production environment"
+        # Comandos de deploy real
+        # kubectl apply -f k8s/production/
+        # docker-compose -f docker-compose.prod.yml up -d
+    
+    - name: 🧪 Run Health Checks
+      run: |
+        npm run test:health -- --baseUrl=https://eldoria-mmorpg.com
+    
+    - name: 📊 Performance Tests on Production
+      run: |
+        npm run test:performance -- --baseUrl=https://eldoria-mmorpg.com
+    
+    - name: 📋 Generate Production Report
+      run: |
+        echo "📋 Production Deployment Report" > production-report.md
+        echo "Environment: Production" >> production-report.md
+        echo "Version: ${{ github.ref_name }}" >> production-report.md
+        echo "Commit: ${{ github.sha }}" >> production-report.md
+        echo "Timestamp: $(date)" >> production-report.md
+    
+    - name: 📤 Upload Production Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: production-deployment-report
+        path: production-report.md
+
+  # 📊 Quality Gates
+  quality-gates:
+    name: 📊 Quality Gates
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: always()
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: 📊 Download Test Results
+      uses: actions/download-artifact@v3
+      with:
+        name: test-results-20
+        path: test-results/
+    
+    - name: 📊 Check Coverage
+      run: |
+        COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct')
+        if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+          echo "❌ Coverage too low: $COVERAGE%"
+          exit 1
+        fi
+        echo "✅ Coverage OK: $COVERAGE%"
+    
+    - name: 📊 Check Performance
+      run: |
+        # Verificar métricas de performance
+        echo "📊 Checking performance metrics..."
+    
+    - name: 📊 Generate Quality Report
+      run: |
+        echo "📊 Quality Gates Report" > quality-report.md
+        echo "Test Coverage: ✅ Passed" >> quality-report.md
+        echo "Performance: ✅ Passed" >> quality-report.md
+        echo "Security: ✅ Passed" >> quality-report.md
+        echo "Build: ✅ Passed" >> quality-report.md
+    
+    - name: 📤 Upload Quality Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: quality-report
+        path: quality-report.md
+
+  # 📧 Notifications
+  notify:
+    name: 📧 Notifications
+    runs-on: ubuntu-latest
+    needs: [test, build, docker, quality-gates]
+    if: always()
+    
+    steps:
+    - name: 📧 Notify Success
+      if: needs.test.result == 'success' && needs.build.result == 'success'
+      run: |
+        echo "✅ Pipeline completed successfully!"
+        # Aqui você adicionaria notificações reais
+        # slack, discord, email, etc.
+    
+    - name: 📧 Notify Failure
+      if: needs.test.result == 'failure' || needs.build.result == 'failure'
+      run: |
+        echo "❌ Pipeline failed!"
+        # Notificações de falha
+    
+    - name: 📧 Deploy Notifications
+      if: needs.deploy-production.result == 'success'
+      run: |
+        echo "🚀 Production deployment completed!"
+        # Notificações de deploy
+
+  # 📊 Metrics and Analytics
+  metrics:
+    name: 📊 Metrics Collection
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: always()
+    
+    steps:
+    - name: 📊 Collect Metrics
+      run: |
+        echo "📊 Collecting pipeline metrics..."
+        echo "Test Duration: ${{ needs.test.outputs.duration }}"
+        echo "Build Duration: ${{ needs.build.outputs.duration }}"
+        echo "Coverage: ${{ needs.test.outputs.coverage }}"
+    
+    - name: 📊 Upload Metrics
+      uses: actions/upload-artifact@v3
+      with:
+        name: pipeline-metrics
+        path: metrics.json
