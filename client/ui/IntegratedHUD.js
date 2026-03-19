@@ -1,6 +1,7 @@
 /**
- * Integrated HUD System
- * Sistema de HUD completo integrado com todos os elementos UI
+ * Integrated HUD System - Legacy of Komodo
+ * Sistema de HUD completo do mundo de Aethelgard
+ * Fragmentos de Komodo e civilizações perdidas
  */
 
 class IntegratedHUD {
@@ -9,6 +10,13 @@ class IntegratedHUD {
         this.canvas = null;
         this.ctx = null;
         this.visible = true;
+        
+        // Configurações do mundo
+        this.gameWorld = {
+            name: 'Aethelgard',
+            title: 'Legacy of Komodo',
+            lore: 'Mundo de fantasia medieval com Fragmentos de Komodo'
+        };
         
         // Elementos do HUD
         this.elements = {
@@ -21,7 +29,8 @@ class IntegratedHUD {
             chat: { x: 20, y: 460, width: 300, height: 120 },
             questTracker: { x: 340, y: 20, width: 200, height: 150 },
             skills: { x: 340, y: 180, width: 200, height: 100 },
-            minimap: { x: 20, y: 100, width: 150, height: 150 }
+            raidInfo: { x: 560, y: 20, width: 200, height: 120 },
+            notifications: { x: 560, y: 150, width: 200, height: 80 }
         };
         
         // Estado do jogador
@@ -35,6 +44,7 @@ class IntegratedHUD {
             exp: 0,
             maxExp: 100,
             gold: 0,
+            fragments: 0, // Fragmentos de Komodo
             position: { x: 400, y: 300 },
             stats: {
                 attack: 10,
@@ -227,6 +237,11 @@ class IntegratedHUD {
         this.ctx.font = '12px Arial';
         this.ctx.fillText(`Level ${this.playerState.level}`, x + 10, y + 40);
         this.ctx.fillText(`Gold: ${this.playerState.gold}`, x + 10, y + 60);
+        
+        // Fragmentos de Komodo
+        this.ctx.fillStyle = '#FFD700';
+        this.ctx.font = 'bold 12px Arial';
+        this.ctx.fillText(`🐉 ${this.playerState.fragments}`, x + 10, y + 75);
     }
     
     renderHealthBar() {

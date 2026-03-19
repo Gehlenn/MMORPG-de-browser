@@ -1,6 +1,7 @@
 /**
- * Integrated Map System
- * Sistema de mapas completo com tiles, dungeons e NPCs
+ * Integrated Map System - Legacy of Komodo
+ * Sistema de mapas do mundo de Aethelgard
+ * Fragmentos de Komodo e civilizações perdidas
  */
 
 class IntegratedMap {
@@ -10,65 +11,151 @@ class IntegratedMap {
         this.mapWidth = 50;
         this.mapHeight = 30;
         
+        // Configurações do mundo de Aethelgard
+        this.gameWorld = {
+            name: 'Aethelgard',
+            title: 'Legacy of Komodo',
+            lore: 'Mundo de fantasia medieval com Fragmentos de Komodo'
+        };
+        
         // Dados do mapa
         this.tiles = [];
         this.npcs = [];
         this.items = [];
         this.portals = [];
         
-        // Configurações do mapa
+        // Configurações das áreas de Aethelgard e Raids
         this.config = {
-            currentArea: 'plains',
+            currentArea: 'verdanthis_village',
             areas: {
-                plains: {
-                    name: 'Planícies Verdes',
+                verdanthis_village: {
+                    name: 'Aldeia Verdantis',
+                    description: 'Ponto inicial para aventureiros em Aethelgard',
                     width: 50,
                     height: 30,
                     spawnPoint: { x: 400, y: 300 },
-                    backgroundColor: '#405b33',
-                    tileTheme: 'grass'
+                    backgroundColor: '#2d5016',
+                    tileTheme: 'grass',
+                    level: 'starting'
                 },
-                forest: {
-                    name: 'Floresta Antiga',
-                    width: 40,
-                    height: 25,
-                    spawnPoint: { x: 200, y: 200 },
-                    backgroundColor: '#245d44',
-                    tileTheme: 'forest'
+                eldoria_city: {
+                    name: 'Cidade de Eldoria',
+                    description: 'Capital do reino, centro do poder',
+                    width: 60,
+                    height: 40,
+                    spawnPoint: { x: 300, y: 200 },
+                    backgroundColor: '#1e3a5f',
+                    tileTheme: 'stone',
+                    level: 'capital'
                 },
-                desert: {
-                    name: 'Deserto Escaldante',
+                draconia_mountains: {
+                    name: 'Montanhas Dracônia',
+                    description: 'Terras altas guardadas por dragões antigos',
                     width: 45,
-                    height: 20,
-                    spawnPoint: { x: 300, y: 150 },
-                    backgroundColor: '#d4a574',
-                    tileTheme: 'sand'
-                },
-                mountain: {
-                    name: 'Montanhas Geladas',
-                    width: 35,
                     height: 25,
-                    spawnPoint: { x: 250, y: 200 },
-                    backgroundColor: '#5f7a37',
-                    tileTheme: 'stone'
+                    spawnPoint: { x: 225, y: 125 },
+                    backgroundColor: '#4a4a4a',
+                    tileTheme: 'mountain',
+                    level: 'high'
                 },
-                dungeon_solo_ruins: {
-                    name: 'Ruínas Solitárias',
+                aurelia_swamps: {
+                    name: 'Pântanos Aurélia',
+                    description: 'Terras pantanosas com segredos antigos',
+                    width: 40,
+                    height: 20,
+                    spawnPoint: { x: 200, y: 100 },
+                    backgroundColor: '#1a4d2e',
+                    tileTheme: 'swamp',
+                    level: 'medium'
+                },
+                ruins_komodo: {
+                    name: 'Ruínas de Komodo',
+                    description: 'Antiga civilização dos Construtores',
                     width: 30,
                     height: 20,
-                    spawnPoint: { x: 150, y: 150 },
-                    backgroundColor: '#1a1a2e',
-                    tileTheme: 'stone',
-                    isDungeon: true
+                    spawnPoint: { x: 150, y: 100 },
+                    backgroundColor: '#2c1810',
+                    tileTheme: 'ruins',
+                    isDungeon: true,
+                    level: 'high'
                 },
-                dungeon_group_crypt: {
-                    name: 'Cripta Grupo',
+                crypt_builders: {
+                    name: 'Cripta dos Construtores',
+                    description: 'Túmulo dos antigos Construtores',
+                    width: 35,
+                    height: 25,
+                    spawnPoint: { x: 175, y: 125 },
+                    backgroundColor: '#1a0f0f',
+                    tileTheme: 'crypt',
+                    isDungeon: true,
+                    level: 'very_high'
+                },
+                // Áreas das Raids dos Generais Demônios
+                fortress_of_agony: {
+                    name: 'Fortaleza da Agonia',
+                    description: 'Fortaleza escura onde Arkazhul tortura almas',
                     width: 40,
                     height: 30,
-                    spawnPoint: { x: 200, y: 200 },
-                    backgroundColor: '#0f0f1e',
-                    tileTheme: 'stone',
-                    isDungeon: true
+                    spawnPoint: { x: 200, y: 150 },
+                    backgroundColor: '#4a0a0a',
+                    tileTheme: 'dark',
+                    isRaid: true,
+                    level: 90,
+                    boss: 'Arkazhul',
+                    title: 'Master of Torture'
+                },
+                infernal_crucible: {
+                    name: 'Crucível Infernal',
+                    description: 'Vulcão onde Vorthrax forja armas de destruição',
+                    width: 45,
+                    height: 35,
+                    spawnPoint: { x: 225, y: 175 },
+                    backgroundColor: '#8b2500',
+                    tileTheme: 'volcano',
+                    isRaid: true,
+                    level: 92,
+                    boss: 'Vorthrax',
+                    title: 'General of Destruction'
+                },
+                cathedral_of_decay: {
+                    name: 'Catedral da Decadência',
+                    description: 'Catedral corrompida onde Valzareth espalha escuridão',
+                    width: 50,
+                    height: 40,
+                    spawnPoint: { x: 250, y: 200 },
+                    backgroundColor: '#1a0a1a',
+                    tileTheme: 'corrupted',
+                    isRaid: true,
+                    level: 94,
+                    boss: 'Valzareth',
+                    title: 'Lord of Corruption'
+                },
+                citadel_of_the_void: {
+                    name: 'Cidadela do Void',
+                    description: 'Fortaleza dimensional onde Dravokhar devora almas',
+                    width: 55,
+                    height: 45,
+                    spawnPoint: { x: 275, y: 225 },
+                    backgroundColor: '#0a0a1a',
+                    tileTheme: 'void',
+                    isRaid: true,
+                    level: 96,
+                    boss: 'Dravokhar',
+                    title: 'Devourer of Souls'
+                },
+                abyss_gate: {
+                    name: 'Portão do Abismo',
+                    description: 'Confronto final com Malekondrius, Lord of the Abyss',
+                    width: 60,
+                    height: 50,
+                    spawnPoint: { x: 300, y: 250 },
+                    backgroundColor: '#000000',
+                    tileTheme: 'abyss',
+                    isRaid: true,
+                    level: 99,
+                    boss: 'Malekondrius',
+                    title: 'Lord of the Abyss',
+                    isFinal: true
                 }
             }
         };

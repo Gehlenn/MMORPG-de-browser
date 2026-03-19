@@ -1,10 +1,21 @@
 /**
- * IntegratedGameplayEngine - Motor de Jogo Principal
- * Versão integrada com Enhanced AI System v0.3.7v
+ * Integrated Gameplay Engine - Legacy of Komodo
+ * Motor de jogo completo do mundo de Aethelgard
+ * Fragmentos de Komodo e civilizações perdidas
  */
 
 class IntegratedGameplayEngine {
     constructor(canvasId, characterData) {
+        this.canvasId = canvasId;
+        this.characterData = characterData;
+        
+        // Configurações do mundo
+        this.gameWorld = {
+            name: 'Aethelgard',
+            title: 'Legacy of Komodo',
+            lore: 'Mundo de fantasia medieval com Fragmentos de Komodo'
+        };
+        
         this.canvas = document.getElementById(canvasId);
         if (!this.canvas) {
             throw new Error(`Canvas com ID '${canvasId}' não encontrado`);

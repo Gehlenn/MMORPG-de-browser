@@ -1,6 +1,7 @@
 /**
- * Integrated Asset Manager
- * Integra todos os assets existentes: NPCs, Mapas, HUD, UI, Mobs, Dungeons
+ * Integrated Asset Manager - Legacy of Komodo
+ * Gerencia todos os assets do mundo de Aethelgard
+ * Fragmentos de Komodo e civilizações perdidas
  */
 
 class IntegratedAssetManager {
@@ -10,6 +11,13 @@ class IntegratedAssetManager {
         this.loaded = false;
         this.loadCount = 0;
         this.totalAssets = 0;
+        
+        // Configurações do mundo de Aethelgard
+        this.gameWorld = {
+            name: 'Aethelgard',
+            title: 'Legacy of Komodo',
+            lore: 'Mundo de fantasia medieval com Fragmentos de Komodo'
+        };
         
         // Definir caminhos dos assets existentes
         this.assetPaths = {
@@ -56,45 +64,61 @@ class IntegratedAssetManager {
             }
         };
         
-        // Configurações de NPCs baseadas nos sprites existentes
+        // Configurações de NPCs baseados na lore de Aethelgard e Raids
         this.npcConfigs = {
             captain: {
-                name: 'Capitão da Guarda',
+                name: 'Capitão da Guarda Real',
                 type: 'guard',
                 x: 400,
                 y: 200,
-                sprite: 'npcs_captain',
                 dialogue: [
-                    'Bem-vindo à cidade, aventureiro!',
-                    'Mantenha a ordem por aqui.',
-                    'Preciso de ajuda com uma missão.'
+                    'Bem-vindo a Aethelgard, aventureiro!',
+                    'Os Fragmentos de Komodo despertam poderes antigos.',
+                    'Proteja o reino das criaturas das sombras.'
                 ],
                 quests: [
                     {
-                        id: 'first_quest',
-                        name: 'Primeira Missão',
-                        description: 'Encontre e derrote 5 goblins.',
-                        reward: { gold: 50, exp: 25 },
-                        target: 'goblin_raider',
-                        count: 5
+                        id: 'patrol_quest',
+                        name: 'Patrulha das Fronteiras',
+                        description: 'Proteja as fronteiras de Aethelgard de invasores.',
+                        reward: { gold: 50, exp: 25, fragments: 1 }
                     }
                 ]
             },
             merchant: {
-                name: 'Mercador Viajante',
+                name: 'Mercador dos Fragmentos',
                 type: 'merchant',
                 x: 300,
                 y: 300,
-                sprite: 'npcs_merchant',
                 dialogue: [
-                    'Olá! Tenho itens raros.',
-                    'Dê uma olhada em minha mercadoria.',
-                    'Volte sempre!'
+                    'Olá! Tenho artefatos dos Construtores.',
+                    'Fragmentos de Komodo concedem poderes extraordinários.',
+                    'Deseja adquirir algum item lendário?'
                 ],
                 shop: [
-                    { id: 'sword_basic', name: 'Espada Básica', price: 100, damage: 15 },
-                    { id: 'shield_basic', name: 'Escudo Básico', price: 75, defense: 10 },
-                    { id: 'potion_heal', name: 'Poção de Cura', price: 25, heal: 50 }
+                    { id: 'komodo_shard', name: 'Fragmento de Komodo', price: 100, power: 15 },
+                    { id: 'builder_armor', name: 'Armadura dos Construtores', price: 75, defense: 10 },
+                    { id: 'aethelgard_potion', name: 'Poção de Aethelgard', price: 25, heal: 50 }
+                ]
+            },
+            raid_herald: {
+                name: 'Heraldo das Raids',
+                type: 'quest_giver',
+                x: 500,
+                y: 250,
+                dialogue: [
+                    'Avisos importantes, aventureiro!',
+                    'Os generais demônios ameaçam Aethelgard.',
+                    'Arkazhul, Vorthrax, Valzareth, Dravokhar, Malekondrius...',
+                    'Apenas heróis corajosos podem detê-los.'
+                ],
+                quests: [
+                    {
+                        id: 'raid_preparation',
+                        name: 'Preparação para as Raids',
+                        description: 'Reúna aliados para enfrentar os generais demônios.',
+                        reward: { gold: 100, exp: 50, fragments: 2, raid_access: true }
+                    }
                 ]
             },
             explorer_npc: {
