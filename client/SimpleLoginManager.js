@@ -192,8 +192,111 @@ class SimpleLoginManager {
     if (this.characterScreen) this.characterScreen.style.display = 'none';
     if (this.gameScreen) this.gameScreen.style.display = 'flex';
     
+    // Adicionar classe para escurecer tela
+    document.body.classList.add('gameplay-active');
+    
+    // Inicializar novas HUDs se disponíveis
+    this.initializeHUDs();
+    
+    // Ativar sistemas visuais
+    this.initializeVisualSystems();
+    
     // Inicializar GameplayEngine
     this.initializeGameplay();
+  }
+  
+  initializeVisualSystems() {
+    console.log('🎨 Inicializando sistemas visuais...');
+    
+    // Ativar Visual Manager
+    if (window.visualManager) {
+      window.visualManager.activate();
+      console.log('✅ Visual Manager ativado');
+    }
+    
+    // Ativar Visual HUD Integration
+    if (window.visualHUDIntegration) {
+      window.visualHUDIntegration.activate();
+      console.log('✅ Visual HUD Integration ativada');
+    }
+    
+    // Substituir sprite system pelo enhanced
+    if (window.enhancedSpriteSystem && window.visualManager) {
+      window.visualManager.spriteSystem = window.enhancedSpriteSystem;
+      console.log('✅ Enhanced Sprite System ativado');
+    }
+    
+    console.log('✅ Sistemas visuais inicializados');
+  }
+  
+  initializeHUDs() {
+    console.log('🎮 Inicializando HUDs para gameplay...');
+    
+    // Mostrar HUD melhorada se disponível
+    if (window.improvedHUD) {
+      window.improvedHUD.show();
+      console.log('✅ Improved HUD ativada');
+    }
+    
+    // Alternar para WoW Style HUD se disponível
+    if (window.wowHUDIntegration) {
+      setTimeout(() => {
+        window.wowHUDIntegration.switchToWoWHUD();
+        console.log('✅ WoW Style HUD ativada');
+      }, 1000);
+    }
+    
+    // Atualizar estado do jogador em todas as HUDs
+    if (this.currentCharacter) {
+      const playerData = {
+        name: this.currentCharacter.name,
+        level: this.currentCharacter.level,
+        health: this.currentCharacter.hp,
+        maxHealth: this.currentCharacter.maxHp,
+        mana: this.currentCharacter.mana,
+        maxMana: this.currentCharacter.maxMana,
+        exp: this.currentCharacter.exp || 0,
+        maxExp: this.currentCharacter.maxExp || 100,
+        gold: this.currentCharacter.gold || 0,
+        position: { x: this.currentCharacter.x || 400, y: this.currentCharacter.y || 300 }
+      };
+      
+      // Atualizar em todas as HUDs
+      if (window.hudIntegration) {
+        window.hudIntegration.updatePlayerState(playerData);
+      }
+      if (window.wowHUDIntegration) {
+        window.wowHUDIntegration.updatePlayerState(playerData);
+      }
+      if (window.improvedHUD) {
+        window.improvedHUD.updatePlayerState(playerData);
+      }
+      
+      console.log('✅ Estado do jogador atualizado em todas as HUDs');
+    }
+  }
+  
+  hideAllHUDs() {
+    // Esconder todas as HUDs disponíveis
+    if (window.hudSystem) {
+      window.hudSystem.hide();
+    }
+    if (window.improvedHUD) {
+      window.improvedHUD.hide();
+    }
+    if (window.wowStyleHUD) {
+      window.wowStyleHUD.hide();
+    }
+    
+    // Desativar sistemas visuais
+    if (window.visualManager) {
+      window.visualManager.deactivate();
+    }
+    if (window.visualHUDIntegration) {
+      window.visualHUDIntegration.deactivate();
+    }
+    
+    console.log('🎮 Todas as HUDs e sistemas visuais escondidos');
   }
   
   handleCreateNewCharacter() {
@@ -486,6 +589,8 @@ class SimpleLoginManager {
       if (window.hudSystem) {
         window.hudSystem.updatePlayerState(characterData);
         window.hudSystem.showNotification(`Bem-vindo ao mundo, ${this.currentCharacter.name}!`, 'success');
+        // Mostrar HUD do gameplay
+        window.hudSystem.show();
       }
       
       // Iniciar gameplay
@@ -584,6 +689,12 @@ class SimpleLoginManager {
       this.gameplayEngine.stop();
       this.gameplayEngine = null;
     }
+    
+    // Esconder todas as HUDs
+    this.hideAllHUDs();
+    
+    // Remover classe de escurecimento
+    document.body.classList.remove('gameplay-active');
     
     // Voltar para tela de login
     if (this.characterScreen) this.characterScreen.style.display = 'none';

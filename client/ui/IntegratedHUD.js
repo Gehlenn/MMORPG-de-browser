@@ -77,6 +77,13 @@ class IntegratedHUD {
     initialize() {
         console.log('🎮 Inicializando HUD integrado...');
         
+        // Verificar se já existe canvas com este ID
+        const existingCanvas = document.getElementById('integrated-hud');
+        if (existingCanvas) {
+            console.log('⚠️ Canvas integrated-hud já existe, removendo...');
+            existingCanvas.remove();
+        }
+        
         // Criar canvas para HUD
         this.canvas = document.createElement('canvas');
         this.canvas.id = 'integrated-hud';
@@ -84,13 +91,26 @@ class IntegratedHUD {
         this.canvas.style.top = '0';
         this.canvas.style.left = '0';
         this.canvas.style.pointerEvents = 'none';
-        this.canvas.style.zIndex = '1000';
+        this.canvas.style.zIndex = '1'; // Muito baixo para não interferir com UI
         
-        // Adicionar ao DOM
-        document.body.appendChild(this.canvas);
+        // Inicialmente oculto - só aparece após login no gameplay
+        this.canvas.style.display = 'none';
+        
+        // TORNAR CANVAS TRANSPARENTE
+        this.canvas.style.backgroundColor = 'transparent';
+        this.canvas.style.background = 'transparent';
+        
+        // Adicionar ao DOM ATRÁS de outros elementos
+        setTimeout(() => {
+            document.body.appendChild(this.canvas);
+            console.log('✅ Canvas HUD adicionado ao DOM');
+        }, 100);
         
         // Configurar contexto
         this.ctx = this.canvas.getContext('2d');
+        
+        // Configurar canvas para ser transparente
+        this.ctx.globalAlpha = 1.0;
         
         // Ajustar tamanho da tela
         this.resize();
@@ -98,7 +118,7 @@ class IntegratedHUD {
         // Event listeners
         this.setupEventListeners();
         
-        console.log('✅ HUD integrado inicializado');
+        console.log('✅ HUD integrado inicializado (oculto até login)');
     }
     
     setupEventListeners() {
@@ -191,8 +211,10 @@ class IntegratedHUD {
     render() {
         if (!this.ctx || !this.visible) return;
         
-        // Limpar canvas
+        // Limpar canvas completamente para transparência total
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // NÃO desenhar background preto - deixar transparente
         
         // Renderizar elementos na ordem correta
         this.renderHealthBar();

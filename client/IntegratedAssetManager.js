@@ -1,7 +1,7 @@
 /**
- * Integrated Asset Manager - Legacy of Komodo
- * Gerencia todos os assets do mundo de Aethelgard
- * Fragmentos de Komodo e civilizações perdidas
+ * Integrated Asset Manager - Eldoria
+ * Gerencia todos os assets do continente de Eldoria
+ * Mundo de fantasia medieval com continentes misteriosos
  */
 
 class IntegratedAssetManager {
@@ -12,11 +12,11 @@ class IntegratedAssetManager {
         this.loadCount = 0;
         this.totalAssets = 0;
         
-        // Configurações do mundo de Aethelgard
+        // Configurações do mundo de Eldoria
         this.gameWorld = {
-            name: 'Aethelgard',
-            title: 'Legacy of Komodo',
-            lore: 'Mundo de fantasia medieval com Fragmentos de Komodo'
+            name: 'Eldoria',
+            title: 'Continente de Eldoria',
+            lore: 'Mundo de fantasia medieval com continentes misteriosos'
         };
         
         // Definir caminhos dos assets existentes
@@ -64,7 +64,7 @@ class IntegratedAssetManager {
             }
         };
         
-        // Configurações de NPCs baseados na lore de Aethelgard e Raids
+        // Configurações de NPCs baseados na lore de Eldoria e Continentes
         this.npcConfigs = {
             captain: {
                 name: 'Capitão da Guarda Real',
@@ -72,33 +72,33 @@ class IntegratedAssetManager {
                 x: 400,
                 y: 200,
                 dialogue: [
-                    'Bem-vindo a Aethelgard, aventureiro!',
-                    'Os Fragmentos de Komodo despertam poderes antigos.',
+                    'Bem-vindo a Eldoria, aventureiro!',
+                    'Os continentes misteriosos despertam poderes antigos.',
                     'Proteja o reino das criaturas das sombras.'
                 ],
                 quests: [
                     {
                         id: 'patrol_quest',
                         name: 'Patrulha das Fronteiras',
-                        description: 'Proteja as fronteiras de Aethelgard de invasores.',
+                        description: 'Proteja as fronteiras de Eldoria de invasores.',
                         reward: { gold: 50, exp: 25, fragments: 1 }
                     }
                 ]
             },
             merchant: {
-                name: 'Mercador dos Fragmentos',
+                name: 'Mercador dos Continentes',
                 type: 'merchant',
                 x: 300,
                 y: 300,
                 dialogue: [
-                    'Olá! Tenho artefatos dos Construtores.',
-                    'Fragmentos de Komodo concedem poderes extraordinários.',
+                    'Olá! Tenho artefatos dos continentes.',
+                    'Fragmentos misteriosos concedem poderes extraordinários.',
                     'Deseja adquirir algum item lendário?'
                 ],
                 shop: [
-                    { id: 'komodo_shard', name: 'Fragmento de Komodo', price: 100, power: 15 },
-                    { id: 'builder_armor', name: 'Armadura dos Construtores', price: 75, defense: 10 },
-                    { id: 'aethelgard_potion', name: 'Poção de Aethelgard', price: 25, heal: 50 }
+                    { id: 'eldoria_shard', name: 'Fragmento de Eldoria', price: 100, power: 15 },
+                    { id: 'continent_armor', name: 'Armadura dos Continentes', price: 75, defense: 10 },
+                    { id: 'eldoria_potion', name: 'Poção de Eldoria', price: 25, heal: 50 }
                 ]
             },
             raid_herald: {
@@ -108,8 +108,7 @@ class IntegratedAssetManager {
                 y: 250,
                 dialogue: [
                     'Avisos importantes, aventureiro!',
-                    'Os generais demônios ameaçam Aethelgard.',
-                    'Arkazhul, Vorthrax, Valzareth, Dravokhar, Malekondrius...',
+                    'Os generais demônios ameaçam Eldoria.',
                     'Apenas heróis corajosos podem detê-los.'
                 ],
                 quests: [

@@ -1012,12 +1012,24 @@ class BetaHUD {
     }
     
     handleSkillClick(slotIndex) {
+        if (!this.elements.skillsContainer || !this.elements.skillsContainer.children) {
+            console.warn('⚠️ Skills container não encontrado');
+            return;
+        }
+        
         const slot = this.elements.skillsContainer.children[slotIndex];
-        const skill = this.skills[slotIndex];
+        if (!slot) {
+            console.warn('⚠️ Slot não encontrado:', slotIndex);
+            return;
+        }
+        
+        const skill = this.skills && this.skills[slotIndex];
         
         if (skill && window.gameplayEngine) {
             window.gameplayEngine.useSkill(slotIndex);
             this.addNotification(`Usando skill: ${skill.name}`, 'info');
+        } else {
+            console.warn('⚠️ Skill ou gameplayEngine não encontrado');
         }
     }
     

@@ -814,7 +814,25 @@ class AIMobController {
         const threats = [];
         
         // Implementar detecção de jogadores próximos
-        // Por enquanto, retorna array vazio
+        if (this.server && this.server.players) {
+            for (const [playerId, player] of this.server.players) {
+                const distance = this.calculateDistance(mobData.position, { x: player.x, y: player.y });
+                
+                // Adicionar distância de segurança - só detectar se player estiver dentro do range de visão
+                if (distance <= this.config.detectionRange) {
+                    threats.push({
+                        id: playerId,
+                        position: { x: player.x, y: player.y },
+                        distance: distance,
+                        level: player.level || 1
+                    });
+                }
+            }
+        }
+        
+        // Ordenar por distância (mais próximo primeiro)
+        threats.sort((a, b) => a.distance - b.distance);
+        
         return threats;
     }
     
@@ -885,14 +903,69 @@ class AIMobController {
     }
     
     moveTowards(mobId, target) {
-        // Implementar movimento do mob
-        // Isso deve ser integrado com o sistema de movimento do jogo
-        console.log(`[AIMobController] Mob ${mobId} moving towards`, target);
+        const mobData = this.getMobData(mobId);
+        if (!mobData || !target) return;
+        
+        // Calcular direção
+        const dx = target.x - mobData.position.x;
+        const dy = target.y - mobData.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < 1) return; // Já chegou ao alvo
+        
+        // Normalizar direção
+        const dirX = (dx / distance) * 2; // Velocidade do mob
+        const dirY = (dy / distance) * 2;
+        
+        // Atualizar posição
+        mobData.position.x += dirX;
+        mobData.position.y += dirY;
+        
+        // Enviar atualização para clientes
+        if (this.server && this.server.io) {
+            this.server.io.emit('mobUpdate', {
+                id: mobId,
+                x: mobData.position.x,
+                y: mobData.position.y,
+                state: 'moving'
+            });
+        }
+        
+        console.log(`[AIMobController] Mob ${mobId} moving towards (${target.x.toFixed(1)}, ${target.y.toFixed(1)})`);
     }
     
     performAttack(mobId, targetId) {
-        // Implementar ataque do mob
-        console.log(`[AIMobController] Mob ${mobId} attacking ${targetId}`);
+        const mobData = this.getMobData(mobId);
+        if (!mobData || !targetId) return;
+        
+        // Calcular dano baseado no tipo do mob
+        const baseDamage = mobData.attack || 10;
+        const damage = baseDamage + Math.floor(Math.random() * 5); // +0-4 dano variável
+        
+        // Enviar dano para o servidor de combate
+        if (this.server && this.server.combatSystem) {
+            const result = this.server.combatSystem.handleMobAttack(mobId, targetId, damage);
+            
+            // Notificar clientes sobre o ataque
+            if (this.server.io) {
+                this.server.io.emit('mobAttack', {
+                    mobId: mobId,
+                    mobName: mobData.name || mobData.type,
+                    targetId: targetId,
+                    damage: damage
+                });
+                
+                // Atualizar posição do mob para mostrar animação de ataque
+                this.server.io.emit('mobUpdate', {
+                    id: mobId,
+                    x: mobData.position.x,
+                    y: mobData.position.y,
+                    state: 'attacking'
+                });
+            }
+        }
+        
+        console.log(`[AIMobController] Mob ${mobId} attacking ${targetId} for ${damage} damage`);
     }
     
     callForHelp(mobId) {
@@ -966,21 +1039,47 @@ class AIMobController {
     // Métodos de acesso a dados (precisam ser integrados com outros sistemas)
     
     getMobData(mobId) {
-        // Implementar acesso aos dados do mob
+        // Implementar acesso aos dados do mob usando o sistema global
+        if (global.mobSpawner && global.mobSpawner.getMob) {
+            return global.mobSpawner.getMob(mobId);
+        }
+        
+        // Fallback se mobSpawner não estiver disponível
         return {
             id: mobId,
             position: { x: 400, y: 300 },
-            stats: { hp: 100, maxHp: 100 }
+            stats: { hp: 100, maxHp: 100 },
+            attack: 10,
+            name: 'Mob',
+            type: 'goblin'
         };
     }
     
     getPlayerPosition(playerId) {
-        // Implementar acesso à posição do jogador
+        // Implementar acesso à posição do jogador usando o sistema do servidor
+        if (this.server && this.server.players && this.server.players.has(playerId)) {
+            const player = this.server.players.get(playerId);
+            return { x: player.x, y: player.y };
+        }
+        
+        // Fallback
         return { x: 400, y: 300 };
     }
     
     getNearbyMobs(mobId, range) {
-        // Implementar busca de mobs próximos
+        // Implementar busca de mobs próximos usando mobSpawner
+        if (global.mobSpawner && global.mobSpawner.getAllMobs) {
+            const allMobs = global.mobSpawner.getAllMobs();
+            const currentMob = this.getMobData(mobId);
+            
+            return allMobs.filter(mob => {
+                if (mob.id === mobId) return false; // Não incluir a si mesmo
+                
+                const distance = this.calculateDistance(currentMob.position, mob.position);
+                return distance <= range;
+            });
+        }
+        
         return [];
     }
     

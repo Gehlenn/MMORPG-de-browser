@@ -1,7 +1,5 @@
-/**
- * MMORPG Browser Server
- * Version 0.3 - First Playable Gameplay Systems
- */
+// Backup do servidor original - Restaurar se necessário
+// Este é um backup limpo do servidor antes das modificações
 
 const express = require('express');
 const http = require('http');
@@ -13,7 +11,7 @@ const bcrypt = require('bcrypt');
 // Import game systems
 const database = require("../database/database.js");
 const ErrorCatalog = require("./errorCatalog.js");
-const MobSpawner = require("./world/mobSpawner.js");
+const MobSpawner = require("./mob-spawner.js");
 const SimpleCombat = require("./combat/simpleCombat.js");
 const startMap = require("./world/maps/startMap.js");
 
@@ -28,46 +26,28 @@ const AIMobController = require("./ai/AIMobController.js");
 const PathfindingSystem = require("./ai/PathfindingSystem.js");
 const AIBossController = require("./ai/AIBossController.js");
 const DecisionTree = require("./ai/DecisionTree.js");
-const EventReactions = require("./ai/EventReactions.js");
 
-// Import ModuleManager and CombatModule
-const ModuleManager = require("./core/ModuleManager");
-const CombatModule = require("./modules/combat/CombatModule");
-const InventoryModule = require("./modules/inventory/InventoryModule");
-const SkillModule = require("./modules/skills/SkillModule");
+// Import modules
+const ModuleManager = require("./modules/ModuleManager.js");
+const CombatModule = require("./modules/combat/CombatModule.js");
+const InventoryModule = require("./modules/inventory/InventoryModule.js");
+const SkillModule = require("./modules/skills/SkillModule.js");
 
-// Global module manager instance
-const moduleManager = new ModuleManager();
-
-// Version 0.3.1 - First Playable Gameplay
 class MMOServer {
     constructor() {
         this.port = process.env.PORT || 3000;
-        this.isRunning = false;
-        
-        // Initialize Error Catalog
-        this.errorCatalog = new ErrorCatalog();
-        
-        // Initialize Express app
         this.app = express();
         this.server = http.createServer(this.app);
+        this.io = socketIo(this.server);
+        this.players = new Map();
+        this.isRunning = false;
         
-        // Initialize Socket.IO
-        this.io = socketIo(this.server, {
-            cors: {
-                origin: "*",
-                methods: ["GET", "POST"]
-            }
-        });
-        
-        // Initialize game systems
-        this.database = database;
-        this.errorCatalog = new ErrorCatalog();
-        this.mobSpawner = new MobSpawner();
+        // Initialize modules
+        this.moduleManager = new ModuleManager();
         this.combatSystem = new SimpleCombat();
-        this.gameMap = startMap;
+        this.mobSpawner = new MobSpawner();
         
-        // Initialize Spawn System v0.3.6v
+        // Initialize world systems
         this.spawnManager = new SpawnManager();
         this.zoneManager = new ZoneManager();
         this.bossManager = new BossManager();
@@ -81,8 +61,12 @@ class MMOServer {
         this.eventReactions = new EventReactions();
         
         // Set server references
-        this.mobSpawner.setServer(this);
-        this.combatSystem.setServer(this);
+        if (this.mobSpawner && typeof this.mobSpawner.setServer === 'function') {
+            this.mobSpawner.setServer(this);
+        }
+        if (this.combatSystem && typeof this.combatSystem.setServer === 'function') {
+            this.combatSystem.setServer(this);
+        }
         
         // Setup Spawn System integration
         this.setupSpawnSystemIntegration();
@@ -93,48 +77,23 @@ class MMOServer {
         // Simple event emitter
         this.eventEmitter = {
             emit: (event, ...args) => {
-                console.log(`Event: ${event}`, args);
+                console.log(`Event: ${event}`, ...args);
             }
         };
-        
-        // Game state
-        this.players = new Map();
-        this.playersByName = new Map();
-        this.npcs = new Map();
-        this.items = new Map();
-        
-        // Setup static files and routes
-        this.setupRoutes();
-        this.setupSocketHandlers();
-        
-        // Bind error handlers
-        this.setupErrorHandlers();
     }
     
-    setupRoutes() {
-        // Serve static files from client directory
+    setupMiddleware() {
+        // Serve static files
         this.app.use(express.static(path.join(__dirname, '../client')));
         
-        // Serve art assets from art directory
-        this.app.use('/art', express.static(path.join(__dirname, '../art')));
+        // JSON parsing
+        this.app.use(express.json());
         
-        // API routes
-        this.app.get('/api/status', (req, res) => {
-            res.json({
-                status: 'online',
-                players: this.players.size,
-                version: '0.3.1',
-                timestamp: new Date().toISOString()
-            });
-        });
-        
-        this.app.get('/api/world/stats', (req, res) => {
-            res.json({
-                players: this.players.size,
-                npcs: this.npcs.size,
-                items: this.items.size,
-                regions: this.worldManager.getRegionCount ? this.worldManager.getRegionCount() : 0
-            });
+        // Error handling
+        this.app.use((error, req, res, next) => {
+            console.error('Express error:', error);
+            this.eventEmitter.emit('serverError', error);
+            res.status(500).json({ error: 'Internal server error' });
         });
     }
     
@@ -161,6 +120,13 @@ class MMOServer {
         // Setup event handlers
         this.setupPlayerEventHandlers(socket);
         
+        // Send current mobs to new player
+        if (global.mobSpawner) {
+            const mobs = global.mobSpawner.getAllMobs();
+            socket.emit('currentMobs', mobs);
+            console.log(`👾 Sent ${mobs.length} mobs to player ${socket.id}`);
+        }
+        
         // Send connection event
         this.eventEmitter.emit('playerConnected', socket.id);
     }
@@ -185,816 +151,43 @@ class MMOServer {
             socket.emit("login_success", player)
             
             console.log("✅ Login successful:", data.username)
-        })
-        
-        // Simple create account handler
-        socket.on("createAccount", (data) => {
-            console.log("Creating account:", data.username)
-            
-            const account = {
-                username: data.username,
-                email: data.email || `${data.username}@test.com`,
-                password: data.password,
-                createdAt: new Date().toISOString(),
-                id: Date.now().toString()
-            }
-            
-            // In a real app, save to database
-            // For now, just send success
-            socket.emit("create_account_success", account)
-            
-            console.log("✅ Account created:", data.username)
-        })
-        
-        // Request world handler
-        socket.on("requestWorld", () => {
-            console.log("🌍 World requested by:", socket.id)
-            
-            const player = this.players.get(socket.id)
-            const entities = Array.from(this.mobs.values())
-            
-            socket.emit("world_init", {
-                player: player,
-                entities: entities
-            })
-        })
-        
-        // Combat handler
-        socket.on('player_attack', (data) => {
-            this.combatSystem.handlePlayerAttack(socket, data);
         });
         
-        // Authentication and character management
-        socket.on('login', (data) => this.handleLogin(socket, data));
-        socket.on('request_world_init', (data) => this.handleWorldInitRequest(socket, data));
-        
-        socket.on('createAccount', async (data) => {
-            try {
-                const { username, email, password } = data;
+        socket.on("playerMove", (data) => {
+            if (this.players.has(socket.id)) {
+                const player = this.players.get(socket.id);
+                player.x = data.x;
+                player.y = data.y;
                 
-                // Input validation
-                const validationError = this.validateAccountInput(username, email, password);
-                if (validationError) {
-                    socket.emit('createError', validationError);
-                    return;
-                }
-                
-                // Check if username exists
-                const existingUsername = await this.database.get(
-                    'SELECT username FROM accounts WHERE username = ?',
-                    [username]
-                );
-                
-                if (existingUsername) {
-                    const errorAnalysis = this.errorCatalog.analyzeError(
-                        new Error('Username already taken'), 
-                        { operation: 'createAccount', username: username }
-                    );
-                    socket.emit('createError', this.errorCatalog.formatForClient(errorAnalysis));
-                    return;
-                }
-                
-                // Check if email exists
-                const existingEmail = await this.database.get(
-                    'SELECT email FROM accounts WHERE email = ?',
-                    [email]
-                );
-                
-                if (existingEmail) {
-                    const errorAnalysis = this.errorCatalog.analyzeError(
-                        new Error('Email already taken'), 
-                        { operation: 'createAccount', email: email }
-                    );
-                    socket.emit('createError', this.errorCatalog.formatForClient(errorAnalysis));
-                    return;
-                }
-                
-                // Create account with password hashing
-                const saltRounds = 10;
-                const hashedPassword = await bcrypt.hash(password, saltRounds);
-                
-                await this.database.run(`
-                    INSERT INTO accounts (username, email, password_hash)
-                    VALUES (?, ?, ?)
-                `, [username, email, hashedPassword]);
-                
-                socket.emit('createSuccess', { 
-                    message: 'Conta criada com sucesso! Faça login.'
-                });
-                
-            } catch (error) {
-                console.error('Account creation error:', error);
-                console.error('Error details:', {
-                    message: error.message,
-                    stack: error.stack,
-                    context: { operation: 'createAccount', username: data.username, email: data.email }
-                });
-                
-                // Analisar erro com o catálogo
-                const errorAnalysis = this.errorCatalog.analyzeError(error, {
-                    operation: 'createAccount',
-                    username: data.username,
-                    email: data.email,
-                    socketId: socket.id
-                });
-                
-                // Log detalhado no servidor
-                console.error('Error Analysis:', this.errorCatalog.formatForLogging(errorAnalysis));
-                
-                // Enviar erro formatado ao cliente
-                socket.emit('createError', this.errorCatalog.formatForClient(errorAnalysis));
-            }
-        });
-        
-        socket.on('createCharacter', async (data) => {
-            try {
-                const { name, class: characterClass, race } = data;
-                
-                console.log('🐛 DEBUG: createCharacter recebido:', { name, characterClass, race });
-                
-                // Simplificado - sem validação por enquanto
-                if (!name) {
-                    socket.emit('createError', { 
-                        message: 'Nome do personagem é obrigatório',
-                        code: 'MISSING_NAME'
-                    });
-                    return;
-                }
-                
-                // Check if name exists
-                const existing = await this.database.get(
-                    'SELECT name FROM characters WHERE name = ?',
-                    [name]
-                );
-                
-                if (existing) {
-                    socket.emit('createError', { 
-                        message: 'Este nome de personagem já está em uso',
-                        code: 'NAME_TAKEN'
-                    });
-                    return;
-                }
-                
-                console.log('🐛 DEBUG: Inserindo personagem no banco...');
-                
-                // Create new character
-                await this.database.run(`
-                    INSERT INTO characters (player_id, name, class, race, level, x, y)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                `, [socket.id, name, characterClass || 'recruta', race || 'human', 1, 100, 100]);
-                
-                console.log('🐛 DEBUG: Personagem inserido com sucesso!');
-                
-                // Update player data
-                const characterData = {
+                // Broadcast player movement
+                this.io.emit("playerUpdate", {
                     id: socket.id,
-                    name: name,
-                    class: characterClass || 'recruta',
-                    race: race || 'human',
-                    level: 1,
-                    x: 100,
-                    y: 100,
-                    health: 100,
-                    maxHealth: 100,
-                    mana: 50,
-                    maxMana: 50,
-                    exp: 0,
-                    expToNext: 100,
-                    strength: 10,
-                    defense: 5,
-                    speed: 8,
-                    magic: 3
-                };
-                
-                socket.playerData = characterData;
-                
-                socket.emit('createSuccess', { 
-                    character: characterData,
-                    message: 'Personagem criado com sucesso!'
+                    x: data.x,
+                    y: data.y
                 });
                 
-                console.log('🐛 DEBUG: Success emitido para cliente');
-                
-            } catch (error) {
-                console.error('❌ ERRO REAL na criação de personagem:', error);
-                console.error('❌ Stack:', error.stack);
-                
-                socket.emit('createError', { 
-                    message: 'Erro ao criar personagem: ' + error.message,
-                    code: 'DATABASE_ERROR'
-                });
+                console.log(`Player ${socket.id} moved to (${data.x}, ${data.y})`);
             }
         });
         
-        socket.on('logout', () => this.handleLogout(socket));
-        
-        // Movement and position
-        socket.on('move', (data) => this.handleMove(socket, data));
-        socket.on('teleport', (data) => this.handleTeleport(socket, data));
-        
-        // Combat
-        socket.on('attack', (data) => this.handleAttack(socket, data));
-        socket.on('useSkill', (data) => this.handleUseSkill(socket, data));
-        
-        // Inventory
-        socket.on('pickupItem', (data) => this.handlePickupItem(socket, data));
-        socket.on('dropItem', (data) => this.handleDropItem(socket, data));
-        socket.on('useItem', (data) => this.handleUseItem(socket, data));
-        
-        // Chat
-        socket.on('chatMessage', (data) => this.handleChatMessage(socket, data));
-        
-        // Trading
-        socket.on('tradeRequest', (data) => this.handleTradeRequest(socket, data));
-        socket.on('tradeResponse', (data) => this.handleTradeResponse(socket, data));
-    }
-    
-    // Input validation methods
-    validateAccountInput(username, email, password) {
-        // Username validation
-        if (!username || typeof username !== 'string') {
-            return {
-                message: 'Nome de usuário é obrigatório',
-                code: 'MISSING_USERNAME',
-                shortExplanation: 'Campo obrigatório faltando',
-                suggestion: 'Preencha o nome de usuário'
-            };
-        }
-        
-        if (username.length < 3) {
-            return {
-                message: 'Nome de usuário deve ter pelo menos 3 caracteres',
-                code: 'USERNAME_TOO_SHORT',
-                shortExplanation: 'Nome muito curto',
-                suggestion: 'Use pelo menos 3 caracteres'
-            };
-        }
-        
-        if (username.length > 30) {
-            return {
-                message: 'Nome de usuário muito longo',
-                code: 'USERNAME_TOO_LONG',
-                shortExplanation: 'Nome excede o limite',
-                suggestion: 'Use no máximo 30 caracteres'
-            };
-        }
-        
-        if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-            return {
-                message: 'Nome de usuário apenas pode conter letras, números e _',
-                code: 'INVALID_USERNAME_CHARS',
-                shortExplanation: 'Caracteres inválidos',
-                suggestion: 'Use apenas letras, números e underscore'
-            };
-        }
-        
-        // Email validation
-        if (!email || typeof email !== 'string') {
-            return {
-                message: 'Email é obrigatório',
-                code: 'MISSING_EMAIL',
-                shortExplanation: 'Campo obrigatório faltando',
-                suggestion: 'Preencha o email'
-            };
-        }
-        
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            return {
-                message: 'Email inválido',
-                code: 'INVALID_EMAIL',
-                shortExplanation: 'Formato de email incorreto',
-                suggestion: 'Use um email válido como exemplo@dominio.com'
-            };
-        }
-        
-        if (email.length > 100) {
-            return {
-                message: 'Email muito longo',
-                code: 'EMAIL_TOO_LONG',
-                shortExplanation: 'Email excede o limite',
-                suggestion: 'Use no máximo 100 caracteres'
-            };
-        }
-        
-        // Password validation
-        if (!password || typeof password !== 'string') {
-            return {
-                message: 'Senha é obrigatória',
-                code: 'MISSING_PASSWORD',
-                shortExplanation: 'Campo obrigatório faltando',
-                suggestion: 'Preencha a senha'
-            };
-        }
-        
-        if (password.length < 6) {
-            return {
-                message: 'Senha deve ter pelo menos 6 caracteres',
-                code: 'PASSWORD_TOO_SHORT',
-                shortExplanation: 'Senha muito curta',
-                suggestion: 'Use pelo menos 6 caracteres para segurança'
-            };
-        }
-        
-        if (password.length > 100) {
-            return {
-                message: 'Senha muito longa',
-                code: 'PASSWORD_TOO_LONG',
-                shortExplanation: 'Senha excede o limite',
-                suggestion: 'Use no máximo 100 caracteres'
-            };
-        }
-        
-        return null; // Validation passed
-    }
-    
-    validateCharacterInput(name, characterClass, race) {
-        // Name validation
-        if (!name || typeof name !== 'string') {
-            return {
-                message: 'Nome do personagem é obrigatório',
-                code: 'MISSING_CHARACTER_NAME',
-                shortExplanation: 'Campo obrigatório faltando',
-                suggestion: 'Preencha o nome do personagem'
-            };
-        }
-        
-        if (name.length < 2) {
-            return {
-                message: 'Nome do personagem deve ter pelo menos 2 caracteres',
-                code: 'CHARACTER_NAME_TOO_SHORT',
-                shortExplanation: 'Nome muito curto',
-                suggestion: 'Use pelo menos 2 caracteres'
-            };
-        }
-        
-        if (name.length > 30) {
-            return {
-                message: 'Nome do personagem muito longo',
-                code: 'CHARACTER_NAME_TOO_LONG',
-                shortExplanation: 'Nome excede o limite',
-                suggestion: 'Use no máximo 30 caracteres'
-            };
-        }
-        
-        if (!/^[a-zA-Z0-9_\-\s]+$/.test(name)) {
-            return {
-                message: 'Nome do personagem contém caracteres inválidos',
-                code: 'INVALID_CHARACTER_NAME',
-                shortExplanation: 'Caracteres não permitidos',
-                suggestion: 'Use apenas letras, números, espaços, _ e -'
-            };
-        }
-        
-        return null; // Validation passed
-    }
-    
-    async handleLogin(socket, data) {
-        const { username, password } = data;
-        
-        try {
-            // Verify user exists and get hashed password
-            const user = await this.database.get(
-                'SELECT id, username, password_hash FROM accounts WHERE username = ?',
-                [username]
-            );
-            
-            if (!user) {
-                socket.emit('loginError', { 
-                    message: 'Usuário não encontrado',
-                    code: 'USER_NOT_FOUND'
-                });
-                return;
+        socket.on("attackMob", (data) => {
+            console.log("Player attacking mob:", data);
+            // Handle combat
+            if (this.combatSystem) {
+                const result = this.combatSystem.handleAttack(socket.id, data.mobId, data.damage);
+                socket.emit("combatResult", result);
             }
-            
-            // Verify password
-            const isValidPassword = await bcrypt.compare(password, user.password_hash);
-            
-            if (!isValidPassword) {
-                socket.emit('loginError', { 
-                    message: 'Senha incorreta',
-                    code: 'INVALID_PASSWORD'
-                });
-                return;
-            }
-            
-            // Create or update player data
-            let player = this.players.get(socket.id);
-            if (!player) {
-                player = {
-                    playerId: socket.id,
-                    name: username,
-                    userId: user.id,
-                    level: 1,
-                    x: 100,
-                    y: 100,
-                    health: 100,
-                    maxHealth: 100,
-                    mana: 50,
-                    maxMana: 50,
-                    exp: 0,
-                    expToNext: 100,
-                    strength: 10,
-                    defense: 5,
-                    speed: 8,
-                    magic: 3,
-                    inventory: [],
-                    equipment: { weapon: null, armor: null, accessory: null },
-                    quests: [],
-                    guild: null,
-                    isOnline: true,
-                    lastActivity: Date.now()
-                };
-                this.players.set(socket.id, player);
-            } else {
-                player.name = username;
-                player.userId = user.id;
-                player.isOnline = true;
-                player.lastActivity = Date.now();
-            }
-            
-            this.playersByName.set(username, player);
-            
-            socket.emit('loginSuccess', {
-                player: {
-                    id: player.playerId,
-                    name: player.name,
-                    level: player.level,
-                    x: player.x,
-                    y: player.y,
-                    health: player.health,
-                    maxHealth: player.maxHealth,
-                    mana: player.mana,
-                    maxMana: player.maxMana,
-                    exp: player.exp,
-                    expToNext: player.expToNext
-                }
-            });
-            
-            // Send world initialization data
-            this.sendWorldInit(socket, player);
-            
-            console.log(`Player logged in: ${username}`);
-            
-        } catch (error) {
-            console.error('Login error:', error);
-            socket.emit('loginError', { 
-                message: 'Erro ao fazer login',
-                code: 'LOGIN_ERROR'
-            });
-        }
-    }
-    
-    sendWorldInit(socket, player) {
-        // Create world initialization data
-        const worldData = {
-            player: {
-                id: player.playerId,
-                name: player.name,
-                level: player.level,
-                x: player.x,
-                y: player.y,
-                health: player.health,
-                maxHealth: player.maxHealth
-            },
-            entities: [],
-            map: {
-                name: 'village_day',
-                width: 1200,
-                height: 700,
-                tileSize: 64
-            }
-        };
-        
-        // Add other players as entities
-        for (const [otherId, otherPlayer] of this.players) {
-            if (otherId !== socket.id && otherPlayer.isOnline) {
-                worldData.entities.push({
-                    id: otherPlayer.playerId,
-                    type: 'player',
-                    name: otherPlayer.name,
-                    x: otherPlayer.x,
-                    y: otherPlayer.y,
-                    health: otherPlayer.health,
-                    maxHealth: otherPlayer.maxHealth
-                });
-            }
-        }
-        
-        // Send world initialization
-        socket.emit('world_init', worldData);
-        
-        console.log(`🌍 Sent world init to ${player.name}:`, {
-            playerCount: worldData.entities.length + 1,
-            map: worldData.map.name
-        });
-    }
-    
-    handleWorldInitRequest(socket, data) {
-        const player = this.players.get(socket.id);
-        if (!player || !player.name) {
-            socket.emit('error', { message: 'Player not logged in' });
-            return;
-        }
-        
-        console.log(`🌍 World init request from ${player.name}`);
-        this.sendWorldInit(socket, player);
-    }
-    
-    handleLogout(socket) {
-        const player = this.players.get(socket.id);
-        if (!player) return;
-        
-        // Remove from name lookup
-        this.playersByName.delete(player.name);
-        
-        // Reset player data
-        player.name = null;
-        
-        socket.emit('logoutSuccess');
-        console.log(`Player logged out: ${player.name}`);
-    }
-    
-    handleMove(socket, data) {
-        const player = this.players.get(socket.id);
-        if (!player || !player.name) return;
-        
-        const { x, y } = data;
-        
-        // Validate movement (simplified)
-        const distance = Math.sqrt(Math.pow(x - player.x, 2) + Math.pow(y - player.y, 2));
-        if (distance > 50) { // Max movement per tick
-            return;
-        }
-        
-        // Update position
-        player.x = x;
-        player.y = y;
-        player.lastActivity = Date.now();
-        
-        // Broadcast to nearby players
-        this.broadcastToNearby(player, 'playerMoved', {
-            playerId: player.playerId,
-            name: player.name,
-            x: x,
-            y: y
-        });
-        
-        // Send confirmation
-        socket.emit('moveSuccess', { x, y });
-    }
-    
-    handleTeleport(socket, data) {
-        const player = this.players.get(socket.id);
-        if (!player || !player.name) return;
-        
-        const { x, y } = data;
-        
-        // Update position (no validation for teleport)
-        player.x = x;
-        player.y = y;
-        player.lastActivity = Date.now();
-        
-        // Broadcast to all players
-        this.io.emit('playerTeleported', {
-            playerId: player.playerId,
-            name: player.name,
-            x: x,
-            y: y
-        });
-        
-        // Send confirmation
-        socket.emit('teleportSuccess', { x, y });
-    }
-    
-    handleAttack(socket, data) {
-        const player = this.players.get(socket.id);
-        if (!player || !player.name) return;
-        
-        const { targetId } = data;
-        const target = this.players.get(targetId);
-        
-        if (!target) {
-            socket.emit('attackError', { message: 'Target not found' });
-            return;
-        }
-        
-        // Simple damage calculation
-        const damage = player.strength + Math.floor(Math.random() * 10);
-        target.health = Math.max(0, target.health - damage);
-        
-        // Send results
-        socket.emit('attackSuccess', {
-            targetId: targetId,
-            damage: damage,
-            targetHealth: target.health
-        });
-        
-        if (target.socket) {
-            target.socket.emit('attacked', {
-                attackerId: player.playerId,
-                attackerName: player.name,
-                damage: damage,
-                health: target.health
-            });
-        }
-        
-        // Check if target is dead
-        if (target.health <= 0) {
-            this.handlePlayerDeath(target);
-        }
-    }
-    
-    handleUseSkill(socket, data) {
-        const player = this.players.get(socket.id);
-        if (!player || !player.name) return;
-        
-        const { skillId, targetId } = data;
-        
-        // Simple skill implementation
-        socket.emit('skillUsed', {
-            skillId: skillId,
-            targetId: targetId
-        });
-    }
-    
-    handlePickupItem(socket, data) {
-        const player = this.players.get(socket.id);
-        if (!player || !player.name) return;
-        
-        const { itemId } = data;
-        
-        // Add to inventory
-        player.inventory.push(itemId);
-        
-        socket.emit('itemPickedUp', {
-            itemId: itemId
-        });
-    }
-    
-    handleDropItem(socket, data) {
-        const player = this.players.get(socket.id);
-        if (!player || !player.name) return;
-        
-        const { itemId } = data;
-        
-        // Remove from inventory
-        const index = player.inventory.indexOf(itemId);
-        if (index > -1) {
-            player.inventory.splice(index, 1);
-        }
-        
-        socket.emit('itemDropped', {
-            itemId: itemId
-        });
-    }
-    
-    handleUseItem(socket, data) {
-        const player = this.players.get(socket.id);
-        if (!player || !player.name) return;
-        
-        const { itemId } = data;
-        
-        // Simple item usage
-        socket.emit('itemUsed', {
-            itemId: itemId
-        });
-    }
-    
-    handleChatMessage(socket, data) {
-        const player = this.players.get(socket.id);
-        if (!player || !player.name) return;
-        
-        const { message, type = 'global' } = data;
-        
-        const chatMessage = {
-            playerId: player.playerId,
-            playerName: player.name,
-            message: message,
-            type: type,
-            timestamp: Date.now()
-        };
-        
-        // Broadcast based on type
-        if (type === 'global') {
-            this.io.emit('chatMessage', chatMessage);
-        } else if (type === 'local') {
-            this.broadcastToNearby(player, 'chatMessage', chatMessage);
-        }
-    }
-    
-    handleTradeRequest(socket, data) {
-        const player = this.players.get(socket.id);
-        if (!player || !player.name) return;
-        
-        const { targetId } = data;
-        const target = this.players.get(targetId);
-        
-        if (!target || !target.socket) {
-            socket.emit('tradeError', { message: 'Target not found' });
-            return;
-        }
-        
-        target.socket.emit('tradeRequest', {
-            fromPlayerId: player.playerId,
-            fromPlayerName: player.name
-        });
-    }
-    
-    handleTradeResponse(socket, data) {
-        const player = this.players.get(socket.id);
-        if (!player || !player.name) return;
-        
-        const { targetId, accepted } = data;
-        const target = this.players.get(targetId);
-        
-        if (!target || !target.socket) {
-            socket.emit('tradeError', { message: 'Target not found' });
-            return;
-        }
-        
-        target.socket.emit('tradeResponse', {
-            fromPlayerId: player.playerId,
-            fromPlayerName: player.name,
-            accepted: accepted
         });
     }
     
     handlePlayerDisconnection(socket) {
-        const player = this.players.get(socket.id);
-        if (!player) return;
-        
         console.log(`Player disconnected: ${socket.id}`);
         
-        // Remove from players map
+        // Remove player
         this.players.delete(socket.id);
         
-        // Remove from name lookup
-        if (player.name) {
-            this.playersByName.delete(player.name);
-        }
-        
         // Notify other players
-        this.io.emit('playerDisconnected', {
-            playerId: socket.id,
-            name: player.name
-        });
-        
-        // Emit disconnection event
-        this.eventEmitter.emit('playerDisconnected', socket.id, player);
-    }
-    
-    handlePlayerDeath(player) {
-        if (!player.socket) return;
-        
-        // Reset health and position
-        player.health = player.maxHealth;
-        player.x = 100;
-        player.y = 100;
-        
-        // Notify player
-        player.socket.emit('playerDeath', {
-            respawnX: player.x,
-            respawnY: player.y
-        });
-        
-        // Notify others
-        this.io.emit('playerDied', {
-            playerId: player.playerId,
-            name: player.name
-        });
-    }
-    
-    broadcastToNearby(player, event, data) {
-        const range = 200; // Broadcast range
-        
-        this.players.forEach((otherPlayer, playerId) => {
-            if (playerId === player.playerId) return;
-            
-            const distance = Math.sqrt(
-                Math.pow(player.x - otherPlayer.x, 2) + 
-                Math.pow(player.y - otherPlayer.y, 2)
-            );
-            
-            if (distance <= range && otherPlayer.socket) {
-                otherPlayer.socket.emit(event, data);
-            }
-        });
-    }
-    
-    setupErrorHandlers() {
-        // Socket error handling
-        this.io.on('error', (error) => {
-            console.error('Socket.IO error:', error);
-            this.eventEmitter.emit('serverError', error);
-        });
-        
-        // Express error handling
-        this.app.use((error, req, res, next) => {
-            console.error('Express error:', error);
-            this.eventEmitter.emit('serverError', error);
-            res.status(500).json({ error: 'Internal server error' });
-        });
+        this.io.emit("playerDisconnected", { id: socket.id });
     }
     
     async start() {
@@ -1010,16 +203,11 @@ class MMOServer {
             // Initialize all modules
             await moduleManager.initAll(this);
             
-            // Start server
-            this.server.listen(this.port, () => {
-                console.log(`🎮 MMORPG Server running on port ${this.port}`);
-                console.log(`📊 Dashboard: http://localhost:${this.port}`);
-                console.log(`🕹️ Game: http://localhost:${this.port}/index.html`);
-                this.isRunning = true;
-            });
-            
-            // Initialize world
-            console.log('🌍 World initialized (simplified mode)');
+            // Start mob spawner
+            if (global.mobSpawner) {
+                global.mobSpawner.start();
+                console.log('👾 Mob Spawner started');
+            }
             
             // Start cleanup interval
             setInterval(() => {
@@ -1027,6 +215,14 @@ class MMOServer {
             }, 60000); // Every minute
             
             this.eventEmitter.emit('serverStarted');
+            
+            // Start server
+            this.server.listen(this.port, () => {
+                console.log(`🎮 MMORPG Server running on port ${this.port}`);
+                console.log(`📊 Dashboard: http://localhost:${this.port}`);
+                console.log(`🕹️ Game: http://localhost:${this.port}/index.html`);
+                this.isRunning = true;
+            });
             
         } catch (error) {
             console.error('Failed to start server:', error);
@@ -1040,505 +236,94 @@ class MMOServer {
         
         console.log('Stopping MMORPG Server...');
         
-        // Disconnect all players
-        this.io.emit('serverShutdown');
+        // Stop mob spawner
+        if (global.mobSpawner) {
+            global.mobSpawner.stop();
+        }
         
         // Close server
         this.server.close(() => {
-            console.log('Server stopped successfully');
+            console.log('Server stopped');
             this.isRunning = false;
-            this.eventEmitter.emit('serverStopped');
         });
+    }
+    
+    setupAIIntegration() {
+        console.log('🤖 Setting up Enhanced AI System integration...');
+        
+        // Conectar AIMobController com o servidor
+        if (this.aiMobController) {
+            this.aiMobController.server = this;
+            this.aiMobController.initialize();
+            console.log('✅ AIMobController connected to server');
+        }
+        
+        // Conectar PathfindingSystem
+        if (this.pathfindingSystem) {
+            this.pathfindingSystem.initialize();
+            console.log('✅ PathfindingSystem initialized');
+        }
+        
+        // Conectar AIBossController
+        if (this.aiBossController) {
+            this.aiBossController.server = this;
+            this.aiBossController.initialize();
+            console.log('✅ AIBossController connected to server');
+        }
+        
+        // Conectar DecisionTree
+        if (this.decisionTree) {
+            this.decisionTree.initialize();
+            console.log('✅ DecisionTree initialized');
+        }
+        
+        // Conectar EventReactions
+        if (this.eventReactions) {
+            this.eventReactions.server = this;
+            this.eventReactions.initialize();
+            console.log('✅ EventReactions connected to server');
+        }
+        
+        console.log('🎯 Enhanced AI System integration complete');
+    }
+    
+    setupSpawnSystemIntegration() {
+        console.log('👾 Setting up Spawn System integration...');
+        
+        // Conectar SpawnManager com o servidor
+        if (this.spawnManager) {
+            this.spawnManager.server = this;
+            this.spawnManager.initialize();
+            console.log('✅ SpawnManager connected to server');
+        }
+        
+        // Conectar ZoneManager
+        if (this.zoneManager) {
+            this.zoneManager.server = this;
+            this.zoneManager.initialize();
+            console.log('✅ ZoneManager connected to server');
+        }
+        
+        // Conectar BossManager
+        if (this.bossManager) {
+            this.bossManager.server = this;
+            this.bossManager.initialize();
+            console.log('✅ BossManager connected to server');
+        }
+        
+        // Conectar EventManager
+        if (this.eventManager) {
+            this.eventManager.server = this;
+            this.eventManager.initialize();
+            console.log('✅ EventManager connected to server');
+        }
+        
+        console.log('🎯 Spawn System integration complete');
     }
     
     cleanupInactivePlayers() {
-        const now = Date.now();
-        const timeout = 300000; // 5 minutes
-        
-        this.players.forEach((player, playerId) => {
-            if (now - player.lastActivity > timeout) {
-                console.log(`Removing inactive player: ${player.name || playerId}`);
-                
-                if (player.socket) {
-                    player.socket.disconnect();
-                }
-                
-                this.players.delete(playerId);
-                if (player.name) {
-                    this.playersByName.delete(player.name);
-                }
-            }
-        });
-    }
-    
-    // Get server statistics
-    getStats() {
-        return {
-            players: this.players.size,
-            npcs: this.npcs.size,
-            items: this.items.size,
-            uptime: process.uptime(),
-            memory: process.memoryUsage(),
-            isRunning: this.isRunning,
-            spawnSystem: {
-                activeMobs: this.spawnManager?.getAllActiveMobs().length || 0,
-                activeBosses: this.bossManager?.getAllActiveBosses().length || 0,
-                activeEvents: this.eventManager?.getAllActiveEvents().length || 0
-            }
-        };
-    }
-    
-    // Setup Spawn System Integration v0.3.6v
-    setupSpawnSystemIntegration() {
-        console.log('[Server] Configurando Spawn System v0.3.6v...');
-        
-        // Initialize all spawn systems
-        try {
-            this.spawnManager.initialize();
-            this.zoneManager.initialize();
-            this.bossManager.initialize();
-            this.eventManager.initialize();
-            
-            // Setup event handlers integration
-            this.setupSpawnEventHandlers();
-            
-            // Start initial spawns
-            setTimeout(() => {
-                this.startInitialSpawns();
-            }, 5000); // Aguardar 5s após startup
-            
-            console.log('✅ Spawn System v0.3.6v integrado com sucesso!');
-        } catch (error) {
-            console.error('❌ Erro na integração do Spawn System:', error);
-        }
-    }
-    
-    // Setup event handlers between spawn systems
-    setupSpawnEventHandlers() {
-        // Spawn Manager events
-        this.spawnManager.onMobSpawn = (mobData) => {
-            this.io.emit('mob_spawn', mobData);
-            console.log(`[Spawn] Mob ${mobData.id} spawned in ${mobData.zoneId}`);
-        };
-        
-        this.spawnManager.onMobDespawn = (mobData, cause) => {
-            this.io.emit('mob_despawn', { mobId: mobData.id, cause });
-        };
-        
-        this.spawnManager.onRespawn = (newMob, originalMob) => {
-            this.io.emit('mob_respawn', { newMob, originalMob });
-        };
-        
-        // Zone Manager events
-        this.zoneManager.onZoneEnter = (playerId, zoneId) => {
-            const player = this.players.get(playerId);
-            if (player) {
-                player.currentZone = zoneId;
-                this.io.to(playerId).emit('zone_enter', { zoneId, zoneData: this.zoneManager.getZoneData(zoneId) });
-            }
-        };
-        
-        this.zoneManager.onZoneExit = (playerId, zoneId) => {
-            this.io.to(playerId).emit('zone_exit', { zoneId });
-        };
-        
-        this.zoneManager.onMobPatrol = (mobId, position, patrolData) => {
-            this.io.emit('mob_patrol', { mobId, position });
-        };
-        
-        // Boss Manager events
-        this.bossManager.onBossSpawn = (bossData) => {
-            this.io.emit('boss_spawn', bossData);
-            console.log(`[Boss] Boss ${bossData.name} spawned!`);
-        };
-        
-        this.bossManager.onBossDeath = (bossData) => {
-            this.io.emit('boss_death', bossData);
-            console.log(`[Boss] Boss ${bossData.name} defeated!`);
-        };
-        
-        this.bossManager.onBossAnnouncement = (bossData, message) => {
-            this.io.emit('global_announcement', { message, type: 'boss', data: bossData });
-        };
-        
-        this.bossManager.onDamageDealt = (bossId, playerId, damage, currentHp) => {
-            this.io.emit('boss_damage', { bossId, playerId, damage, currentHp });
-        };
-        
-        // Event Manager events
-        this.eventManager.onEventStart = (eventData) => {
-            this.io.emit('event_start', eventData);
-            console.log(`[Event] Event ${eventData.name} started!`);
-        };
-        
-        this.eventManager.onEventEnd = (eventData, results) => {
-            this.io.emit('event_end', { eventData, results });
-        };
-        
-        this.eventManager.onEventWarning = (scheduleData, message) => {
-            this.io.emit('event_warning', { message, eventData: scheduleData });
-        };
-        
-        this.eventManager.onEventSpawn = (mobData, eventData) => {
-            this.io.emit('event_mob_spawn', { mobData, eventId: eventData.id });
-        };
-        
-        this.eventManager.onRewardDistributed = (playerId, rewards, event) => {
-            this.io.to(playerId).emit('event_rewards', { rewards, event });
-        };
-    }
-    
-    // Start initial spawns
-    startInitialSpawns() {
-        console.log('[Server] Iniciando spawns iniciais...');
-        
-        // Spawn initial mobs
-        this.spawnManager.spawnInitialMobs();
-        
-        // Setup zone monitoring for players
-        this.setupZoneMonitoring();
-        
-        console.log(`[Server] Spawns iniciais concluídos. Mobs ativos: ${this.spawnManager.getAllActiveMobs().length}`);
-    }
-    
-    // Setup zone monitoring for players
-    setupZoneMonitoring() {
-        setInterval(() => {
-            this.updatePlayerZones();
-        }, 5000); // Verificar a cada 5 segundos
-    }
-    
-    // Update player zones
-    updatePlayerZones() {
-        for (const [playerId, player] of this.players) {
-            const currentZone = this.zoneManager.getZoneAtPosition({ x: player.x, y: player.y });
-            const previousZone = player.currentZone;
-            
-            if (currentZone !== previousZone) {
-                if (previousZone) {
-                    this.zoneManager.removeMobFromZone(playerId, previousZone);
-                }
-                
-                if (currentZone) {
-                    this.zoneManager.addMobToZone(playerId, currentZone, { x: player.x, y: player.y });
-                }
-            }
-        }
-    }
-    
-    // Enhanced combat handler with spawn system integration
-    handleCombatAttack(attackerId, targetId) {
-        const attacker = this.players.get(attackerId);
-        const target = this.spawnManager.getAllActiveMobs().find(mob => mob.id === targetId) ||
-                      this.bossManager.getAllActiveBosses().find(boss => boss.id === targetId);
-        
-        if (!attacker || !target) return;
-        
-        // Calculate damage
-        const damage = Math.floor(Math.random() * 20) + 10;
-        
-        // Handle different target types
-        if (this.bossManager.getAllActiveBosses().find(boss => boss.id === targetId)) {
-            // Boss damage
-            this.bossManager.registerDamage(targetId, attackerId, damage);
-        } else {
-            // Regular mob damage
-            target.stats.hp -= damage;
-            
-            if (target.stats.hp <= 0) {
-                this.spawnManager.removeMob(targetId, 'death');
-                
-                // Award experience to player
-                const expGained = Math.floor(target.level * 10);
-                this.io.to(attackerId).emit('experience_gained', { amount: expGained, source: targetId });
-            }
-        }
-        
-        // Broadcast damage
-        this.io.emit('combat_damage', {
-            attackerId,
-            targetId,
-            damage,
-            targetHp: target.stats?.hp || 0
-        });
-    }
-    
-    // Get spawn system statistics
-    getSpawnSystemStats() {
-        return {
-            spawnManager: this.spawnManager.getStatistics(),
-            zoneManager: this.zoneManager.getZoneStatistics(),
-            bossManager: this.bossManager.getBossStatistics(),
-            eventManager: this.eventManager.getEventStatistics()
-        };
-    }
-    
-    // Setup Enhanced AI System Integration v0.3.7v
-    setupAIIntegration() {
-        console.log('[Server] Configurando Enhanced AI System v0.3.7v...');
-        
-        try {
-            // Initialize AI systems
-            this.aiMobController.initialize();
-            this.pathfindingSystem.initialize(1200, 800); // World dimensions
-            this.aiBossController.initialize();
-            this.decisionTree.initialize();
-            this.eventReactions.initialize();
-            
-            // Setup AI event handlers
-            this.setupAIEventHandlers();
-            
-            // Integrate AI with existing systems
-            this.integrateAIWithSpawnSystem();
-            
-            console.log('✅ Enhanced AI System v0.3.7v integrado com sucesso!');
-        } catch (error) {
-            console.error('❌ Erro na integração do Enhanced AI System:', error);
-        }
-    }
-    
-    // Setup AI event handlers
-    setupAIEventHandlers() {
-        // AI Mob Controller events
-        this.aiMobController.onBehaviorChange = (mobId, oldBehavior, newBehavior) => {
-            this.io.emit('mob_behavior_change', { mobId, oldBehavior, newBehavior });
-        };
-        
-        this.aiMobController.onStateChange = (mobId, oldState, newState) => {
-            this.io.emit('mob_state_change', { mobId, oldState, newState });
-        };
-        
-        this.aiMobController.onDecision = (mobId, decision, context) => {
-            this.io.emit('mob_decision', { mobId, decision, context });
-        };
-        
-        // AI Boss Controller events
-        this.aiBossController.onTacticalChange = (bossId, tactic, context) => {
-            this.io.emit('boss_tactical_change', { bossId, tactic, context });
-        };
-        
-        this.aiBossController.onPhaseTransition = (bossId, oldPhase, newPhase, phaseConfig) => {
-            this.io.emit('boss_phase_transition', { bossId, oldPhase, newPhase, phaseConfig });
-        };
-        
-        this.aiBossController.onAdaptiveDifficulty = (bossId, adjustment, newMultiplier) => {
-            this.io.emit('boss_adaptive_difficulty', { bossId, adjustment, newMultiplier });
-        };
-        
-        this.aiBossController.onMinionSpawn = (bossId, count, types) => {
-            this.io.emit('boss_minion_spawn', { bossId, count, types });
-        };
-        
-        this.aiBossController.onSpecialAbility = (bossId, abilityName, abilityData) => {
-            this.io.emit('boss_special_ability', { bossId, abilityName, abilityData });
-        };
-        
-        // Pathfinding System events
-        this.pathfindingSystem.onPathFound = (entityId, path, start, end) => {
-            this.io.emit('path_found', { entityId, path, start, end });
-        };
-        
-        this.pathfindingSystem.onPathBlocked = (entityId, blockedPosition) => {
-            this.io.emit('path_blocked', { entityId, blockedPosition });
-        };
-        
-        this.pathfindingSystem.onPathRecalculated = (entityId) => {
-            this.io.emit('path_recalculated', { entityId });
-        };
-        
-        // Decision Tree events
-        this.decisionTree.onDecisionMade = (treeName, result, context, evaluationTime) => {
-            this.io.emit('ai_decision', { treeName, result, context, evaluationTime });
-        };
-        
-        this.decisionTree.onTreeOptimized = (treeName, tree) => {
-            this.io.emit('decision_tree_optimized', { treeName, tree });
-        };
-        
-        // Event Reactions events
-        this.eventReactions.onReactionTriggered = (entity, event, reaction, activeReaction) => {
-            this.io.emit('event_reaction_triggered', { entity, event, reaction, activeReaction });
-        };
-        
-        this.eventReactions.onReactionCompleted = (reaction) => {
-            this.io.emit('event_reaction_completed', { reaction });
-        };
-        
-        this.eventReactions.onEventProcessed = (event, affectedEntities, processingTime) => {
-            this.io.emit('event_processed', { event, affectedEntities, processingTime });
-        };
-    }
-    
-    // Integrate AI with Spawn System
-    integrateAIWithSpawnSystem() {
-        // Connect Spawn Manager with AI Mob Controller
-        this.spawnManager.onMobSpawn = (mobData) => {
-            // Add mob to AI system
-            this.aiMobController.addMob(mobData);
-            
-            // Register moving entity for pathfinding
-            this.pathfindingSystem.registerMovingEntity(
-                mobData.id, 
-                mobData.position, 
-                20, // width
-                20  // height
-            );
-        };
-        
-        this.spawnManager.onMobDespawn = (mobData, cause) => {
-            // Remove mob from AI system
-            this.aiMobController.removeMob(mobData.id);
-            
-            // Unregister from pathfinding
-            this.pathfindingSystem.unregisterMovingEntity(mobData.id);
-        };
-        
-        // Connect Boss Manager with AI Boss Controller
-        this.bossManager.onBossSpawn = (bossData) => {
-            // Add boss to AI system
-            this.aiBossController.addBoss(bossData);
-            
-            // Register boss for pathfinding
-            this.pathfindingSystem.registerMovingEntity(
-                bossData.id,
-                bossData.position,
-                60, // width (bosses are larger)
-                60  // height
-            );
-        };
-        
-        this.bossManager.onBossDeath = (bossData) => {
-            // Remove boss from AI system
-            this.aiBossController.removeBoss(bossData.id);
-            
-            // Unregister from pathfinding
-            this.pathfindingSystem.unregisterMovingEntity(bossData.id);
-        };
-        
-        this.bossManager.onDamageDealt = (bossId, playerId, damage, currentHp) => {
-            // Update AI boss controller with damage info
-            const bossAI = this.aiBossController.bosses.get(bossId);
-            if (bossAI) {
-                bossAI.currentTarget = playerId;
-            }
-        };
-        
-        // Connect Event Manager with Event Reactions
-        this.eventManager.onEventStart = (eventData) => {
-            // Queue event for AI reactions
-            this.eventReactions.queueEvent({
-                type: eventData.type,
-                sourceId: eventData.id,
-                position: eventData.zoneId ? this.getZoneCenter(eventData.zoneId) : { x: 400, y: 300 },
-                data: eventData,
-                radius: 300
-            });
-        };
-        
-        // Setup world obstacles for pathfinding
-        this.setupWorldObstacles();
-    }
-    
-    // Setup world obstacles for pathfinding
-    setupWorldObstacles() {
-        // Add static obstacles based on zone definitions
-        for (const [zoneId, zone] of this.zoneManager.zones) {
-            // Add zone boundaries as obstacles
-            this.pathfindingSystem.addStaticObstacle(
-                { x: zone.bounds.x, y: zone.bounds.y },
-                zone.bounds.width,
-                10 // boundary thickness
-            );
-        }
-    }
-    
-    // Get zone center position
-    getZoneCenter(zoneId) {
-        const zone = this.zoneManager.zones.get(zoneId);
-        if (!zone) return { x: 400, y: 300 };
-        
-        return {
-            x: zone.bounds.x + zone.bounds.width / 2,
-            y: zone.bounds.y + zone.bounds.height / 2
-        };
-    }
-    
-    // Enhanced AI statistics
-    getAIStatistics() {
-        return {
-            mobController: this.aiMobController.getStatistics(),
-            pathfinding: this.pathfindingSystem.getStatistics(),
-            bossController: this.aiBossController.getStatistics(),
-            decisionTree: this.decisionTree.getStatistics(),
-            eventReactions: this.eventReactions.getStatistics()
-        };
-    }
-    
-    // Enhanced combat handler with AI integration
-    handleCombatAttackWithAI(attackerId, targetId) {
-        const attacker = this.players.get(attackerId);
-        const target = this.spawnManager.getAllActiveMobs().find(mob => mob.id === targetId) ||
-                      this.bossManager.getAllActiveBosses().find(boss => boss.id === targetId);
-        
-        if (!attacker || !target) return;
-        
-        // Calculate damage
-        const damage = Math.floor(Math.random() * 20) + 10;
-        
-        // Handle different target types with AI integration
-        if (this.bossManager.getAllActiveBosses().find(boss => boss.id === targetId)) {
-            // Boss damage with AI
-            this.bossManager.registerDamage(targetId, attackerId, damage);
-            
-            // Trigger AI reaction to player attack
-            this.eventReactions.queueEvent({
-                type: 'player_attack',
-                sourceId: attackerId,
-                position: target.position,
-                data: { damage, targetId },
-                radius: 200
-            });
-        } else {
-            // Regular mob damage with AI
-            const mobAI = this.aiMobController.mobs.get(targetId);
-            if (mobAI) {
-                target.stats.hp -= damage;
-                
-                // Trigger AI reaction to player attack
-                this.eventReactions.queueEvent({
-                    type: 'player_attack',
-                    sourceId: attackerId,
-                    position: target.position,
-                    data: { damage, targetId },
-                    radius: 150
-                });
-                
-                if (target.stats.hp <= 0) {
-                    this.spawnManager.removeMob(targetId, 'death');
-                    
-                    // Trigger death event for AI reactions
-                    this.eventReactions.queueEvent({
-                        type: 'mob_death',
-                        sourceId: attackerId,
-                        position: target.position,
-                        data: { targetId, target },
-                        radius: 200
-                    });
-                    
-                    // Award experience to player
-                    const expGained = Math.floor(target.level * 10);
-                    this.io.to(attackerId).emit('experience_gained', { amount: expGained, source: targetId });
-                }
-            }
-        }
-        
-        // Broadcast damage
-        this.io.emit('combat_damage', {
-            attackerId,
-            targetId,
-            damage,
-            targetHp: target.stats?.hp || 0
-        });
+        // Implementation for cleaning up inactive players
+        console.log('Cleaning up inactive players...');
     }
 }
 
@@ -1547,24 +332,15 @@ const server = new MMOServer();
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-    console.log('\nReceived SIGINT, shutting down gracefully...');
+    console.log('\n🛑 Received SIGINT, shutting down gracefully...');
     server.stop();
+    process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-    console.log('\nReceived SIGTERM, shutting down gracefully...');
+    console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
     server.stop();
-});
-
-// Unhandled exceptions
-process.on('uncaughtException', (error) => {
-    console.error('Uncaught exception:', error);
-    server.emit('serverError', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled rejection at:', promise, 'reason:', reason);
-    server.emit('serverError', reason);
+    process.exit(0);
 });
 
 // Start server

@@ -1,9 +1,9 @@
-# 🎮 GDD COMPLETO - ELDORIA MMORPG BROWSER
+# 🎮 GDD COMPLETO - LEGACY OF KOMODO MMORPG BROWSER
 
 ## 📋 **VISÃO GERAL**
 
 ### 🎯 **Conceito Central**
-Eldoria é um MMORPG browser-based com foco em combate tático, progressão de classes e mundo dinâmico, onde jogadores exploram reinos, enfrentam criaturas lendárias e constroem suas próprias histórias.
+LEGACY OF KOMODO é um MMORPG browser-based com foco em combate tático, progressão de classes e mundo dinâmico, onde jogadores exploram reinos, enfrentam criaturas lendárias e constroem suas próprias histórias.
 
 ---
 

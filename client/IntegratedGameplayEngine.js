@@ -1,7 +1,7 @@
 /**
- * Integrated Gameplay Engine - Legacy of Komodo
- * Motor de jogo completo do mundo de Aethelgard
- * Fragmentos de Komodo e civilizações perdidas
+ * Integrated Gameplay Engine - Eldoria
+ * Motor de jogo completo do continente de Eldoria
+ * Mundo de fantasia medieval com continentes misteriosos
  */
 
 class IntegratedGameplayEngine {
@@ -11,9 +11,9 @@ class IntegratedGameplayEngine {
         
         // Configurações do mundo
         this.gameWorld = {
-            name: 'Aethelgard',
-            title: 'Legacy of Komodo',
-            lore: 'Mundo de fantasia medieval com Fragmentos de Komodo'
+            name: 'Eldoria',
+            title: 'Continente de Eldoria',
+            lore: 'Mundo de fantasia medieval com continentes misteriosos'
         };
         
         this.canvas = document.getElementById(canvasId);
@@ -283,24 +283,53 @@ class IntegratedGameplayEngine {
             });
         });
         
-        this.socket.on('world_init', (data) => {
-            console.log('🌍 Mundo inicializado:', data);
-            this.entities = data.entities || [];
-            this.mobs = data.mobs || [];
+        this.socket.on('currentMobs', (mobs) => {
+            console.log('👾 Current mobs recebidos:', mobs.length);
+            this.mobs = mobs || [];
+            this.renderAllMobs();
         });
         
-        this.socket.on('mob_spawn', (mob) => {
+        this.socket.on('mobSpawn', (mob) => {
+            console.log('👾 Mob spawn recebido:', mob.name || mob.type);
             this.mobs.push(mob);
+            this.renderMob(mob);
         });
         
-        this.socket.on('mob_death', (mobId) => {
-            this.mobs = this.mobs.filter(m => m.id !== mobId);
+        this.socket.on('mobUpdate', (mob) => {
+            console.log('📊 Mob update recebido:', mob.name || mob.id);
+            const existingMob = this.mobs.find(m => m.id === mob.id);
+            if (existingMob) {
+                Object.assign(existingMob, mob);
+                this.updateMobPosition(mob);
+            }
+        });
+        
+        this.socket.on('mobRemove', (data) => {
+            console.log('💀 Mob remove recebido:', data.id);
+            this.mobs = this.mobs.filter(m => m.id !== data.id);
+            this.removeMobFromCanvas(data.id);
         });
         
         this.socket.on('combat_damage', (data) => {
-            if (data.targetId === this.player.id) {
+            if (data.targetId === this.player.id || data.targetId === this.socket.id) {
                 this.player.hp = Math.max(0, this.player.hp - data.damage);
+                console.log('💔 Player recebeu ' + data.damage + ' de dano! HP: ' + this.player.hp + '/' + this.player.maxHp);
                 this.updateHUD();
+                this.showDamage(this.player.x, this.player.y, data.damage);
+            }
+        });
+        
+        this.socket.on('mobAttack', (data) => {
+            if (data.targetId === this.player.id || data.targetId === this.socket.id) {
+                this.player.hp = Math.max(0, this.player.hp - data.damage);
+                console.log('👹 ' + data.mobName + ' atacou! Dano: ' + data.damage + ' HP: ' + this.player.hp + '/' + this.player.maxHp);
+                this.updateHUD();
+                this.showDamage(this.player.x, this.player.y, data.damage);
+                
+                if (this.player.hp <= 0) {
+                    console.log('💀 Player derrotado!');
+                    this.handlePlayerDeath();
+                }
             }
         });
         
@@ -633,8 +662,12 @@ class IntegratedGameplayEngine {
                 // Usar sprite real
                 this.ctx.drawImage(sprite, mob.x, mob.y, mob.width || 32, mob.height || 32);
             } else {
-                // Fallback para cores
+                // Fallback para cores - ATUALIZADO COM CORES DO SERVIDOR
                 const mobColors = {
+                    goblin: '#228B22',      // Verde
+                    wolf: '#696969',        // Cinza
+                    orc: '#8B4513',         // Marrom
+                    slime: '#90EE90',       // Verde claro
                     goblin_raider: '#8B4513',
                     dire_wolf: '#696969',
                     mountain_orc: '#556B2F',
@@ -642,7 +675,7 @@ class IntegratedGameplayEngine {
                     dragon: '#8B0000'
                 };
                 
-                this.ctx.fillStyle = mobColors[mob.type] || '#f44336';
+                this.ctx.fillStyle = mob.color || mobColors[mob.type] || '#f44336';
                 this.ctx.fillRect(mob.x, mob.y, mob.width || 32, mob.height || 32);
             }
             
@@ -661,6 +694,301 @@ class IntegratedGameplayEngine {
                 this.ctx.fillRect(mob.x, mob.y - 15, 32 * hpPercent, 4);
             }
         });
+    }
+    
+    // Métodos auxiliares para renderização de mobs
+    renderMob(mob) {
+        // Adicionar mob se não existir
+        if (!this.mobs.find(m => m.id === mob.id)) {
+            this.mobs.push(mob);
+        }
+        // Forçar renderização completa
+        this.render();
+    }
+    
+    updateMobPosition(mob) {
+        // Atualizar mob existente
+        const existingMob = this.mobs.find(m => m.id === mob.id);
+        if (existingMob) {
+            // Logar posição para debug
+            if (existingMob.x !== mob.x || existingMob.y !== mob.y) {
+                console.log(`🏃 ${mob.name} movendo de (${existingMob.x}, ${existingMob.y}) para (${mob.x}, ${mob.y})`);
+            }
+            Object.assign(existingMob, mob);
+        }
+        // Forçar renderização completa
+        this.render();
+    }
+    
+    removeMobFromCanvas(mobId) {
+        // Remover mob da lista
+        this.mobs = this.mobs.filter(m => m.id !== mobId);
+        // Forçar renderização completa
+        this.render();
+    }
+    
+    attackMob(mobId) {
+        if (!this.socket || !this.socket.connected) {
+            console.log('❌ Não conectado ao servidor');
+            return;
+        }
+        
+        const mob = this.mobs.find(m => m.id === mobId);
+        if (!mob) {
+            console.log('❌ Mob não encontrado: ' + mobId);
+            return;
+        }
+        
+        // Calcular distância
+        const dx = mob.x - this.player.x;
+        const dy = mob.y - this.player.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance > 100) {
+            console.log('❌ Mob muito longe: ' + distance.toFixed(2) + 'px (máximo 100px)');
+            return;
+        }
+        
+        // Calcular dano
+        const damage = 10 + Math.floor(Math.random() * 10); // 10-20 dano
+        
+        console.log('⚔️ Atacando ' + mob.name + ' a ' + distance.toFixed(2) + 'px com ' + damage + ' de dano');
+        
+        // Enviar ataque ao servidor
+        this.socket.emit('attackMob', {
+            mobId: mobId,
+            damage: damage
+        });
+        
+        // Feedback visual
+        this.showDamage(mob.x, mob.y, damage);
+    }
+
+        renderAllMobs() {
+        // Renderizar todos os mobs
+        this.render();
+    }
+    
+    // Funções de Combate
+    performAttack() {
+        if (!this.socket || !this.socket.connected) {
+            console.log('❌ Não conectado ao servidor');
+            return;
+        }
+        
+        // Encontrar mob mais próximo
+        let nearestMob = null;
+        let minDistance = Infinity;
+        
+        this.mobs.forEach(mob => {
+            const dx = mob.x - this.player.x;
+            const dy = mob.y - this.player.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < minDistance && distance < 100) { // 100px de alcance
+                minDistance = distance;
+                nearestMob = mob;
+            }
+        });
+        
+        if (nearestMob) {
+            console.log('⚔️ Atacando ' + nearestMob.name + ' a ' + minDistance.toFixed(2) + 'px');
+            
+            // Enviar ataque ao servidor
+            this.socket.emit('attackMob', {
+                mobId: nearestMob.id,
+                damage: 10 + Math.floor(Math.random() * 10) // 10-20 dano
+            });
+            
+            // Feedback visual
+            this.showDamage(nearestMob.x, nearestMob.y, 10 + Math.floor(Math.random() * 10));
+        } else {
+            console.log('❌ Nenhum mob no alcance (100px)');
+        }
+    }
+    
+    useSkill(skillIndex) {
+        console.log('🎯 Usando skill ' + (skillIndex + 1));
+        
+        // Skills baseadas no índice
+        const skills = [
+            { name: 'Fireball', damage: 25, range: 150 },
+            { name: 'Heal', healing: 30, range: 0 },
+            { name: 'Lightning', damage: 40, range: 200 },
+            { name: 'Berserk', damage: 15, range: 80 }
+        ];
+        
+        const skill = skills[skillIndex];
+        if (!skill) return;
+        
+        if (skill.damage) {
+            // Skill de dano
+            let nearestMob = null;
+            let minDistance = Infinity;
+            
+            this.mobs.forEach(mob => {
+                const dx = mob.x - this.player.x;
+                const dy = mob.y - this.player.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < minDistance && distance < skill.range) {
+                    minDistance = distance;
+                    nearestMob = mob;
+                }
+            });
+            
+            if (nearestMob) {
+                console.log('🔥 Usando ' + skill.name + ' em ' + nearestMob.name);
+                
+                this.socket.emit('attackMob', {
+                    mobId: nearestMob.id,
+                    damage: skill.damage
+                });
+                
+                this.showDamage(nearestMob.x, nearestMob.y, skill.damage);
+                this.showSkillEffect(skill.name, nearestMob.x, nearestMob.y);
+            } else {
+                console.log('❌ Nenhum mob no alcance da skill ' + skill.range + 'px');
+            }
+        } else if (skill.healing) {
+            // Skill de cura
+            this.player.hp = Math.min(this.player.maxHp, this.player.hp + skill.healing);
+            console.log('💚 Usando ' + skill.name + ' - curou ' + skill.healing + ' HP');
+            this.updateHUD();
+            this.showSkillEffect(skill.name, this.player.x, this.player.y);
+        }
+    }
+    
+    handlePlayerDeath() {
+        console.log('💀 Player died - implementing death mechanics...');
+        
+        // Parar movimento
+        this.player.hp = 0;
+        this.updateHUD();
+        
+        // Mostrar tela de morte
+        this.showDeathScreen();
+        
+        // Resetar posição após delay
+        setTimeout(() => {
+            this.respawnPlayer();
+        }, 3000);
+    }
+    
+    showDeathScreen() {
+        // Criar overlay de morte
+        const deathOverlay = document.createElement('div');
+        deathOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            font-family: Arial, sans-serif;
+        `;
+        
+        deathOverlay.innerHTML = `
+            <div style="text-align: center; padding: 40px; background: rgba(255, 0, 0, 0.8); border-radius: 10px;">
+                <h1 style="color: #ff4444; margin-bottom: 20px;">💀 Você Morreu!</h1>
+                <p style="margin-bottom: 20px;">Revivindo em 3 segundos...</p>
+                <div style="font-size: 14px; color: #ccc;">
+                    <p>Perdeu 10% de experiência</p>
+                    <p>Volte para o ponto de spawn seguro</p>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(deathOverlay);
+        
+        // Remover após 3 segundos
+        setTimeout(() => {
+            if (deathOverlay.parentNode) {
+                deathOverlay.parentNode.removeChild(deathOverlay);
+            }
+        }, 3000);
+    }
+    
+    respawnPlayer() {
+        // Resetar jogador
+        this.player.hp = this.player.maxHp;
+        this.player.mana = Math.floor(this.player.maxMana * 0.5); // 50% de mana
+        this.player.x = 400; // Spawn point
+        this.player.y = 300;
+        
+        // Perder experiência
+        this.player.exp = Math.max(0, this.player.exp - Math.floor(this.player.maxExp * 0.1));
+        
+        // Atualizar HUD
+        this.updateHUD();
+        
+        console.log('🔄 Player respawned at (400, 300)');
+    }
+    
+    showDamage(x, y, damage) {
+        // Mostrar número de dano flutuante
+        const damageText = document.createElement('div');
+        damageText.textContent = '-' + damage;
+        damageText.style.position = 'absolute';
+        damageText.style.left = x + 'px';
+        damageText.style.top = (y - 20) + 'px';
+        damageText.style.color = '#ff0000';
+        damageText.style.fontSize = '16px';
+        damageText.style.fontWeight = 'bold';
+        damageText.style.zIndex = '9999';
+        damageText.style.pointerEvents = 'none';
+        damageText.style.transition = 'all 1s ease-out';
+        
+        document.body.appendChild(damageText);
+        
+        // Animação
+        setTimeout(() => {
+            damageText.style.transform = 'translateY(-30px)';
+            damageText.style.opacity = '0';
+        }, 100);
+        
+        // Remover após animação
+        setTimeout(() => {
+            if (damageText.parentNode) {
+                damageText.parentNode.removeChild(damageText);
+            }
+        }, 1100);
+    }
+    
+    showSkillEffect(skillName, x, y) {
+        // Mostrar efeito visual da skill
+        const effect = document.createElement('div');
+        effect.textContent = '✨ ' + skillName;
+        effect.style.position = 'absolute';
+        effect.style.left = (x - 30) + 'px';
+        effect.style.top = (y - 40) + 'px';
+        effect.style.color = '#ffff00';
+        effect.style.fontSize = '14px';
+        effect.style.fontWeight = 'bold';
+        effect.style.zIndex = '9999';
+        effect.style.pointerEvents = 'none';
+        effect.style.transition = 'all 1.5s ease-out';
+        
+        document.body.appendChild(effect);
+        
+        // Animação
+        setTimeout(() => {
+            effect.style.transform = 'translateY(-20px) scale(1.5)';
+            effect.style.opacity = '0';
+        }, 100);
+        
+        // Remover após animação
+        setTimeout(() => {
+            if (effect.parentNode) {
+                effect.parentNode.removeChild(effect);
+            }
+        }, 1600);
     }
     
     renderPlayer() {
@@ -682,7 +1010,13 @@ class IntegratedGameplayEngine {
             this.ctx.drawImage(playerSprite, this.player.x, this.player.y, this.player.width, this.player.height);
         } else {
             // Fallback para cor sólida
-            this.ctx.fillStyle = this.player.color;
+            const raceColors = {
+                human: '#4CAF50',
+                elf: '#2196F3', 
+                dwarf: '#795548'
+            };
+            const playerColor = raceColors[this.characterData.race] || '#4CAF50';
+            this.ctx.fillStyle = playerColor;
             this.ctx.fillRect(this.player.x, this.player.y, this.player.width, this.player.height);
             
             // Indicador de facing
@@ -698,11 +1032,11 @@ class IntegratedGameplayEngine {
             this.ctx.fillRect(this.player.x + offset.x - 2, this.player.y + offset.y - 2, 4, 4);
         }
         
-        // Nome
-        this.ctx.fillStyle = '#fff';
-        this.ctx.font = 'bold 14px Arial';
+        // Desenhar nome do jogador
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = '12px Arial';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText(this.player.name, this.player.x + 16, this.player.y - 10);
+        this.ctx.fillText(this.player.name, this.player.x + 16, this.player.y - 5);
     }
     
     renderParticles() {
@@ -764,6 +1098,16 @@ class IntegratedGameplayEngine {
         if (key === 'f3' && this.config.debug) {
             this.mobs = [];
             console.log('🧹 Mobs cleared');
+        }
+        
+        // Attack/Combat
+        if (key === ' ') {
+            this.performAttack();
+        }
+        
+        // Skill 1-4
+        if (key >= '1' && key <= '4') {
+            this.useSkill(parseInt(key) - 1);
         }
     }
     
