@@ -40,6 +40,28 @@ global.HTMLCanvasElement = function() {
 };
 
 global.document = {
+  addEventListener: jest.fn(),
+  removeEventListener: jest.fn(),
+  getElementById: jest.fn((id) => {
+    // Return different mock elements based on ID for better testing
+    if (id === 'gameCanvas') {
+      return mockCanvas;
+    }
+    return {
+      style: {},
+      classList: {
+        add: jest.fn(),
+        remove: jest.fn(),
+        contains: jest.fn(() => false)
+      },
+      appendChild: jest.fn(),
+      removeChild: jest.fn(),
+      setAttribute: jest.fn(),
+      textContent: '',
+      innerHTML: '',
+      value: ''
+    };
+  }),
   createElement: jest.fn((tag) => {
     if (tag === 'canvas') {
       return mockCanvas;
@@ -48,13 +70,20 @@ global.document = {
       getContext: jest.fn(() => mockCanvas.getContext()),
       width: 800,
       height: 600,
-      style: {}
+      style: {},
+      classList: {
+        add: jest.fn(),
+        remove: jest.fn()
+      }
     };
   }),
   createElementNS: jest.fn(),
   body: {
-    appendChild: jest.fn()
-  }
+    appendChild: jest.fn(),
+    removeChild: jest.fn()
+  },
+  querySelector: jest.fn(() => null),
+  querySelectorAll: jest.fn(() => [])
 };
 
 global.window = {

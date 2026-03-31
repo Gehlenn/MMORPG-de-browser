@@ -88,6 +88,18 @@ class SimpleLoginManager {
     this.cancelCreationBtn = document.getElementById('cancelCreationBtn');
     this.enterWorldBtn = document.getElementById('enterWorldBtn');
     this.logoutBtn = document.getElementById('logoutBtn');
+
+    // Inicializar NetworkManager global (sempre disponível)
+    if (typeof window.networkManager !== 'undefined') {
+      window.networkManager.connect();
+      this.setupNetworkHandlers();
+      console.log('📡 NetworkManager conectado');
+    }
+    
+    // Modo online legado (remover quando migrar completamente)
+    if (typeof Config !== 'undefined' && Config.GAME_MODE === 'SERVER_ONLINE') {
+      console.log('📡 Modo SERVER_ONLINE ativado');
+    }
     
     // Messages
     this.loginMessage = document.getElementById('loginMessage');
@@ -107,7 +119,21 @@ class SimpleLoginManager {
     if (this.createNewCharacterBtn) this.createNewCharacterBtn.addEventListener('click', () => this.handleCreateNewCharacter());
     if (this.createCharacterBtn) this.createCharacterBtn.addEventListener('click', () => this.handleCreateCharacter());
     if (this.cancelCreationBtn) this.cancelCreationBtn.addEventListener('click', () => this.handleCancelCreation());
-    if (this.enterWorldBtn) this.enterWorldBtn.addEventListener('click', () => this.handleEnterWorld());
+    if (this.enterWorldBtn) {
+      this.enterWorldBtn.addEventListener('click', () => {
+        console.log('🌍 Botão entrar no mundo clicado');
+        // Se não houver currentCharacter, pegar o último personagem do usuário
+        if (!this.currentCharacter && this.currentUser) {
+          const chars = JSON.parse(localStorage.getItem('eldoria_characters') || '{}');
+          const userChars = chars[this.currentUser.username] || [];
+          if (userChars.length > 0) {
+            this.currentCharacter = userChars[userChars.length - 1];
+            console.log('✅ Personagem atual definido a partir da lista:', this.currentCharacter);
+          }
+        }
+        this.enterWorld();
+      });
+    }
     if (this.logoutBtn) this.logoutBtn.addEventListener('click', () => this.handleLogout());
     
     // Enter key events
@@ -136,6 +162,108 @@ class SimpleLoginManager {
     }
   }
   
+  setupNetworkHandlers() {
+    if (!window.networkManager) return;
+    
+    // Login handlers
+    window.networkManager.on('loginSuccess', (data) => {
+      console.log('✅ Login via servidor:', data.username);
+      this.currentUser = data;
+      
+      if (window.gameState) {
+        window.gameState.setUser(data);
+        window.gameState.setScreen('character');
+      }
+      
+      this.showMessage('loginMessage', 'Login realizado com sucesso!', 'success');
+      setTimeout(() => this.showCharacter(), 1000);
+    });
+    
+    window.networkManager.on('loginError', (data) => {
+      console.error('❌ Erro no login:', data.error);
+      this.showMessage('loginMessage', data.error || 'Erro no login', 'error');
+    });
+    
+    // Account handlers
+    window.networkManager.on('accountCreateSuccess', (data) => {
+      console.log('✅ Conta criada:', data.username);
+      this.showMessage('loginMessage', 'Conta criada! Faça login.', 'success');
+      setTimeout(() => this.showLoginForm(), 1500);
+    });
+    
+    window.networkManager.on('accountCreateError', (data) => {
+      console.error('❌ Erro ao criar conta:', data.error);
+      this.showMessage('loginMessage', data.error || 'Erro ao criar conta', 'error');
+    });
+    
+    // Character handlers
+    window.networkManager.on('characterCreateSuccess', (data) => {
+      console.log('✅ Personagem criado:', data.character?.name);
+      this.currentCharacter = data.character;
+      this.handleCancelCreation();
+      this.loadCharacters();
+      this.showMessage('characterMessage', 'Personagem criado!', 'success');
+    });
+    
+    window.networkManager.on('characterCreateError', (data) => {
+      console.error('❌ Erro ao criar personagem:', data.error);
+      this.showMessage('characterMessage', data.error || 'Erro ao criar personagem', 'error');
+    });
+    
+    window.networkManager.on('characterSelected', (data) => {
+      console.log('✅ Personagem selecionado:', data.character?.name);
+      this.currentCharacter = data.character;
+      
+      if (window.gameState) {
+        window.gameState.setCharacter(data.character);
+      }
+      
+      // Solicitar world init
+      window.networkManager.requestWorldInit({
+        characterId: data.character?.id
+      });
+    });
+    
+    // World handlers
+    window.networkManager.on('worldInit', (data) => {
+      console.log('🌍 World init:', data);
+      
+      if (window.gameState) {
+        window.gameState.setWorldLoaded(true);
+      }
+      
+      // Atualizar GameplayEngine com dados do servidor
+      if (this.gameplayEngine && data.entities) {
+        this.gameplayEngine.remotePlayers = data.entities.filter(e => e.type === 'player');
+        this.gameplayEngine.mobs = data.entities.filter(e => e.type === 'mob');
+      }
+      
+      // Entrar no mundo
+      this.enterWorld();
+    });
+    
+    // Player movement updates
+    window.networkManager.on('playerMoved', (data) => {
+      if (this.gameplayEngine && data.id !== window.networkManager.getSocketId()) {
+        // Atualizar posição de player remoto
+        const remotePlayer = this.gameplayEngine.remotePlayers.find(p => p.id === data.id);
+        if (remotePlayer) {
+          remotePlayer.x = data.x;
+          remotePlayer.y = data.y;
+        }
+      }
+    });
+    
+    // Connection handlers
+    window.networkManager.on('connected', (data) => {
+      console.log('🔌 Conectado ao servidor:', data.socketId);
+    });
+    
+    window.networkManager.on('disconnected', () => {
+      console.log('🔌 Desconectado do servidor');
+    });
+  }
+  
   handleLogin() {
     const username = this.sanitizeInput(this.username.value.trim());
     const password = this.sanitizeInput(this.password.value);
@@ -145,7 +273,29 @@ class SimpleLoginManager {
       return;
     }
     
+    // Se estiver em modo de servidor, envia para o servidor
+    if (typeof Config !== 'undefined' && Config.GAME_MODE === 'SERVER_ONLINE') {
+      this.loginViaServer(username, password);
+      return;
+    }
+    
+    // Se não, continua com o login local
+    this.loginLocal(username, password);
+  }
+  
+  loginLocal(username, password) {
+    console.log('🔐 Login local (localStorage)');
     this.authenticateUser(username, password);
+  }
+  
+  loginViaServer(username, password) {
+    console.log('🔐 Login via servidor (Socket.IO) - ainda não implementado');
+    this.showMessage('loginMessage', 'Login online em desenvolvimento...', 'info');
+    
+    // TODO: Implementar conexão com servidor
+    // if (window.networkManager) {
+    //   window.networkManager.sendLogin(username, password);
+    // }
   }
   
   handleCreateAccount() {
@@ -164,8 +314,8 @@ class SimpleLoginManager {
       return;
     }
     
-    if (password.length < 6) {
-      this.showMessage('loginMessage', 'Senha deve ter pelo menos 6 caracteres', 'error');
+    if (!this.validateEmail(email)) {
+      this.showMessage('loginMessage', 'E-mail inválido', 'error');
       return;
     }
     
@@ -174,18 +324,44 @@ class SimpleLoginManager {
       return;
     }
     
-    if (!this.validateEmail(email)) {
-      this.showMessage('loginMessage', 'E-mail inválido', 'error');
+    // Se estiver em modo de servidor, envia para o servidor
+    if (typeof Config !== 'undefined' && Config.GAME_MODE === 'SERVER_ONLINE') {
+      this.createAccountViaServer(username, password, email);
       return;
     }
     
+    // Se não, continua com a criação local
+    this.createAccountLocal(username, password, email);
+  }
+  
+  createAccountLocal(username, password, email) {
+    console.log('👤 Criando conta local');
     this.createAccount(username, password, email);
   }
   
+  createAccountViaServer(username, password, email) {
+    console.log('👤 Criando conta via servidor - ainda não implementado');
+    this.showMessage('loginMessage', 'Criação de conta online em desenvolvimento...', 'info');
+    
+    // TODO: Implementar criação de conta no servidor
+    // if (window.networkManager) {
+    //   window.networkManager.sendCreateAccount(username, password, email);
+    // }
+  }
+
   handleEnterWorld() {
     if (!this.currentCharacter) {
       this.showMessage('characterMessage', 'Selecione um personagem', 'error');
       return;
+    }
+    
+    console.log('🚀 Iniciando mundo com personagem:', this.currentCharacter);
+    
+    // Atualizar GameState global
+    if (window.gameState) {
+      window.gameState.setCharacter(this.currentCharacter);
+      window.gameState.setScreen('game');
+      window.gameState.setWorldLoaded(true);
     }
     
     // Mostrar tela de jogo
@@ -203,6 +379,9 @@ class SimpleLoginManager {
     
     // Inicializar GameplayEngine
     this.initializeGameplay();
+    
+    // Iniciar o jogo com o personagem
+    this.startGame(this.currentCharacter);
   }
   
   initializeVisualSystems() {
@@ -214,39 +393,19 @@ class SimpleLoginManager {
       console.log('✅ Visual Manager ativado');
     }
     
-    // Ativar Visual HUD Integration
-    if (window.visualHUDIntegration) {
-      window.visualHUDIntegration.activate();
-      console.log('✅ Visual HUD Integration ativada');
-    }
-    
-    // Substituir sprite system pelo enhanced
-    if (window.enhancedSpriteSystem && window.visualManager) {
-      window.visualManager.spriteSystem = window.enhancedSpriteSystem;
-      console.log('✅ Enhanced Sprite System ativado');
-    }
-    
     console.log('✅ Sistemas visuais inicializados');
   }
   
   initializeHUDs() {
-    console.log('🎮 Inicializando HUDs para gameplay...');
+    console.log('🎮 Inicializando HUD...');
     
-    // Mostrar HUD melhorada se disponível
-    if (window.improvedHUD) {
-      window.improvedHUD.show();
-      console.log('✅ Improved HUD ativada');
+    // Usar HUDManager consolidado
+    if (window.hudManager) {
+      window.hudManager.show();
+      console.log('✅ HUDManager ativado');
     }
     
-    // Alternar para WoW Style HUD se disponível
-    if (window.wowHUDIntegration) {
-      setTimeout(() => {
-        window.wowHUDIntegration.switchToWoWHUD();
-        console.log('✅ WoW Style HUD ativada');
-      }, 1000);
-    }
-    
-    // Atualizar estado do jogador em todas as HUDs
+    // Preparar dados para HUD
     if (this.currentCharacter) {
       const playerData = {
         name: this.currentCharacter.name,
@@ -261,134 +420,15 @@ class SimpleLoginManager {
         position: { x: this.currentCharacter.x || 400, y: this.currentCharacter.y || 300 }
       };
       
-      // Atualizar em todas as HUDs
-      if (window.hudIntegration) {
-        window.hudIntegration.updatePlayerState(playerData);
-      }
-      if (window.wowHUDIntegration) {
-        window.wowHUDIntegration.updatePlayerState(playerData);
-      }
-      if (window.improvedHUD) {
-        window.improvedHUD.updatePlayerState(playerData);
+      // Atualizar HUD
+      if (window.hudManager) {
+        window.hudManager.update(playerData, 0, 0);
       }
       
-      console.log('✅ Estado do jogador atualizado em todas as HUDs');
+      console.log('✅ Estado do jogador atualizado no HUD');
     }
   }
-  
-  hideAllHUDs() {
-    // Esconder todas as HUDs disponíveis
-    if (window.hudSystem) {
-      window.hudSystem.hide();
-    }
-    if (window.improvedHUD) {
-      window.improvedHUD.hide();
-    }
-    if (window.wowStyleHUD) {
-      window.wowStyleHUD.hide();
-    }
-    
-    // Desativar sistemas visuais
-    if (window.visualManager) {
-      window.visualManager.deactivate();
-    }
-    if (window.visualHUDIntegration) {
-      window.visualHUDIntegration.deactivate();
-    }
-    
-    console.log('🎮 Todas as HUDs e sistemas visuais escondidos');
-  }
-  
-  handleCreateNewCharacter() {
-    if (!this.dataManager) {
-      console.error('❌ LocalDataManager não disponível');
-      this.showMessage('characterMessage', 'Erro no sistema de dados', 'error');
-      return;
-    }
-    
-    const userCharacters = this.dataManager.getCharacters(this.currentUser.username);
-    
-    if (userCharacters.length >= 3) {
-      this.showMessage('characterMessage', 'Limite de 3 personagens por conta atingido', 'error');
-      return;
-    }
-    
-    if (this.characterCreation) this.characterCreation.style.display = 'block';
-    if (this.characterList) this.characterList.style.display = 'none';
-    if (this.createNewCharacterBtn) this.createNewCharacterBtn.style.display = 'none';
-    if (this.enterWorldBtn) this.enterWorldBtn.style.display = 'none';
-    
-    // Limpar campos
-    if (this.characterName) this.characterName.value = '';
-    if (this.characterRace) this.characterRace.value = '';
-    
-    // Focar no nome
-    setTimeout(() => this.characterName.focus(), 100);
-  }
-  
-  handleCancelCreation() {
-    if (this.characterCreation) this.characterCreation.style.display = 'none';
-    if (this.characterList) this.characterList.style.display = 'grid';
-    if (this.createNewCharacterBtn) this.createNewCharacterBtn.style.display = 'inline-block';
-    if (this.enterWorldBtn) this.enterWorldBtn.style.display = 'inline-block';
-  }
-  
-  handleCreateCharacter() {
-    if (!this.characterName || !this.characterRace) {
-      console.error('❌ Elementos de criação de personagem não encontrados');
-      return;
-    }
-    
-    const name = this.characterName.value.trim();
-    const race = this.characterRace.value;
-    
-    if (!name || name.length < 3) {
-      this.showMessage('characterMessage', 'Nome deve ter pelo menos 3 caracteres', 'error');
-      return;
-    }
-    
-    if (!race) {
-      this.showMessage('characterMessage', 'Selecione uma raça', 'error');
-      return;
-    }
-    
-    // Todos personagens começam como aprendiz
-    const characterClass = 'apprentice';
-    
-    this.createCharacter(name, race, characterClass);
-  }
-  
-  handleDeleteCharacter() {
-    if (!this.currentCharacter) {
-      this.showMessage('characterMessage', 'Nenhum personagem selecionado', 'error');
-      return;
-    }
-    
-    if (!this.dataManager) {
-      console.error('❌ LocalDataManager não disponível');
-      this.showMessage('characterMessage', 'Erro no sistema de dados', 'error');
-      return;
-    }
-    
-    if (confirm(`Tem certeza que deseja excluir "${this.currentCharacter.name}"? Esta ação não pode ser desfeita.`)) {
-      const result = this.dataManager.deleteCharacter(this.currentUser.username, this.currentCharacter.id);
-      
-      if (result.success) {
-        this.currentCharacter = null;
-        if (this.enterWorldBtn) this.enterWorldBtn.disabled = true;
-        if (this.deleteCharacterBtn) this.deleteCharacterBtn.style.display = 'none';
-        
-        this.loadCharacters();
-        
-        this.showMessage('characterMessage', 'Personagem excluído com sucesso', 'success');
-        console.log(`🗑️ Personagem excluído com sucesso`);
-      } else {
-        this.showMessage('characterMessage', result.error || 'Erro ao excluir personagem', 'error');
-        console.error('❌ Erro ao excluir personagem:', result.error);
-      }
-    }
-  }
-  
+
   authenticateUser(username, password) {
     // Usar LocalDataManager para gerenciar dados locais
     if (!this.dataManager) {
@@ -401,6 +441,13 @@ class SimpleLoginManager {
     
     if (result.success) {
       this.currentUser = result.account;
+      
+      // Atualizar GameState global
+      if (window.gameState) {
+        window.gameState.setUser(result.account);
+        window.gameState.setScreen('character');
+      }
+      
       this.showMessage('loginMessage', 'Login realizado com sucesso!', 'success');
       setTimeout(() => this.showCharacter(), 1000);
       
@@ -443,6 +490,11 @@ class SimpleLoginManager {
   showCharacter() {
     if (this.loginScreen) this.loginScreen.style.display = 'none';
     if (this.characterScreen) this.characterScreen.style.display = 'flex';
+    
+    // Atualizar GameState
+    if (window.gameState) {
+      window.gameState.setScreen('character');
+    }
     
     this.loadCharacters();
   }
@@ -549,6 +601,14 @@ class SimpleLoginManager {
       this.handleCancelCreation();
       this.loadCharacters();
       
+      // Definir personagem atual após criação
+      const characters = JSON.parse(localStorage.getItem('eldoria_characters') || '{}');
+      const userCharacters = characters[this.currentUser?.username] || [];
+      if (userCharacters.length > 0) {
+        this.currentCharacter = userCharacters[userCharacters.length - 1];
+        console.log('✅ Personagem atual definido:', this.currentCharacter);
+      }
+      
       this.showMessage('characterMessage', 'Personagem criado com sucesso!', 'success');
       console.log(`🎭 Personagem ${name} criado para ${this.currentUser.username}`);
     } else {
@@ -564,39 +624,51 @@ class SimpleLoginManager {
       return;
     }
     
+    const character = this.currentCharacter;
+    if (!character) {
+      console.error('❌ Nenhum personagem para iniciar o jogo');
+      this.showMessage('characterMessage', 'Selecione um personagem primeiro', 'error');
+      return;
+    }
+    
     try {
+      // Trocar telas
+      if (this.loginScreen) this.loginScreen.style.display = 'none';
+      if (this.characterScreen) this.characterScreen.style.display = 'none';
+      if (this.gameScreen) this.gameScreen.style.display = 'flex';
+      
       // Inicializar GameplayEngine com dados do personagem
-      this.gameplayEngine = new window.IntegratedGameplayEngine('gameCanvas', this.currentCharacter);
+      this.gameplayEngine = new window.IntegratedGameplayEngine('gameCanvas', character);
       
       // Garantir que window.gameplayEngine aponte para a instância correta
       window.gameplayEngine = this.gameplayEngine;
+      window._gameplayEngine = this.gameplayEngine; // Compatibilidade
       
       // Preparar dados para HUD
       const characterData = {
-        name: this.currentCharacter.name,
-        level: this.currentCharacter.level,
-        health: this.currentCharacter.hp,
-        maxHealth: this.currentCharacter.maxHp,
-        mana: this.currentCharacter.mana,
-        maxMana: this.currentCharacter.maxMana,
-        exp: this.currentCharacter.exp || 0,
-        maxExp: this.currentCharacter.maxExp || 100,
-        gold: this.currentCharacter.gold || 0,
-        position: { x: this.currentCharacter.x, y: this.currentCharacter.y }
+        name: character.name,
+        level: character.level,
+        health: character.hp,
+        maxHealth: character.maxHp,
+        mana: character.mana,
+        maxMana: character.maxMana,
+        exp: character.exp || 0,
+        maxExp: character.maxExp || 100,
+        gold: character.gold || 0,
+        position: { x: character.x, y: character.y }
       };
       
       // Atualizar HUD se disponível
-      if (window.hudSystem) {
-        window.hudSystem.updatePlayerState(characterData);
-        window.hudSystem.showNotification(`Bem-vindo ao mundo, ${this.currentCharacter.name}!`, 'success');
-        // Mostrar HUD do gameplay
-        window.hudSystem.show();
+      if (window.hudManager) {
+        window.hudManager.update(characterData, 0, 0);
+        window.hudManager.addChatMessage(`Bem-vindo ao mundo, ${character.name}!`, '#4CAF50');
+        window.hudManager.show();
       }
       
       // Iniciar gameplay
       this.gameplayEngine.start();
       
-      console.log(`🎮 Gameplay iniciado para ${this.currentCharacter.name}`);
+      console.log(`🎮 Gameplay iniciado para ${character.name}`);
       
     } catch (error) {
       console.error('❌ Erro ao inicializar gameplay:', error);
@@ -604,23 +676,11 @@ class SimpleLoginManager {
     }
   }
   
-  getClassStats(characterClass) {
-    const classStats = {
-      warrior: { hp: 120, maxHp: 120, attack: 15, defense: 10, mana: 20, maxMana: 20 },
-      mage: { hp: 80, maxHp: 80, attack: 8, defense: 5, mana: 100, maxMana: 100 },
-      hunter: { hp: 100, maxHp: 100, attack: 12, defense: 7, mana: 50, maxMana: 50 },
-      rogue: { hp: 90, maxHp: 90, attack: 14, defense: 6, mana: 30, maxMana: 30 },
-      priest: { hp: 85, maxHp: 85, attack: 6, defense: 8, mana: 80, maxMana: 80 },
-      druid: { hp: 95, maxHp: 95, attack: 10, defense: 8, mana: 70, maxMana: 70 },
-      apprentice: { hp: 100, maxHp: 100, attack: 10, defense: 8, mana: 50, maxMana: 50 }
-    };
-    
-    return classStats[characterClass] || classStats.apprentice;
-  }
+  // startGame removido - funcionalidade consolidada em initializeGameplay
   
   updatePlayerUI(character) {
-    if (window.hudSystem) {
-      window.hudSystem.updatePlayerState({
+    if (window.hudManager) {
+      window.hudManager.update({
         name: character.name,
         level: character.level,
         health: character.hp,
@@ -631,15 +691,20 @@ class SimpleLoginManager {
         maxExp: character.maxExp || 100,
         gold: character.gold || 0,
         position: { x: character.x || 400, y: character.y || 300 }
-      });
+      }, 0, 0);
       return;
     }
     
-    // Fallback para HUD antigo
-    if (this.playerName) this.playerName.textContent = character.name;
-    if (this.playerLevel) this.playerLevel.textContent = `Lv. ${character.level}`;
-    if (this.hpText) this.hpText.textContent = `${character.hp}/${character.maxHp}`;
-    if (this.healthFill) this.healthFill.style.width = `${(character.hp / character.maxHp) * 100}%`;
+    // Fallback para elementos DOM diretos
+    const playerName = document.getElementById('playerName');
+    const playerLevel = document.getElementById('playerLevel');
+    const hpText = document.getElementById('hpText');
+    const healthFill = document.getElementById('healthFill');
+    
+    if (playerName) playerName.textContent = character.name;
+    if (playerLevel) playerLevel.textContent = `Lv. ${character.level}`;
+    if (hpText) hpText.textContent = `${character.hp}/${character.maxHp}`;
+    if (healthFill) healthFill.style.width = `${(character.hp / character.maxHp) * 100}%`;
   }
   
   showMessage(elementId, message, type = 'info') {
@@ -678,6 +743,39 @@ class SimpleLoginManager {
     
     // Focar no primeiro campo
     setTimeout(() => this.newUsername.focus(), 100);
+  }
+  
+  logout() {
+    this.currentUser = null;
+    this.currentCharacter = null;
+    
+    // Resetar GameState global
+    if (window.gameState) {
+      window.gameState.reset();
+    }
+    
+    // Limpar localStorage do usuário atual (opcional - descomente se quiser)
+    // localStorage.removeItem('current_user');
+    
+    // Voltar para tela de login
+    this.showLoginForm();
+    
+    // Limpar mensagens
+    this.clearMessage('loginMessage');
+    this.clearMessage('characterMessage');
+    
+    // Resetar estados visuais
+    if (this.gameScreen) this.gameScreen.style.display = 'none';
+    if (this.characterScreen) this.characterScreen.style.display = 'none';
+    if (this.loginScreen) {
+      this.loginScreen.style.display = 'flex';
+      this.loginScreen.style.opacity = '1';
+    }
+    
+    // Remover classe de gameplay ativo
+    document.body.classList.remove('gameplay-active');
+    
+    console.log('👋 Usuário deslogado');
   }
   
   handleLogout() {
