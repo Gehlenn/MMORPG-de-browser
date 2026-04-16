@@ -1,14 +1,16 @@
-// === CHARACTER UI ===
-
 /**
- * Interface de Personagens
+ * CharacterUI - Interface de Personagens Refatorada
  * Gerencia apenas a UI de seleção e criação de personagens
+ * Parte do STEP 2 - Refatoração do Sistema de Login
  */
 
-export class CharacterUI {
+class CharacterUI {
     constructor() {
         this.elements = {
             characterScreen: null,
+            characterNameInput: null,
+            characterRaceSelect: null,
+            characterClassSelect: null,
             characterList: null,
             createCharacterBtn: null,
             enterWorldBtn: null,
@@ -23,10 +25,15 @@ export class CharacterUI {
         
         this.selectedCharacter = null;
         this.characters = [];
+        this.isVisible = false;
+        this.isLoading = false;
         
         this.initialize();
     }
     
+    /**
+     * Inicializa a UI de personagens
+     */
     initialize() {
         console.log('👤 Initializing CharacterUI...');
         this.cacheElements();
@@ -34,9 +41,15 @@ export class CharacterUI {
         console.log('✅ CharacterUI initialized');
     }
     
+    /**
+     * Cache dos elementos DOM
+     */
     cacheElements() {
         this.elements = {
             characterScreen: document.getElementById('characterScreen'),
+            characterNameInput: document.getElementById('characterName'),
+            characterRaceSelect: document.getElementById('characterRace'),
+            characterClassSelect: document.getElementById('characterClass'),
             characterList: document.getElementById('characterList'),
             createCharacterBtn: document.getElementById('createCharacterBtn'),
             enterWorldBtn: document.getElementById('enterWorldBtn'),
@@ -49,6 +62,431 @@ export class CharacterUI {
                 console.warn(`⚠️ CharacterUI element not found: ${name}`);
             }
         });
+    }
+    
+    /**
+     * Configura event listeners
+     */
+    bindEvents() {
+        const { createCharacterBtn, enterWorldBtn } = this.elements;
+        
+        if (createCharacterBtn) {
+            createCharacterBtn.addEventListener('click', () => this.handleCreateCharacter());
+            console.log('✅ Create character button event bound');
+        }
+        
+        if (enterWorldBtn) {
+            enterWorldBtn.addEventListener('click', () => this.handleEnterWorld());
+            console.log('✅ Enter world button event bound');
+        }
+    }
+    
+    /**
+     * Manipula criação de personagem
+     */
+    handleCreateCharacter() {
+        if (this.isLoading) {
+            console.warn('⚠️ Character creation already in progress');
+            return;
+        }
+        
+        const characterData = this.getCharacterFormData();
+        
+        if (!this.validateCharacterData(characterData)) {
+            return;
+        }
+        
+        this.setLoading(true);
+        
+        // Notificar callback
+        if (this.callbacks.onCreateCharacter) {
+            this.callbacks.onCreateCharacter(characterData);
+        } else {
+            console.error('❌ Create character callback not set');
+            this.setLoading(false);
+        }
+    }
+    
+    /**
+     * Manipula entrada no mundo
+     */
+    handleEnterWorld() {
+        if (this.isLoading) {
+            console.warn('⚠️ Enter world already in progress');
+            return;
+        }
+        
+        if (!this.selectedCharacter) {
+            this.showMessage('Selecione um personagem para entrar no mundo', 'error');
+            return;
+        }
+        
+        this.setLoading(true);
+        
+        // Notificar callback
+        if (this.callbacks.onEnterWorld) {
+            this.callbacks.onEnterWorld(this.selectedCharacter);
+        } else {
+            console.error('❌ Enter world callback not set');
+            this.setLoading(false);
+        }
+    }
+    
+    /**
+     * Obtém dados do formulário de personagem
+     * @returns {object}
+     */
+    getCharacterFormData() {
+        return {
+            name: this.elements.characterNameInput?.value?.trim() || '',
+            race: this.elements.characterRaceSelect?.value || '',
+            class: this.elements.characterClassSelect?.value || ''
+        };
+    }
+    
+    /**
+     * Valida dados do personagem
+     * @param {object} characterData - Dados do personagem
+     * @returns {boolean}
+     */
+    validateCharacterData(characterData) {
+        const { name, race, class: characterClass } = characterData;
+        
+        if (!name || name.length < 3) {
+            this.showMessage('Nome do personagem deve ter pelo menos 3 caracteres', 'error');
+            return false;
+        }
+        
+        if (name.length > 20) {
+            this.showMessage('Nome do personagem deve ter no máximo 20 caracteres', 'error');
+            return false;
+        }
+        
+        // Validação de caracteres
+        const validNameRegex = /^[a-zA-Z0-9_\p{L}\p{M}]+$/u;
+        if (!validNameRegex.test(name)) {
+            this.showMessage('Nome do personagem contém caracteres inválidos', 'error');
+            return false;
+        }
+        
+        if (!race) {
+            this.showMessage('Selecione uma raça', 'error');
+            return false;
+        }
+        
+        if (!characterClass) {
+            this.showMessage('Selecione uma classe', 'error');
+            return false;
+        }
+        
+        // Verificar se nome já existe
+        if (this.characters.some(char => char.name.toLowerCase() === name.toLowerCase())) {
+            this.showMessage('Este nome de personagem já está em uso', 'error');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Define a lista de personagens
+     * @param {array} characters - Lista de personagens
+     */
+    setCharacters(characters) {
+        this.characters = characters || [];
+        this.renderCharacterList();
+        console.log(`📋 Character list updated: ${this.characters.length} characters`);
+    }
+    
+    /**
+     * Renderiza a lista de personagens
+     */
+    renderCharacterList() {
+        const { characterList } = this.elements;
+        
+        if (!characterList) return;
+        
+        if (this.characters.length === 0) {
+            characterList.innerHTML = `
+                <div class="no-characters">
+                    <p>Nenhum personagem encontrado.</p>
+                    <p>Crie um novo personagem para começar!</p>
+                </div>
+            `;
+            return;
+        }
+        
+        characterList.innerHTML = '';
+        
+        this.characters.forEach(character => {
+            const characterCard = this.createCharacterCard(character);
+            characterList.appendChild(characterCard);
+        });
+    }
+    
+    /**
+     * Cria um card de personagem
+     * @param {object} character - Dados do personagem
+     * @returns {HTMLElement}
+     */
+    createCharacterCard(character) {
+        const card = document.createElement('div');
+        card.className = 'character-card';
+        card.dataset.characterId = character.id;
+        
+        if (this.selectedCharacter?.id === character.id) {
+            card.classList.add('selected');
+        }
+        
+        card.innerHTML = `
+            <div class="character-info">
+                <h3 class="character-name">${character.name}</h3>
+                <div class="character-details">
+                    <span class="character-race">${this.getRaceDisplayName(character.race)}</span>
+                    <span class="character-class">${this.getClassDisplayName(character.class)}</span>
+                </div>
+                <div class="character-stats">
+                    <span class="character-level">Nível ${character.level || 1}</span>
+                    <span class="character-hp">HP: ${character.hp || 100}/${character.maxHp || 100}</span>
+                </div>
+            </div>
+        `;
+        
+        card.addEventListener('click', () => this.selectCharacter(character));
+        
+        return card;
+    }
+    
+    /**
+     * Seleciona um personagem
+     * @param {object} character - Personagem selecionado
+     */
+    selectCharacter(character) {
+        this.selectedCharacter = character;
+        
+        // Atualizar UI
+        document.querySelectorAll('.character-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        
+        const selectedCard = document.querySelector(`[data-character-id="${character.id}"]`);
+        if (selectedCard) {
+            selectedCard.classList.add('selected');
+        }
+        
+        // Habilitar botão de entrar no mundo
+        if (this.elements.enterWorldBtn) {
+            this.elements.enterWorldBtn.disabled = false;
+        }
+        
+        console.log('👤 Character selected:', character.name);
+        
+        // Notificar callback
+        if (this.callbacks.onSelectCharacter) {
+            this.callbacks.onSelectCharacter(character);
+        }
+    }
+    
+    /**
+     * Obtém nome display da raça
+     * @param {string} race - Raça
+     * @returns {string}
+     */
+    getRaceDisplayName(race) {
+        const raceNames = {
+            human: 'Humano',
+            elf: 'Elfo',
+            dwarf: 'Anão'
+        };
+        return raceNames[race] || race;
+    }
+    
+    /**
+     * Obtém nome display da classe
+     * @param {string} characterClass - Classe
+     * @returns {string}
+     */
+    getClassDisplayName(characterClass) {
+        const classNames = {
+            warrior: 'Guerreiro',
+            mage: 'Mago',
+            ranger: 'Rastreador'
+        };
+        return classNames[characterClass] || characterClass;
+    }
+    
+    /**
+     * Define estado de loading
+     * @param {boolean} loading - Estado de loading
+     */
+    setLoading(loading) {
+        this.isLoading = loading;
+        
+        const { createCharacterBtn, enterWorldBtn } = this.elements;
+        
+        if (createCharacterBtn) {
+            createCharacterBtn.disabled = loading;
+            createCharacterBtn.textContent = loading ? 'Criando...' : 'Criar Personagem';
+        }
+        
+        if (enterWorldBtn) {
+            enterWorldBtn.disabled = loading || !this.selectedCharacter;
+            enterWorldBtn.textContent = loading ? 'Entrando...' : 'Entrar no Mundo';
+        }
+    }
+    
+    /**
+     * Mostra mensagem para o usuário
+     * @param {string} message - Mensagem
+     * @param {string} type - Tipo (success, error, info)
+     */
+    showMessage(message, type = 'info') {
+        const { messageContainer } = this.elements;
+        
+        if (messageContainer) {
+            messageContainer.textContent = message;
+            messageContainer.className = `message ${type}`;
+            
+            // Auto-clear para mensagens de sucesso
+            if (type === 'success') {
+                setTimeout(() => {
+                    this.clearMessage();
+                }, 3000);
+            }
+            
+            console.log(`💬 CharacterUI message: ${message} (${type})`);
+        }
+    }
+    
+    /**
+     * Limpa mensagem
+     */
+    clearMessage() {
+        const { messageContainer } = this.elements;
+        if (messageContainer) {
+            messageContainer.textContent = '';
+            messageContainer.className = 'message';
+        }
+    }
+    
+    /**
+     * Limpa formulário de criação
+     */
+    clearCreateForm() {
+        if (this.elements.characterNameInput) {
+            this.elements.characterNameInput.value = '';
+        }
+        if (this.elements.characterRaceSelect) {
+            this.elements.characterRaceSelect.selectedIndex = 0;
+        }
+        if (this.elements.characterClassSelect) {
+            this.elements.characterClassSelect.selectedIndex = 0;
+        }
+        this.clearMessage();
+    }
+    
+    /**
+     * Mostra a UI de personagens
+     */
+    show() {
+        if (this.elements.characterScreen) {
+            this.elements.characterScreen.style.display = 'flex';
+            this.isVisible = true;
+            console.log('👁️ CharacterUI shown');
+        }
+    }
+    
+    /**
+     * Esconde a UI de personagens
+     */
+    hide() {
+        if (this.elements.characterScreen) {
+            this.elements.characterScreen.style.display = 'none';
+            this.isVisible = false;
+            console.log('👁️‍🗨️ CharacterUI hidden');
+        }
+    }
+    
+    /**
+     * Define callbacks
+     * @param {object} callbacks - Callback functions
+     */
+    setCallbacks(callbacks) {
+        this.callbacks = { ...this.callbacks, ...callbacks };
+        console.log('🔧 CharacterUI callbacks set');
+    }
+    
+    /**
+     * Remove callbacks
+     */
+    removeCallbacks() {
+        this.callbacks = {
+            onSelectCharacter: null,
+            onCreateCharacter: null,
+            onEnterWorld: null
+        };
+    }
+    
+    /**
+     * Reseta a UI
+     */
+    reset() {
+        this.selectedCharacter = null;
+        this.characters = [];
+        this.clearCreateForm();
+        this.setLoading(false);
+        
+        if (this.elements.enterWorldBtn) {
+            this.elements.enterWorldBtn.disabled = true;
+        }
+        
+        console.log('🔄 CharacterUI reset');
+    }
+    
+    /**
+     * Destrói a UI
+     */
+    destroy() {
+        this.removeCallbacks();
+        this.reset();
+        
+        // Remover event listeners (simplificado)
+        const { createCharacterBtn, enterWorldBtn } = this.elements;
+        if (createCharacterBtn) {
+            createCharacterBtn.replaceWith(createCharacterBtn.cloneNode(true));
+        }
+        if (enterWorldBtn) {
+            enterWorldBtn.replaceWith(enterWorldBtn.cloneNode(true));
+        }
+        
+        console.log('🗑️ CharacterUI destroyed');
+    }
+    
+    /**
+     * Obtém informações de debug
+     * @returns {object}
+     */
+    getDebugInfo() {
+        return {
+            isVisible: this.isVisible,
+            isLoading: this.isLoading,
+            charactersCount: this.characters.length,
+            hasSelectedCharacter: !!this.selectedCharacter,
+            selectedCharacterName: this.selectedCharacter?.name || null,
+            hasCallbacks: Object.values(this.callbacks).some(cb => !!cb)
+        };
+    }
+}
+
+// Exportar para uso global
+if (typeof window !== 'undefined') {
+    window.CharacterUI = CharacterUI;
+}
+
+// Exportar para módulos
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CharacterUI;
+}
     }
     
     bindEvents() {

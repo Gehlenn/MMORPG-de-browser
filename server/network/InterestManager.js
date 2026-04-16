@@ -1,13 +1,16 @@
 /**
  * Interest Manager
  * Determines which entities are visible to each player
- * Uses Spatial Grid for efficient proximity queries
+ * Uses RegionManager for efficient proximity queries
  */
 
 class InterestManager {
     constructor(spatialGrid, componentManager) {
         this.spatialGrid = spatialGrid;
         this.componentManager = componentManager;
+        
+        // Import RegionManager
+        this.regionManager = new (require('../world/regions/RegionManager'))();
         
         // Interest management configuration
         this.config = {
@@ -38,7 +41,7 @@ class InterestManager {
         this.interestCache = new Map(); // playerId -> {entities, timestamp}
         this.cacheTimeout = 50; // milliseconds
         
-        console.log('🌐 Interest Manager initialized');
+        console.log('🌐 Interest Manager initialized with RegionManager');
     }
 
     /**
@@ -83,8 +86,8 @@ class InterestManager {
         // Get view radius
         const viewRadius = this.playerViewRadius.get(playerId) || this.config.defaultViewRadius;
         
-        // Query spatial grid for nearby entities
-        const nearbyEntities = this.spatialGrid.getNearbyEntities(
+        // Query RegionManager for nearby entities
+        const nearbyEntities = this.regionManager.getNearbyEntities(
             playerPos.x, 
             playerPos.y, 
             viewRadius

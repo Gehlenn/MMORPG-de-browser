@@ -1,722 +1,794 @@
 /**
- * HUD Manager
- * Manages all UI elements using generated art assets
+ * HUDManager.js
+ * Interface do jogo - Independente, lê GameplayEngine.state e atualiza DOM
+ * Versão: 1.0 MVP Core
  */
 
 class HUDManager {
-    constructor(assetManager) {
-        this.assetManager = assetManager;
-        this.canvas = null;
-        this.ctx = null;
-        this.visible = true;
+    constructor(gameplayEngine) {
+        this.engine = gameplayEngine;
+        this.container = null;
+        this.elements = {};
+        this.updateInterval = null;
+        this.lastState = null;
         
-        // HUD elements
-        this.elements = {
-            healthBar: null,
-            manaBar: null,
-            expBar: null,
-            minimap: { visible: true },
-            inventory: null,
-            chat: null,
-            buttons: null,
-            stats: null
+        // Configurações de atualização
+        this.config = {
+            updateRate: 100, // ms entre atualizações (10fps é suficiente para UI)
+            showDebug: false
         };
         
-        // UI state
-        this.state = {
-            playerHealth: 100,
-            playerMaxHealth: 100,
-            playerMana: 50,
-            playerMaxMana: 50,
-            playerExp: 0,
-            playerExpToNext: 100,
-            playerLevel: 1,
-            playerGold: 0,
-            inventory: [],
-            chatMessages: [],
-            showInventory: false,
-            showChat: true
-        };
-        
-        // Button configurations
-        this.buttons = {
-            inventory: { x: 10, y: 10, width: 60, height: 30, icon: '🎒', label: 'Inventário' },
-            character: { x: 80, y: 10, width: 80, height: 30, icon: '👤', label: 'Personagem' },
-            map: { x: 170, y: 10, width: 60, height: 30, icon: '🗺️', label: 'Mapa' },
-            quests: { x: 240, y: 10, width: 60, height: 30, icon: '📜', label: 'Missões' },
-            settings: { x: 310, y: 10, width: 60, height: 30, icon: '⚙️', label: 'Config' }
-        };
-        
-        this.init();
+        console.log('✅ HUDManager criado');
     }
     
     /**
-     * Set game engine reference
-     */
-    setGameEngine(gameEngine) {
-        this.gameEngine = gameEngine;
-        this.canvas = gameEngine.canvas; // Usar canvas do jogo
-        console.log('🎮 HUD Manager recebeu referência do game engine');
-    }
-    
-    /**
-     * Initialize HUD
+     * Inicializa o HUD - cria elementos DOM
      */
     init() {
-        this.createHUDCanvas();
-        this.setupEventListeners();
-        this.loadUIAssets();
-        console.log('🎮 HUD inicializado');
+        this.createContainer();
+        this.createPlayerPanel();
+        this.createXPBar();
+        this.createSkillBar();
+        this.createMinimap();
+        this.createCombatLog();
+        this.createChatBox();
+        this.createFloatingTextContainer();
+        this.cacheElements();
+        
+        console.log('✅ HUD inicializado');
     }
     
     /**
-     * Create HUD canvas - REMOVIDO para não criar canvas sobreposto
+     * Container principal do HUD
      */
-    createHUDCanvas() {
-        // NÃO criar canvas HUD - estava causando sobreposição
-        console.log('🎮 HUD Canvas desativado para evitar sobreposição');
-        this.canvas = null;
-        this.ctx = null;
+    createContainer() {
+        // Remover HUD antigo se existir
+        const oldHud = document.getElementById('game-hud');
+        if (oldHud) oldHud.remove();
+        
+        this.container = document.createElement('div');
+        this.container.id = 'game-hud';
+        this.container.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        `;
+        
+        document.body.appendChild(this.container);
     }
     
     /**
-     * Load UI assets
+     * Painel do jogador (HP, MP, Nome, Level)
      */
-    async loadUIAssets() {
-        try {
-            // Load layout assets
-            if (this.assetManager && this.assetManager.getUI) {
-                const layoutAsset = this.assetManager.getUI('layout_main_01');
-                if (layoutAsset && layoutAsset.loaded) {
-                    this.elements.layout = layoutAsset;
-                    console.log('✅ Layout UI carregado');
-                }
-                
-                // Load main UI asset
-                const mainAsset = this.assetManager.getUI('_main_01');
-                if (mainAsset && mainAsset.loaded) {
-                    this.elements.main = mainAsset;
-                    console.log('✅ Main UI carregado');
-                }
-            } else {
-                console.log('⚠️ AssetManager não disponível ainda');
-            }
+    createPlayerPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'hud-player-panel';
+        panel.style.cssText = `
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #444;
+            border-radius: 8px;
+            padding: 12px;
+            color: white;
+            min-width: 220px;
+            pointer-events: auto;
+        `;
+        
+        panel.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <div id="hud-player-avatar" style="width: 40px; height: 40px; background: #3498db; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px;">👤</div>
+                <div>
+                    <div id="hud-player-name" style="font-weight: bold; font-size: 16px;">Jogador</div>
+                    <div style="font-size: 12px; color: #aaa;">
+                        <span id="hud-player-class">Aprendiz</span> 
+                        <span style="color: #ffd700;">Lv <span id="hud-player-level">1</span></span>
+                    </div>
+                </div>
+            </div>
             
-        } catch (error) {
-            console.error('❌ Erro ao carregar UI assets:', error);
-        }
+            <!-- HP Bar -->
+            <div style="margin-bottom: 6px;">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px;">
+                    <span style="color: #e74c3c;">HP</span>
+                    <span id="hud-hp-text">100/100</span>
+                </div>
+                <div style="width: 100%; height: 14px; background: #333; border-radius: 7px; overflow: hidden; border: 1px solid #555;">
+                    <div id="hud-hp-bar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #e74c3c, #c0392b); transition: width 0.2s ease;"></div>
+                </div>
+            </div>
+            
+            <!-- MP Bar -->
+            <div style="margin-bottom: 6px;">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px;">
+                    <span style="color: #3498db;">MP</span>
+                    <span id="hud-mp-text">50/50</span>
+                </div>
+                <div style="width: 100%; height: 10px; background: #333; border-radius: 5px; overflow: hidden; border: 1px solid #555;">
+                    <div id="hud-mp-bar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #3498db, #2980b9); transition: width 0.2s ease;"></div>
+                </div>
+            </div>
+            
+            <!-- Stats (colapsável) -->
+            <div id="hud-stats" style="font-size: 10px; color: #aaa; border-top: 1px solid #444; padding-top: 6px; margin-top: 6px; display: none;">
+                STR: <span id="hud-stat-str">10</span> | 
+                AGI: <span id="hud-stat-agi">10</span> | 
+                INT: <span id="hud-stat-int">10</span>
+            </div>
+        `;
+        
+        this.container.appendChild(panel);
+        
+        // Toggle stats on click
+        panel.addEventListener('click', (e) => {
+            if (e.target.closest('#hud-player-avatar') || e.target.closest('#hud-player-name')) {
+                const stats = panel.querySelector('#hud-stats');
+                stats.style.display = stats.style.display === 'none' ? 'block' : 'none';
+            }
+        });
     }
     
     /**
-     * Setup event listeners
+     * Barra de XP
      */
-    setupEventListeners() {
-        // Window resize - apenas se canvas existir
-        window.addEventListener('resize', () => {
-            if (this.canvas) {
-                this.canvas.width = window.innerWidth;
-                this.canvas.height = window.innerHeight;
-            }
-        });
+    createXPBar() {
+        const xpContainer = document.createElement('div');
+        xpContainer.id = 'hud-xp-container';
+        xpContainer.style.cssText = `
+            position: absolute;
+            top: 110px;
+            left: 10px;
+            right: 170px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            padding: 3px;
+            border: 1px solid #444;
+        `;
         
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'i' || e.key === 'I') {
-                this.toggleInventory();
-            } else if (e.key === 'm' || e.key === 'M') {
-                this.toggleMinimap();
-            } else if (e.key === 'Enter' && e.shiftKey) {
-                this.focusChat();
-            }
-        });
+        xpContainer.innerHTML = `
+            <div id="hud-xp-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #9b59b6, #8e44ad); border-radius: 7px; transition: width 0.3s ease;"></div>
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 11px; text-shadow: 1px 1px 2px black; font-weight: bold;">
+                XP: <span id="hud-xp-text">0/100</span>
+            </div>
+        `;
         
-        // Mouse events for buttons - apenas se canvas existir
-        if (this.canvas) {
-            this.canvas.style.pointerEvents = 'auto';
-            this.canvas.addEventListener('click', (e) => {
-                this.handleClick(e);
+        this.container.appendChild(xpContainer);
+    }
+    
+    /**
+     * Barra de Skills (8 slots)
+     */
+    createSkillBar() {
+        const skillBar = document.createElement('div');
+        skillBar.id = 'hud-skill-bar';
+        skillBar.style.cssText = `
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            pointer-events: auto;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px;
+            border-radius: 8px;
+            border: 2px solid #444;
+        `;
+        
+        for (let i = 1; i <= 8; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'skill-slot';
+            slot.dataset.slot = i;
+            slot.style.cssText = `
+                width: 50px;
+                height: 50px;
+                background: rgba(0, 0, 0, 0.7);
+                border: 2px solid #555;
+                border-radius: 6px;
+                position: relative;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.1s;
+            `;
+            
+            slot.innerHTML = `
+                <div class="skill-icon" style="font-size: 24px; filter: grayscale(0.3);">❔</div>
+                <div class="skill-key" style="position: absolute; bottom: 2px; right: 4px; font-size: 10px; color: #aaa; font-weight: bold;">${i}</div>
+                <div class="cooldown-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 0%; background: rgba(0, 0, 0, 0.7); transition: height 0.1s; border-radius: 4px;"></div>
+                <div class="skill-mana" style="position: absolute; top: 2px; left: 2px; font-size: 9px; color: #3498db; display: none;">⚡</div>
+            `;
+            
+            // Hover effect
+            slot.addEventListener('mouseenter', () => {
+                slot.style.borderColor = '#888';
+                slot.style.transform = 'scale(1.05)';
             });
             
-            this.canvas.addEventListener('mousemove', (e) => {
-                this.handleMouseMove(e);
+            slot.addEventListener('mouseleave', () => {
+                slot.style.borderColor = '#555';
+                slot.style.transform = 'scale(1)';
             });
+            
+            // Click
+            slot.addEventListener('click', () => {
+                this.onSkillClick?.(i);
+            });
+            
+            skillBar.appendChild(slot);
         }
+        
+        this.container.appendChild(skillBar);
     }
     
     /**
-     * Handle mouse clicks
+     * Minimap
      */
-    handleClick(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+    createMinimap() {
+        const minimap = document.createElement('div');
+        minimap.id = 'hud-minimap';
+        minimap.style.cssText = `
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 150px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #444;
+            border-radius: 50%;
+            overflow: hidden;
+            pointer-events: auto;
+        `;
         
-        // Check button clicks
-        Object.entries(this.buttons).forEach(([key, button]) => {
-            if (x >= button.x && x <= button.x + button.width &&
-                y >= button.y && y <= button.y + button.height) {
-                this.onButtonClick(key);
-            }
+        const canvas = document.createElement('canvas');
+        canvas.id = 'hud-minimap-canvas';
+        canvas.width = 150;
+        canvas.height = 150;
+        canvas.style.cssText = 'width: 100%; height: 100%;';
+        
+        minimap.appendChild(canvas);
+        this.container.appendChild(minimap);
+    }
+    
+    /**
+     * Combat Log
+     */
+    createCombatLog() {
+        const combatLog = document.createElement('div');
+        combatLog.id = 'hud-combat-log';
+        combatLog.style.cssText = `
+            position: absolute;
+            top: 140px;
+            right: 10px;
+            width: 200px;
+            max-height: 200px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 8px;
+            overflow-y: auto;
+            font-size: 11px;
+            color: white;
+            pointer-events: auto;
+        `;
+        
+        combatLog.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 5px; color: #f39c12; font-size: 12px; border-bottom: 1px solid #444; padding-bottom: 4px;">
+                ⚔️ Combat Log
+            </div>
+            <div id="hud-combat-entries"></div>
+        `;
+        
+        this.container.appendChild(combatLog);
+        
+        // Auto-scroll
+        combatLog.addEventListener('DOMNodeInserted', () => {
+            combatLog.scrollTop = combatLog.scrollHeight;
         });
     }
     
     /**
-     * Handle mouse movement
+     * Chat Box
      */
-    handleMouseMove(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+    createChatBox() {
+        const chatContainer = document.createElement('div');
+        chatContainer.id = 'hud-chat-container';
+        chatContainer.style.cssText = `
+            position: absolute;
+            bottom: 90px;
+            left: 10px;
+            width: 300px;
+            display: none;
+            pointer-events: auto;
+        `;
         
-        // Check button hover
-        Object.entries(this.buttons).forEach(([key, button]) => {
-            button.hovered = x >= button.x && x <= button.x + button.width &&
-                           y >= button.y && y <= button.y + button.height;
-        });
-    }
-    
-    /**
-     * Handle button clicks
-     */
-    onButtonClick(buttonKey) {
-        console.log(`🖱️ Botão clicado: ${buttonKey}`);
+        chatContainer.innerHTML = `
+            <div id="hud-chat-messages" style="max-height: 150px; overflow-y: auto; background: rgba(0, 0, 0, 0.7); border-radius: 4px 4px 0 0; padding: 8px; font-size: 12px; color: white;">
+                <div style="color: #888;">Pressione Enter para digitar...</div>
+            </div>
+            <input type="text" id="hud-chat-input" placeholder="Digite sua mensagem..." style="width: 100%; padding: 6px; background: rgba(0, 0, 0, 0.9); border: none; border-radius: 0 0 4px 4px; color: white; outline: none; font-size: 12px;">
+        `;
         
-        switch (buttonKey) {
-            case 'inventory':
-                this.toggleInventory();
-                break;
-            case 'character':
-                this.showCharacterSheet();
-                break;
-            case 'map':
-                this.toggleMinimap();
-                break;
-            case 'quests':
-                this.showQuestLog();
-                break;
-            case 'settings':
-                this.showSettings();
-                break;
-        }
-    }
-    
-    /**
-     * Toggle inventory
-     */
-    toggleInventory() {
-        this.state.showInventory = !this.state.showInventory;
-        console.log('🎒 Inventário:', this.state.showInventory ? 'aberto' : 'fechado');
-    }
-    
-    /**
-     * Toggle minimap
-     */
-    toggleMinimap() {
-        if (this.elements.minimap) {
-            this.elements.minimap.visible = !this.elements.minimap.visible;
-            console.log('🗺️ Minimapa:', this.elements.minimap.visible ? 'visível' : 'oculto');
-        }
-    }
-    
-    /**
-     * Focus chat
-     */
-    focusChat() {
-        const chatInput = document.getElementById('chatInput');
-        if (chatInput) {
-            chatInput.focus();
-        }
-    }
-    
-    /**
-     * Show character sheet
-     */
-    showCharacterSheet() {
-        console.log('👤 Abrindo ficha de personagem...');
-        // This would open a detailed character stats modal
-    }
-    
-    /**
-     * Show quest log
-     */
-    showQuestLog() {
-        console.log('📜 Abrindo registro de missões...');
-        // This would open the quest log modal
-    }
-    
-    /**
-     * Show settings
-     */
-    showSettings() {
-        console.log('⚙️ Abrindo configurações...');
-        // This would open the settings modal
-    }
-    
-    /**
-     * Update player stats
-     */
-    updatePlayerStats(stats) {
-        Object.assign(this.state, stats);
-    }
-    
-    /**
-     * Add chat message
-     */
-    addChatMessage(message, type = 'normal') {
-        const timestamp = new Date().toLocaleTimeString('pt-BR', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        });
+        this.container.appendChild(chatContainer);
         
-        this.state.chatMessages.push({
-            message,
-            type,
-            timestamp
-        });
-        
-        // Keep only last 50 messages
-        if (this.state.chatMessages.length > 50) {
-            this.state.chatMessages.shift();
-        }
-    }
-    
-    /**
-     * Add item to inventory
-     */
-    addInventoryItem(item) {
-        this.state.inventory.push(item);
-        console.log(`🎒 Item adicionado ao inventário: ${item.name}`);
-    }
-    
-    /**
-     * Remove item from inventory
-     */
-    removeInventoryItem(itemId) {
-        const index = this.state.inventory.findIndex(item => item.id === itemId);
-        if (index !== -1) {
-            const removedItem = this.state.inventory.splice(index, 1)[0];
-            console.log(`🎒 Item removido do inventário: ${removedItem.name}`);
-            return removedItem;
-        }
-        return null;
-    }
-    
-    /**
-     * Render all HUD elements
-     */
-    render() {
-        if (!this.visible || !this.ctx) return;
-        
-        // Clear canvas
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Render in order (bottom to top)
-        this.renderBackground();
-        this.renderButtons();
-        this.renderHealthBar();
-        this.renderManaBar();
-        this.renderExpBar();
-        this.renderMinimap();
-        this.renderInventory();
-        this.renderChat();
-        this.renderStats();
-    }
-    
-    /**
-     * Render background
-     */
-    renderBackground() {
-        if (this.elements.layout) {
-            // Draw background panel
-            this.ctx.globalAlpha = 0.8;
-            this.ctx.drawImage(this.elements.layout.image, 0, 0);
-            this.ctx.globalAlpha = 1.0;
-        }
-    }
-    
-    /**
-     * Render buttons
-     */
-    renderButtons() {
-        Object.entries(this.buttons).forEach(([key, button]) => {
-            const isHovered = button.hovered || false;
-            
-            // Button background
-            this.ctx.fillStyle = isHovered ? 'rgba(76, 175, 80, 0.8)' : 'rgba(76, 175, 80, 0.6)';
-            this.ctx.fillRect(button.x, button.y, button.width, button.height);
-            
-            // Button border
-            this.ctx.strokeStyle = isHovered ? '#4CAF50' : '#2E7D32';
-            this.ctx.lineWidth = 2;
-            this.ctx.strokeRect(button.x, button.y, button.width, button.height);
-            
-            // Button icon and text
-            this.ctx.fillStyle = '#FFF';
-            this.ctx.font = '16px Arial';
-            this.ctx.textAlign = 'left';
-            this.ctx.textBaseline = 'middle';
-            
-            const iconX = button.x + 8;
-            const textX = button.x + 35;
-            const centerY = button.y + button.height / 2;
-            
-            this.ctx.fillText(button.icon, iconX, centerY);
-            this.ctx.font = '12px Arial';
-            this.ctx.fillText(button.label, textX, centerY);
-        });
-    }
-    
-    /**
-     * Render health bar
-     */
-    renderHealthBar() {
-        const x = 10;
-        const y = this.canvas.height - 80;
-        const width = 200;
-        const height = 20;
-        
-        const healthPercent = this.state.playerHealth / this.state.playerMaxHealth;
-        
-        // Background
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        this.ctx.fillRect(x, y, width, height);
-        
-        // Health fill
-        const healthColor = healthPercent > 0.5 ? '#4CAF50' : 
-                          healthPercent > 0.25 ? '#FF9800' : '#F44336';
-        this.ctx.fillStyle = healthColor;
-        this.ctx.fillRect(x, y, width * healthPercent, height);
-        
-        // Border
-        this.ctx.strokeStyle = '#FFF';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(x, y, width, height);
-        
-        // Text
-        this.ctx.fillStyle = '#FFF';
-        this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText(
-            `❤️ ${this.state.playerHealth}/${this.state.playerMaxHealth}`,
-            x + width / 2,
-            y + height / 2
-        );
-    }
-    
-    /**
-     * Render mana bar
-     */
-    renderManaBar() {
-        const x = 10;
-        const y = this.canvas.height - 55;
-        const width = 200;
-        const height = 20;
-        
-        const manaPercent = this.state.playerMana / this.state.playerMaxMana;
-        
-        // Background
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        this.ctx.fillRect(x, y, width, height);
-        
-        // Mana fill
-        this.ctx.fillStyle = '#2196F3';
-        this.ctx.fillRect(x, y, width * manaPercent, height);
-        
-        // Border
-        this.ctx.strokeStyle = '#FFF';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(x, y, width, height);
-        
-        // Text
-        this.ctx.fillStyle = '#FFF';
-        this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText(
-            `💧 ${this.state.playerMana}/${this.state.playerMaxMana}`,
-            x + width / 2,
-            y + height / 2
-        );
-    }
-    
-    /**
-     * Render experience bar
-     */
-    renderExpBar() {
-        const x = 10;
-        const y = this.canvas.height - 30;
-        const width = 200;
-        const height = 15;
-        
-        const expPercent = this.state.playerExp / this.state.playerExpToNext;
-        
-        // Background
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        this.ctx.fillRect(x, y, width, height);
-        
-        // Exp fill
-        this.ctx.fillStyle = '#FFD700';
-        this.ctx.fillRect(x, y, width * expPercent, height);
-        
-        // Border
-        this.ctx.strokeStyle = '#FFF';
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeRect(x, y, width, height);
-        
-        // Text
-        this.ctx.fillStyle = '#FFF';
-        this.ctx.font = '10px Arial';
-        this.ctx.textAlign = 'left';
-        this.ctx.fillText(
-            `⭐ Lv.${this.state.playerLevel} - ${this.state.playerExp}/${this.state.playerExpToNext} XP`,
-            x + 5,
-            y + height / 2
-        );
-    }
-    
-    /**
-     * Render minimap
-     */
-    renderMinimap() {
-        if (!this.elements.minimap.visible) return;
-        
-        const size = 150;
-        const x = this.canvas.width - size - 10;
-        const y = 10;
-        
-        // Background
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        this.ctx.fillRect(x, y, size, size);
-        
-        // Border
-        this.ctx.strokeStyle = '#4CAF50';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(x, y, size, size);
-        
-        // Title
-        this.ctx.fillStyle = '#FFF';
-        this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('🗺️ Mapa', x + size / 2, y - 5);
-        
-        // Draw minimap content (simplified)
-        this.renderMinimapContent(x, y, size);
-    }
-    
-    /**
-     * Render minimap content
-     */
-    renderMinimapContent(x, y, size) {
-        // This would render the actual map content
-        // For now, just draw a placeholder
-        this.ctx.fillStyle = '#4CAF50';
-        this.ctx.fillRect(x + size/2 - 5, y + size/2 - 5, 10, 10);
-        
-        // Draw exit indicators
-        this.ctx.fillStyle = '#FFD700';
-        this.ctx.fillRect(x + size - 20, y + size/2 - 5, 10, 10); // East
-        this.ctx.fillRect(x + 5, y + 5, 10, 10); // South
-    }
-    
-    /**
-     * Render inventory
-     */
-    renderInventory() {
-        if (!this.state.showInventory) return;
-        
-        const x = this.canvas.width / 2 - 200;
-        const y = this.canvas.height / 2 - 150;
-        const width = 400;
-        const height = 300;
-        
-        // Background
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-        this.ctx.fillRect(x, y, width, height);
-        
-        // Border
-        this.ctx.strokeStyle = '#4CAF50';
-        this.ctx.lineWidth = 3;
-        this.ctx.strokeRect(x, y, width, height);
-        
-        // Title
-        this.ctx.fillStyle = '#FFF';
-        this.ctx.font = '18px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('🎒 Inventário', x + width / 2, y + 30);
-        
-        // Grid background
-        const gridSize = 50;
-        const gridCols = 7;
-        const gridRows = 4;
-        const gridX = x + 25;
-        const gridY = y + 60;
-        
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        this.ctx.lineWidth = 1;
-        
-        for (let row = 0; row < gridRows; row++) {
-            for (let col = 0; col < gridCols; col++) {
-                const slotX = gridX + col * gridSize;
-                const slotY = gridY + row * gridSize;
-                
-                this.ctx.strokeRect(slotX, slotY, gridSize, gridSize);
-                
-                // Draw item if exists
-                const itemIndex = row * gridCols + col;
-                const item = this.state.inventory[itemIndex];
-                if (item) {
-                    this.renderInventoryItem(item, slotX, slotY, gridSize);
+        // Input handling
+        const input = chatContainer.querySelector('#hud-chat-input');
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const message = input.value.trim();
+                if (message) {
+                    this.onChatMessage?.(message);
+                    input.value = '';
                 }
+                this.hideChat();
+            } else if (e.key === 'Escape') {
+                this.hideChat();
             }
-        }
-        
-        // Close button
-        this.ctx.fillStyle = '#F44336';
-        this.ctx.fillRect(x + width - 30, y + 5, 25, 25);
-        this.ctx.fillStyle = '#FFF';
-        this.ctx.font = '16px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('✕', x + width - 17, y + 22);
+        });
     }
     
     /**
-     * Render inventory item
+     * Container para floating texts
      */
-    renderInventoryItem(item, x, y, size) {
-        // Item background
-        this.ctx.fillStyle = 'rgba(76, 175, 80, 0.3)';
-        this.ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
+    createFloatingTextContainer() {
+        const container = document.createElement('div');
+        container.id = 'hud-floating-texts';
+        container.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 999;
+        `;
         
-        // Item icon (simplified)
-        this.ctx.fillStyle = '#FFD700';
-        this.ctx.font = '20px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'middle';
-        
-        const icons = {
-            weapon: '⚔️',
-            armor: '🛡️',
-            potion: '🧪',
-            food: '🍞',
-            gem: '💎',
-            gold: '🪙',
-            quest: '📜'
+        document.body.appendChild(container);
+    }
+    
+    /**
+     * Cache de elementos DOM para atualização rápida
+     */
+    cacheElements() {
+        this.elements = {
+            // Player
+            playerName: document.getElementById('hud-player-name'),
+            playerClass: document.getElementById('hud-player-class'),
+            playerLevel: document.getElementById('hud-player-level'),
+            playerAvatar: document.getElementById('hud-player-avatar'),
+            
+            // HP/MP
+            hpBar: document.getElementById('hud-hp-bar'),
+            hpText: document.getElementById('hud-hp-text'),
+            mpBar: document.getElementById('hud-mp-bar'),
+            mpText: document.getElementById('hud-mp-text'),
+            
+            // XP
+            xpBar: document.getElementById('hud-xp-bar'),
+            xpText: document.getElementById('hud-xp-text'),
+            
+            // Stats
+            statStr: document.getElementById('hud-stat-str'),
+            statAgi: document.getElementById('hud-stat-agi'),
+            statInt: document.getElementById('hud-stat-int'),
+            
+            // Combat Log
+            combatEntries: document.getElementById('hud-combat-entries'),
+            
+            // Chat
+            chatContainer: document.getElementById('hud-chat-container'),
+            chatMessages: document.getElementById('hud-chat-messages'),
+            chatInput: document.getElementById('hud-chat-input'),
+            
+            // Skill slots
+            skillSlots: []
         };
         
-        const icon = icons[item.type] || '📦';
-        this.ctx.fillText(icon, x + size / 2, y + size / 2);
+        // Cache skill slots
+        for (let i = 1; i <= 8; i++) {
+            const slot = document.querySelector(`.skill-slot[data-slot="${i}"]`);
+            if (slot) {
+                this.elements.skillSlots[i] = {
+                    container: slot,
+                    icon: slot.querySelector('.skill-icon'),
+                    cooldown: slot.querySelector('.cooldown-overlay'),
+                    mana: slot.querySelector('.skill-mana')
+                };
+            }
+        }
         
-        // Item quantity
-        if (item.quantity > 1) {
-            this.ctx.fillStyle = '#FFF';
-            this.ctx.font = '10px Arial';
-            this.ctx.fillText(item.quantity, x + size - 8, y + 12);
+        // Minimap canvas
+        this.elements.minimapCanvas = document.getElementById('hud-minimap-canvas');
+        this.elements.floatingContainer = document.getElementById('hud-floating-texts');
+    }
+    
+    // ============================================================
+    // UPDATE LOOP
+    // ============================================================
+    
+    start() {
+        if (this.updateInterval) return;
+        
+        this.updateInterval = setInterval(() => {
+            this.update();
+        }, this.config.updateRate);
+        
+        console.log('✅ HUDManager atualizando');
+    }
+    
+    stop() {
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+            this.updateInterval = null;
+        }
+    }
+    
+    update() {
+        if (!this.engine) return;
+        
+        const state = this.engine.state;
+        const player = state.player;
+        
+        // Atualizar dados do player
+        this.updatePlayerInfo(player);
+        this.updateHPMP(player);
+        this.updateXP(player);
+        this.updateStats(player);
+        this.updateSkillCooldowns(player);
+        this.updateMinimap(state);
+    }
+    
+    updatePlayerInfo(player) {
+        if (!this.elements.playerName) return;
+        
+        this.elements.playerName.textContent = player.name || 'Jogador';
+        this.elements.playerClass.textContent = this.getClassName(player.class);
+        this.elements.playerLevel.textContent = player.level;
+        
+        // Avatar emoji por classe
+        const classEmojis = {
+            warrior: '⚔️', mage: '🔮', archer: '🏹', priest: '⭐',
+            druid: '🌿', rogue: '🗡️', warlock: '💀', fighter: '👊',
+            apprentice: '👤'
+        };
+        this.elements.playerAvatar.textContent = classEmojis[player.class] || '👤';
+    }
+    
+    updateHPMP(player) {
+        // HP
+        const hpPct = (player.hp / player.maxHp) * 100;
+        this.elements.hpBar.style.width = `${Math.max(0, hpPct)}%`;
+        this.elements.hpText.textContent = `${Math.floor(player.hp)}/${player.maxHp}`;
+        
+        // MP
+        const mpPct = (player.mp / player.maxMp) * 100;
+        this.elements.mpBar.style.width = `${Math.max(0, mpPct)}%`;
+        this.elements.mpText.textContent = `${Math.floor(player.mp)}/${player.maxMp}`;
+    }
+    
+    updateXP(player) {
+        const needed = player.level * 100;
+        const pct = (player.xp / needed) * 100;
+        
+        this.elements.xpBar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+        this.elements.xpText.textContent = `${player.xp}/${needed}`;
+    }
+    
+    updateStats(player) {
+        if (!this.elements.statStr) return;
+        
+        this.elements.statStr.textContent = Math.floor(player.stats.str);
+        this.elements.statAgi.textContent = Math.floor(player.stats.agi);
+        this.elements.statInt.textContent = Math.floor(player.stats.int);
+    }
+    
+    updateSkillCooldowns(player) {
+        // TODO: integrar com sistema de skills quando disponível
+        // Por agora, apenas mostrar slots vazios
+    }
+    
+    updateMinimap(state) {
+        const canvas = this.elements.minimapCanvas;
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        
+        // Limpar
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, w, h);
+        
+        // Escala
+        const scaleX = w / state.map.width;
+        const scaleY = h / state.map.height;
+        
+        // Desenhar obstacles (pontos escuros)
+        ctx.fillStyle = '#333';
+        for (const obs of state.map.obstacles) {
+            const mx = obs.x * scaleX;
+            const my = obs.y * scaleY;
+            const mw = obs.width * scaleX;
+            const mh = obs.height * scaleY;
+            ctx.fillRect(mx - mw/2, my - mh/2, mw, mh);
+        }
+        
+        // Desenhar entities (mobs)
+        for (const [id, entity] of state.entities) {
+            if (entity.type !== 'mob') continue;
+            
+            const mx = entity.x * scaleX;
+            const my = entity.y * scaleY;
+            
+            ctx.fillStyle = entity.isAggressive ? '#e74c3c' : '#2ecc71';
+            ctx.beginPath();
+            ctx.arc(mx, my, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Desenhar player (sempre no centro ou posição real)
+        const px = state.player.x * scaleX;
+        const py = state.player.y * scaleY;
+        
+        ctx.fillStyle = '#3498db';
+        ctx.beginPath();
+        ctx.arc(px, py, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Borda
+        ctx.strokeStyle = '#555';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(w/2, h/2, w/2 - 1, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    
+    // ============================================================
+    // PUBLIC API
+    // ============================================================
+    
+    /**
+     * Define skill em um slot
+     */
+    setSkill(slot, skillData) {
+        if (slot < 1 || slot > 8) return;
+        
+        const slotEl = this.elements.skillSlots[slot];
+        if (!slotEl) return;
+        
+        slotEl.icon.textContent = skillData.icon || '❔';
+        slotEl.icon.style.filter = 'none';
+        slotEl.container.title = `${skillData.name}\n${skillData.description || ''}`;
+        
+        if (skillData.manaCost > 0) {
+            slotEl.mana.style.display = 'block';
         }
     }
     
     /**
-     * Render chat
+     * Atualiza cooldown visual de um slot
      */
-    renderChat() {
-        if (!this.state.showChat) return;
+    setCooldown(slot, current, max) {
+        if (slot < 1 || slot > 8) return;
         
-        const x = 10;
-        const y = 60;
-        const width = 300;
-        const height = 200;
+        const slotEl = this.elements.skillSlots[slot];
+        if (!slotEl) return;
         
-        // Background
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        this.ctx.fillRect(x, y, width, height);
+        const pct = (current / max) * 100;
+        slotEl.cooldown.style.height = `${pct}%`;
         
-        // Border
-        this.ctx.strokeStyle = '#2196F3';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(x, y, width, height);
-        
-        // Title
-        this.ctx.fillStyle = '#FFF';
-        this.ctx.font = '14px Arial';
-        this.ctx.textAlign = 'left';
-        this.ctx.fillText('💬 Chat', x + 10, y + 20);
-        
-        // Messages
-        this.ctx.font = '11px Arial';
-        let messageY = y + 40;
-        
-        this.state.chatMessages.slice(-10).forEach(msg => {
-            const color = msg.type === 'system' ? '#4CAF50' : 
-                          msg.type === 'error' ? '#F44336' : '#FFF';
-            
-            this.ctx.fillStyle = color;
-            this.ctx.fillText(
-                `[${msg.timestamp}] ${msg.message}`,
-                x + 10,
-                messageY
+        if (current > 0) {
+            slotEl.icon.style.filter = 'grayscale(1)';
+        } else {
+            slotEl.icon.style.filter = 'none';
+        }
+    }
+    
+    /**
+     * Mostra dano como floating text
+     */
+    showDamage(x, y, amount, isCrit = false) {
+        this.createFloatingText(x, y, `-${amount}`, isCrit ? '#ff0' : '#fff', isCrit ? 20 : 16, isCrit);
+    }
+    
+    /**
+     * Mostra cura como floating text
+     */
+    showHeal(x, y, amount) {
+        this.createFloatingText(x, y, `+${amount}`, '#2ecc71', 16);
+    }
+    
+    /**
+     * Mostra XP ganho
+     */
+    showXp(amount) {
+        const canvas = this.engine?.canvas;
+        if (canvas) {
+            this.createFloatingText(
+                canvas.width / 2,
+                canvas.height / 2 - 50,
+                `+${amount} XP`,
+                '#9b59b6',
+                18
             );
-            
-            messageY += 18;
-        });
-    }
-    
-    /**
-     * Render stats
-     */
-    renderStats() {
-        const x = this.canvas.width - 160;
-        const y = this.canvas.height - 80;
-        
-        // Background
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        this.ctx.fillRect(x, y, 150, 70);
-        
-        // Border
-        this.ctx.strokeStyle = '#FFD700';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(x, y, 150, 70);
-        
-        // Stats text
-        this.ctx.fillStyle = '#FFF';
-        this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'left';
-        
-        const stats = [
-            `🪙 Ouro: ${this.state.playerGold}`,
-            `🎒 Itens: ${this.state.inventory.length}`,
-            `⏱️ Tempo: ${Math.floor(Date.now() / 1000)}s`
-        ];
-        
-        stats.forEach((stat, index) => {
-            this.ctx.fillText(stat, x + 10, y + 20 + index * 18);
-        });
-    }
-    
-    /**
-     * Show/hide HUD
-     */
-    setVisible(visible) {
-        this.visible = visible;
-        this.canvas.style.display = visible ? 'block' : 'none';
-    }
-    
-    /**
-     * Get HUD state
-     */
-    getState() {
-        return this.state;
-    }
-    
-    /**
-     * Destroy HUD
-     */
-    destroy() {
-        if (this.canvas && this.canvas.parentNode) {
-            this.canvas.parentNode.removeChild(this.canvas);
         }
     }
+    
+    /**
+     * Cria floating text
+     */
+    createFloatingText(x, y, text, color, size, isCrit = false) {
+        const el = document.createElement('div');
+        el.textContent = text;
+        el.style.cssText = `
+            position: absolute;
+            left: ${x}px;
+            top: ${y}px;
+            color: ${color};
+            font-size: ${size}px;
+            font-weight: ${isCrit ? 'bold' : 'normal'};
+            text-shadow: 2px 2px 4px black;
+            pointer-events: none;
+            transition: all 1s ease-out;
+            transform: translate(-50%, -50%);
+            ${isCrit ? 'text-shadow: 0 0 10px ' + color + ';' : ''}
+        `;
+        
+        this.elements.floatingContainer.appendChild(el);
+        
+        // Animar
+        requestAnimationFrame(() => {
+            el.style.transform = 'translate(-50%, -150px)';
+            el.style.opacity = '0';
+        });
+        
+        // Remover
+        setTimeout(() => {
+            el.remove();
+        }, 1000);
+    }
+    
+    /**
+     * Adiciona mensagem ao combat log
+     */
+    addCombatLog(message, type = 'normal') {
+        const entry = document.createElement('div');
+        entry.style.cssText = `
+            margin-bottom: 2px;
+            color: ${this.getCombatLogColor(type)};
+        `;
+        entry.textContent = message;
+        
+        this.elements.combatEntries.appendChild(entry);
+        
+        // Limitar entries
+        while (this.elements.combatEntries.children.length > 20) {
+            this.elements.combatEntries.removeChild(this.elements.combatEntries.firstChild);
+        }
+        
+        // Auto-scroll
+        this.elements.combatEntries.parentElement.scrollTop = 
+            this.elements.combatEntries.parentElement.scrollHeight;
+    }
+    
+    getCombatLogColor(type) {
+        const colors = {
+            damage: '#e74c3c',
+            heal: '#2ecc71',
+            xp: '#9b59b6',
+            loot: '#f39c12',
+            system: '#3498db',
+            normal: '#fff'
+        };
+        return colors[type] || colors.normal;
+    }
+    
+    /**
+     * Mostra chat
+     */
+    showChat() {
+        this.elements.chatContainer.style.display = 'block';
+        this.elements.chatInput.focus();
+    }
+    
+    /**
+     * Esconde chat
+     */
+    hideChat() {
+        this.elements.chatContainer.style.display = 'none';
+        this.elements.chatInput.blur();
+    }
+    
+    /**
+     * Adiciona mensagem ao chat
+     */
+    addChatMessage(from, message, channel = 'global') {
+        const msg = document.createElement('div');
+        msg.style.marginBottom = '4px';
+        
+        const channelColors = {
+            global: '#fff',
+            party: '#2ecc71',
+            guild: '#f39c12',
+            whisper: '#9b59b6',
+            system: '#e74c3c'
+        };
+        
+        const color = channelColors[channel] || channelColors.global;
+        
+        msg.innerHTML = `
+            <span style="color: #888;">[${channel}]</span>
+            <span style="color: ${color}; font-weight: bold;">${from}:</span>
+            <span style="color: #ddd;">${message}</span>
+        `;
+        
+        this.elements.chatMessages.appendChild(msg);
+        
+        // Limitar
+        while (this.elements.chatMessages.children.length > 50) {
+            this.elements.chatMessages.removeChild(this.elements.chatMessages.firstChild);
+        }
+        
+        this.elements.chatMessages.scrollTop = this.elements.chatMessages.scrollHeight;
+    }
+    
+    /**
+     * Toggle visibilidade do HUD
+     */
+    toggle() {
+        this.container.style.display = 
+            this.container.style.display === 'none' ? 'block' : 'none';
+    }
+    
+    /**
+     * Mostra/esconde debug info
+     */
+    toggleDebug() {
+        this.config.showDebug = !this.config.showDebug;
+        const stats = document.getElementById('hud-stats');
+        if (stats) {
+            stats.style.display = this.config.showDebug ? 'block' : 'none';
+        }
+    }
+    
+    // ============================================================
+    // UTILS
+    // ============================================================
+    
+    getClassName(classId) {
+        const names = {
+            warrior: 'Guerreiro',
+            mage: 'Mago',
+            archer: 'Arqueiro',
+            priest: 'Sacerdote',
+            druid: 'Druida',
+            rogue: 'Ladino',
+            warlock: 'Bruxo',
+            fighter: 'Lutador',
+            apprentice: 'Aprendiz'
+        };
+        return names[classId] || 'Desconhecido';
+    }
+    
+    /**
+     * Callbacks configuráveis
+     */
+    onSkillClick = null;
+    onChatMessage = null;
 }
 
-// Export for ES6 modules
-export { HUDManager };
-
-// Global instance for legacy compatibility
-window.hudManager = new HUDManager();
+// Export
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = HUDManager;
+} else {
+    window.HUDManager = HUDManager;
+}

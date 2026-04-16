@@ -14,11 +14,41 @@ const worldMap = {
             description: "Verdant plains where new adventurers begin their journey",
             color: "#4ade80",
             mobs: [
-                { type: "rat", level: 1, count: 15, respawnTime: 5000 },
-                { type: "slime", level: 2, count: 12, respawnTime: 6000 },
-                { type: "young_wolf", level: 3, count: 8, respawnTime: 8000 },
-                { type: "bandit", level: 4, count: 6, respawnTime: 10000 }
+                // Mobs Comuns
+                { type: "rat", level: 1, count: 15, respawnTime: 5000, rarity: "common" },
+                { type: "slime", level: 2, count: 12, respawnTime: 6000, rarity: "common" },
+                { type: "young_wolf", level: 3, count: 8, respawnTime: 8000, rarity: "common" },
+                { type: "bandit", level: 4, count: 6, respawnTime: 10000, rarity: "common" },
+                { type: "wild_boar", level: 2, count: 10, respawnTime: 7000, rarity: "common" },
+                { type: "goblin_scavenger", level: 3, count: 8, respawnTime: 9000, rarity: "common" },
+                { type: "forest_squirrel", level: 1, count: 20, respawnTime: 4000, rarity: "common" },
+                { type: "rabbit", level: 1, count: 25, respawnTime: 3000, rarity: "common" },
+                { type: "mushroom_sprite", level: 2, count: 12, respawnTime: 8000, rarity: "uncommon" },
+                { type: "lost_traveler", level: 3, count: 5, respawnTime: 12000, rarity: "uncommon" },
+                { type: "baby_bear", level: 4, count: 4, respawnTime: 15000, rarity: "uncommon" },
+                { type: "forest_imp", level: 3, count: 6, respawnTime: 10000, rarity: "uncommon" }
             ],
+            // Mobs Raros (0.1% chance, respawn 30min)
+            rareMobs: [
+                { type: "alpha_wolf", level: 5, count: 1, respawnTime: 1800000, rarity: "rare", 
+                  statsMultiplier: 2.5, lootMultiplier: 5, xpMultiplier: 3 },
+                { type: "giant_rat", level: 4, count: 1, respawnTime: 1800000, rarity: "rare",
+                  statsMultiplier: 2.0, lootMultiplier: 4, xpMultiplier: 2.5 },
+                { type: "slime_king", level: 5, count: 1, respawnTime: 1800000, rarity: "rare",
+                  statsMultiplier: 3.0, lootMultiplier: 6, xpMultiplier: 4 }
+            ],
+            // Mini-Boss (respawn 2 horas)
+            miniBoss: {
+                type: "plains_guardian",
+                level: 8,
+                count: 1,
+                respawnTime: 7200000,
+                rarity: "boss",
+                statsMultiplier: 5.0,
+                lootMultiplier: 10,
+                xpMultiplier: 8,
+                drops: ["guardian_shard", "plains_armor_piece", "rare_herb"]
+            },
             dungeons: [],
             raids: [],
             pois: [
@@ -41,11 +71,41 @@ const worldMap = {
             description: "Ancient forest home to druids and mystical creatures",
             color: "#22c55e",
             mobs: [
-                { type: "wolf", level: 12, count: 20, respawnTime: 7000 },
-                { type: "boar", level: 14, count: 15, respawnTime: 8000 },
-                { type: "goblin", level: 16, count: 12, respawnTime: 9000 },
-                { type: "forest_troll", level: 18, count: 6, respawnTime: 12000 }
+                // Mobs Comuns
+                { type: "wolf", level: 12, count: 20, respawnTime: 7000, rarity: "common" },
+                { type: "boar", level: 14, count: 15, respawnTime: 8000, rarity: "common" },
+                { type: "goblin", level: 16, count: 12, respawnTime: 9000, rarity: "common" },
+                { type: "forest_troll", level: 18, count: 6, respawnTime: 12000, rarity: "common" },
+                { type: "brown_bear", level: 13, count: 8, respawnTime: 10000, rarity: "common" },
+                { type: "forest_spider", level: 11, count: 18, respawnTime: 6000, rarity: "common" },
+                { type: "mushroom_man", level: 15, count: 10, respawnTime: 11000, rarity: "uncommon" },
+                { type: "pixie", level: 12, count: 12, respawnTime: 8000, rarity: "uncommon" },
+                { type: "ent_sapling", level: 17, count: 5, respawnTime: 15000, rarity: "uncommon" },
+                { type: "forest_imp", level: 14, count: 8, respawnTime: 9000, rarity: "uncommon" },
+                { type: "owl", level: 11, count: 15, respawnTime: 7000, rarity: "common" },
+                { type: "deer", level: 10, count: 20, respawnTime: 5000, rarity: "common" }
             ],
+            // Mobs Raros (0.1% chance, respawn 30min)
+            rareMobs: [
+                { type: "alpha_wolf", level: 20, count: 1, respawnTime: 1800000, rarity: "rare",
+                  statsMultiplier: 2.5, lootMultiplier: 5, xpMultiplier: 3 },
+                { type: "giant_spider", level: 18, count: 1, respawnTime: 1800000, rarity: "rare",
+                  statsMultiplier: 2.0, lootMultiplier: 4, xpMultiplier: 2.5 },
+                { type: "ancient_ent", level: 22, count: 1, respawnTime: 1800000, rarity: "rare",
+                  statsMultiplier: 3.0, lootMultiplier: 6, xpMultiplier: 4 }
+            ],
+            // Mini-Boss (respawn 2 horas)
+            miniBoss: {
+                type: "forest_guardian",
+                level: 25,
+                count: 1,
+                respawnTime: 7200000,
+                rarity: "boss",
+                statsMultiplier: 5.0,
+                lootMultiplier: 10,
+                xpMultiplier: 8,
+                drops: ["guardian_essence", "forest_staff", "rare_mushroom"]
+            },
             dungeons: ["goblin_cave", "whispering_grove"],
             raids: [],
             pois: [

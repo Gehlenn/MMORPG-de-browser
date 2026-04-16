@@ -20,7 +20,8 @@ export default defineConfig({
       
       // Incluir apenas arquivos que realmente testamos
       include: [
-        'src/**/*.js',
+        'client/**/*.js',
+        'server/**/*.js',
         'tests/**/*.test.js'
       ],
       
@@ -105,7 +106,6 @@ export default defineConfig({
   // Configurações de resolve
   resolve: {
     alias: {
-      '@': './src',
       '@client': './client',
       '@server': './server',
       '@tests': './tests'

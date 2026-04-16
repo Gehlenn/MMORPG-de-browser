@@ -1,0 +1,148 @@
+name: Coverage Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  coverage-validation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run Feature Integrity Tests
+      run: npm run test:integrity
+      
+    - name: Run Enhanced Coverage Tests
+      run: npm run test:enhanced-coverage
+      
+    - name: Check Coverage Thresholds
+      run: |
+        echo "Checking coverage thresholds..."
+        
+        # Check if coverage meets minimum requirements
+        COVERAGE_FILE="reports/coverage-report.json"
+        
+        if [ -f "$COVERAGE_FILE" ]; then
+          AVERAGE_COVERAGE=$(node -e "
+            const report = require('./$COVERAGE_FILE');
+            console.log(report.summary.averageCoverage);
+          ")
+          
+          echo "Average Coverage: $AVERAGE_COVERAGE%"
+          
+          if [ $AVERAGE_COVERAGE -lt 95 ]; then
+            echo "❌ Coverage below 95% threshold"
+            exit 1
+          else
+            echo "✅ Coverage meets 95% threshold"
+          fi
+        else
+          echo "❌ Coverage report not found"
+          exit 1
+        fi
+        
+    - name: Upload Coverage Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-reports
+        path: |
+          reports/
+          coverage-*/
+          
+    - name: Comment PR with Coverage
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          try {
+            const report = JSON.parse(fs.readFileSync('reports/coverage-report.json', 'utf8'));
+            const avgCoverage = report.summary.averageCoverage;
+            
+            const comment = `
+            ## 📊 Coverage Report
+            
+            **Average Coverage:** ${avgCoverage}%
+            **Status:** ${avgCoverage >= 95 ? '✅ PASS' : '❌ FAIL'}
+            
+            ### Category Breakdown:
+            ${report.results.map(r => 
+              `- **${r.category}:** ${r.coverage}% ${r.passed ? '✅' : '❌'} (Target: ${r.target}%)`
+            ).join('\n')}
+            
+            ${avgCoverage < 95 ? '### 🔧 Areas needing improvement:\n' + 
+              report.results.filter(r => !r.passed).map(r => 
+                `- ${r.category}: ${r.coverage}% (need ${r.target - r.coverage}% more)`
+              ).join('\n') : ''}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          } catch (error) {
+            console.log('Could not read coverage report:', error.message);
+          }
+          
+  regression-tests:
+    runs-on: ubuntu-latest
+    needs: coverage-validation
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run Regression Tests
+      run: npm run test:regression
+      
+    - name: Run Security Tests
+      run: npm run tests/v0.4.0/financial-security.test.js
+      
+  quality-gate:
+    runs-on: ubuntu-latest
+    needs: [coverage-validation, regression-tests]
+    
+    steps:
+    - name: Quality Gate Check
+      run: |
+        echo "🚪 Running Quality Gate..."
+        
+        # Check if all previous jobs passed
+        if [ "${{ needs.coverage-validation.result }}" != "success" ]; then
+          echo "❌ Coverage validation failed"
+          exit 1
+        fi
+        
+        if [ "${{ needs.regression-tests.result }}" != "success" ]; then
+          echo "❌ Regression tests failed"
+          exit 1
+        fi
+        
+        echo "✅ Quality gate passed - Ready for deployment"

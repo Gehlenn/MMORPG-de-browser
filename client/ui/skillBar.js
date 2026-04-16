@@ -37,7 +37,8 @@ class SkillBarUI {
             poison_blade: '🩸',
             weapon_mastery: '🎯',
             mana_efficiency: '💧',
-            critical_strike: '💥'
+            critical_strike: '💥',
+            shield_bash: '🛡️'
         };
         
         this.skillColors = {
