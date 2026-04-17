@@ -308,6 +308,219 @@ class GuildUI {
                 color: #888;
                 margin-bottom: 24px;
             }
+            
+            /* Guild Directory Styles */
+            .guild-directory {
+                padding: 20px;
+            }
+            
+            .guild-directory-header {
+                display: flex;
+                gap: 12px;
+                margin-bottom: 16px;
+            }
+            
+            .guild-directory-search {
+                flex: 1;
+                padding: 10px 14px;
+                background: rgba(255,255,255,0.05);
+                border: 1px solid #4a4a6a;
+                border-radius: 6px;
+                color: #fff;
+                font-size: 14px;
+            }
+            
+            .guild-directory-search:focus {
+                outline: none;
+                border-color: #4a6fa5;
+            }
+            
+            .guild-directory-list {
+                max-height: 300px;
+                overflow-y: auto;
+            }
+            
+            .guild-directory-item {
+                display: flex;
+                align-items: center;
+                padding: 12px;
+                background: rgba(255,255,255,0.03);
+                border-radius: 8px;
+                margin-bottom: 8px;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            
+            .guild-directory-item:hover {
+                background: rgba(255,255,255,0.08);
+            }
+            
+            .guild-directory-info {
+                flex: 1;
+            }
+            
+            .guild-directory-name {
+                font-weight: bold;
+                color: #fff;
+            }
+            
+            .guild-directory-meta {
+                font-size: 12px;
+                color: #888;
+                margin-top: 4px;
+            }
+            
+            .guild-directory-tag {
+                background: #ffd700;
+                color: #1a1a2e;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: bold;
+                margin-right: 12px;
+            }
+            
+            /* Create Guild Modal */
+            .guild-modal-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1001;
+            }
+            
+            .guild-modal {
+                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                border: 2px solid #4a4a6a;
+                border-radius: 12px;
+                width: 420px;
+                max-width: 90vw;
+                overflow: hidden;
+            }
+            
+            .guild-modal-header {
+                background: linear-gradient(90deg, #4a6fa5 0%, #6a8fc5 100%);
+                padding: 16px 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .guild-modal-title {
+                font-size: 18px;
+                font-weight: bold;
+                color: #fff;
+            }
+            
+            .guild-modal-body {
+                padding: 20px;
+            }
+            
+            .guild-form-group {
+                margin-bottom: 16px;
+            }
+            
+            .guild-form-label {
+                display: block;
+                font-size: 13px;
+                color: #aaa;
+                margin-bottom: 6px;
+            }
+            
+            .guild-form-input {
+                width: 100%;
+                padding: 10px 12px;
+                background: rgba(255,255,255,0.05);
+                border: 1px solid #4a4a6a;
+                border-radius: 6px;
+                color: #fff;
+                font-size: 14px;
+                box-sizing: border-box;
+            }
+            
+            .guild-form-input:focus {
+                outline: none;
+                border-color: #4a6fa5;
+            }
+            
+            .guild-form-hint {
+                font-size: 11px;
+                color: #666;
+                margin-top: 4px;
+            }
+            
+            .guild-form-error {
+                font-size: 12px;
+                color: #ff6666;
+                margin-top: 4px;
+                display: none;
+            }
+            
+            .guild-form-error.visible {
+                display: block;
+            }
+            
+            .guild-requirements {
+                background: rgba(255,215,0,0.1);
+                border-left: 3px solid #ffd700;
+                padding: 12px;
+                margin-bottom: 16px;
+                font-size: 13px;
+            }
+            
+            .guild-requirement-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 4px;
+            }
+            
+            .guild-requirement-met {
+                color: #4caf50;
+            }
+            
+            .guild-requirement-unmet {
+                color: #ff6666;
+            }
+            
+            .guild-modal-footer {
+                padding: 16px 20px;
+                display: flex;
+                gap: 12px;
+                justify-content: flex-end;
+                border-top: 1px solid rgba(255,255,255,0.1);
+            }
+            
+            /* Settings Dialog */
+            .guild-settings-textarea {
+                width: 100%;
+                min-height: 100px;
+                padding: 10px 12px;
+                background: rgba(255,255,255,0.05);
+                border: 1px solid #4a4a6a;
+                border-radius: 6px;
+                color: #fff;
+                font-size: 14px;
+                resize: vertical;
+                box-sizing: border-box;
+            }
+            
+            .guild-settings-textarea:focus {
+                outline: none;
+                border-color: #4a6fa5;
+            }
+            
+            .guild-char-count {
+                font-size: 11px;
+                color: #666;
+                text-align: right;
+                margin-top: 4px;
+            }
         `;
         document.head.appendChild(styles);
     }
@@ -681,17 +894,362 @@ class GuildUI {
     /**
      * Show guild directory
      */
-    showDirectory() {
-        // This would open the directory UI
-        this.game.showNotification('Guild directory - coming soon!', 'info');
+    async showDirectory() {
+        this.currentView = 'directory';
+        this.close(); // Close current panel
+        
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'guild-modal-overlay';
+        overlay.id = 'guild-directory-modal';
+        
+        overlay.innerHTML = `
+            <div class="guild-modal" style="width: 500px;">
+                <div class="guild-modal-header">
+                    <span class="guild-modal-title">🏰 Guild Directory</span>
+                    <button class="guild-close-btn" id="guild-dir-close">×</button>
+                </div>
+                <div class="guild-directory">
+                    <div class="guild-directory-header">
+                        <input type="text" 
+                               class="guild-directory-search" 
+                               id="guild-dir-search"
+                               placeholder="Search guilds by name or tag...">
+                    </div>
+                    <div class="guild-directory-list" id="guild-dir-list">
+                        <div style="text-align: center; padding: 40px; color: #888;">
+                            Loading guilds...
+                        </div>
+                    </div>
+                </div>
+                <div class="guild-modal-footer">
+                    <button class="guild-btn guild-btn-secondary" id="guild-dir-back">
+                        ← Back
+                    </button>
+                    <button class="guild-btn guild-btn-primary" id="guild-dir-create">
+                        Create Guild
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        // Event listeners
+        document.getElementById('guild-dir-close').addEventListener('click', () => {
+            overlay.remove();
+            this.open();
+        });
+        
+        document.getElementById('guild-dir-back').addEventListener('click', () => {
+            overlay.remove();
+            this.open();
+        });
+        
+        document.getElementById('guild-dir-create').addEventListener('click', () => {
+            overlay.remove();
+            this.showCreateDialog();
+        });
+        
+        // Search functionality
+        let searchTimeout;
+        document.getElementById('guild-dir-search').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                this.searchGuilds(e.target.value);
+            }, 300);
+        });
+        
+        // Load guilds
+        await this.loadGuildDirectory();
+    }
+    
+    /**
+     * Load guild directory data
+     */
+    async loadGuildDirectory() {
+        const listEl = document.getElementById('guild-dir-list');
+        
+        try {
+            const response = await this.game.network.send('guild:browse', { limit: 50 });
+            
+            if (response.success && response.guilds) {
+                this.renderGuildList(response.guilds);
+            } else {
+                listEl.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #888;">
+                        No guilds found.<br>
+                        <small>Be the first to create one!</small>
+                    </div>
+                `;
+            }
+        } catch (err) {
+            listEl.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #ff6666;">
+                    Error loading guilds.<br>
+                    <small>Please try again later.</small>
+                </div>
+            `;
+        }
+    }
+    
+    /**
+     * Search guilds
+     */
+    async searchGuilds(query) {
+        const listEl = document.getElementById('guild-dir-list');
+        listEl.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">Searching...</div>';
+        
+        try {
+            const response = await this.game.network.send('guild:browse', { 
+                search: query,
+                limit: 50 
+            });
+            
+            if (response.success && response.guilds?.length > 0) {
+                this.renderGuildList(response.guilds);
+            } else {
+                listEl.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #888;">
+                        No guilds found matching "${query}"
+                    </div>
+                `;
+            }
+        } catch (err) {
+            console.error('Search error:', err);
+        }
+    }
+    
+    /**
+     * Render guild list
+     */
+    renderGuildList(guilds) {
+        const listEl = document.getElementById('guild-dir-list');
+        
+        if (guilds.length === 0) {
+            listEl.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #888;">
+                    No guilds found.
+                </div>
+            `;
+            return;
+        }
+        
+        listEl.innerHTML = guilds.map(g => `
+            <div class="guild-directory-item" data-guild-id="${g.id}">
+                <span class="guild-directory-tag">[${g.tag}]</span>
+                <div class="guild-directory-info">
+                    <div class="guild-directory-name">${g.name}</div>
+                    <div class="guild-directory-meta">
+                        ${g.memberCount}/${g.maxMembers} members • ${g.onlineCount} online
+                        ${g.recruiting ? ' • 🏳️ Recruiting' : ''}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        // Add click handlers
+        listEl.querySelectorAll('.guild-directory-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const guildId = item.dataset.guildId;
+                this.viewGuildDetails(guildId);
+            });
+        });
+    }
+    
+    /**
+     * View guild details
+     */
+    viewGuildDetails(guildId) {
+        // For now, show a notification
+        // In the future, this could show guild info + apply button
+        this.game.showNotification('Guild details view - coming soon!', 'info');
     }
 
     /**
      * Show create guild dialog
      */
     showCreateDialog() {
-        // This would open the create modal
-        this.game.showNotification('Create guild - coming soon!', 'info');
+        this.currentView = 'create';
+        
+        const player = this.game.player || {};
+        const hasEnoughGold = (player.gold || 0) >= 10000;
+        const hasEnoughLevel = (player.level || 1) >= 10;
+        
+        // Remove any existing modal
+        document.getElementById('guild-create-modal')?.remove();
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'guild-modal-overlay';
+        overlay.id = 'guild-create-modal';
+        
+        overlay.innerHTML = `
+            <div class="guild-modal">
+                <div class="guild-modal-header">
+                    <span class="guild-modal-title">🏰 Create Guild</span>
+                    <button class="guild-close-btn" id="guild-create-close">×</button>
+                </div>
+                <div class="guild-modal-body">
+                    <div class="guild-requirements">
+                        <div class="guild-requirement-item ${hasEnoughLevel ? 'guild-requirement-met' : 'guild-requirement-unmet'}">
+                            ${hasEnoughLevel ? '✅' : '❌'} Level 10 or higher (you: ${player.level || 1})
+                        </div>
+                        <div class="guild-requirement-item ${hasEnoughGold ? 'guild-requirement-met' : 'guild-requirement-unmet'}">
+                            ${hasEnoughGold ? '✅' : '❌'} 10,000 gold (you: ${(player.gold || 0).toLocaleString()})
+                        </div>
+                    </div>
+                    
+                    <div class="guild-form-group">
+                        <label class="guild-form-label">Guild Name *</label>
+                        <input type="text" 
+                               class="guild-form-input" 
+                               id="guild-create-name"
+                               placeholder="Enter guild name (3-30 chars)"
+                               maxlength="30">
+                        <div class="guild-form-hint">This will be your guild's full name</div>
+                        <div class="guild-form-error" id="guild-name-error"></div>
+                    </div>
+                    
+                    <div class="guild-form-group">
+                        <label class="guild-form-label">Guild Tag *</label>
+                        <input type="text" 
+                               class="guild-form-input" 
+                               id="guild-create-tag"
+                               placeholder="TAG (3-4 uppercase letters)"
+                               maxlength="4"
+                               style="text-transform: uppercase;">
+                        <div class="guild-form-hint">Short identifier shown in chat [TAG]</div>
+                        <div class="guild-form-error" id="guild-tag-error"></div>
+                    </div>
+                    
+                    <div class="guild-form-group">
+                        <label class="guild-form-label">Description</label>
+                        <textarea class="guild-form-input" 
+                                  id="guild-create-desc"
+                                  placeholder="Describe your guild... (optional)"
+                                  maxlength="200"
+                                  style="min-height: 80px; resize: vertical;"></textarea>
+                        <div class="guild-char-count" id="guild-desc-count">0/200</div>
+                    </div>
+                </div>
+                <div class="guild-modal-footer">
+                    <button class="guild-btn guild-btn-secondary" id="guild-create-cancel">
+                        Cancel
+                    </button>
+                    <button class="guild-btn guild-btn-primary" id="guild-create-submit"
+                            ${!hasEnoughGold || !hasEnoughLevel ? 'disabled style="opacity: 0.5;"' : ''}>
+                        Create Guild (10,000 gold)
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        // Event listeners
+        document.getElementById('guild-create-close').addEventListener('click', () => {
+            overlay.remove();
+            this.open();
+        });
+        
+        document.getElementById('guild-create-cancel').addEventListener('click', () => {
+            overlay.remove();
+            this.open();
+        });
+        
+        // Character counter for description
+        document.getElementById('guild-create-desc').addEventListener('input', (e) => {
+            document.getElementById('guild-desc-count').textContent = `${e.target.value.length}/200`;
+        });
+        
+        // Tag validation - only uppercase letters
+        document.getElementById('guild-create-tag').addEventListener('input', (e) => {
+            e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+        });
+        
+        // Submit
+        document.getElementById('guild-create-submit').addEventListener('click', () => {
+            this.submitCreateGuild();
+        });
+    }
+    
+    /**
+     * Submit create guild form
+     */
+    async submitCreateGuild() {
+        const nameInput = document.getElementById('guild-create-name');
+        const tagInput = document.getElementById('guild-create-tag');
+        const descInput = document.getElementById('guild-create-desc');
+        
+        const name = nameInput.value.trim();
+        const tag = tagInput.value.trim();
+        const description = descInput.value.trim();
+        
+        // Validation
+        let hasError = false;
+        
+        // Name validation
+        const nameError = document.getElementById('guild-name-error');
+        if (name.length < 3) {
+            nameError.textContent = 'Guild name must be at least 3 characters';
+            nameError.classList.add('visible');
+            hasError = true;
+        } else if (name.length > 30) {
+            nameError.textContent = 'Guild name must be 30 characters or less';
+            nameError.classList.add('visible');
+            hasError = true;
+        } else if (!/^[a-zA-Z0-9\s_-]+$/.test(name)) {
+            nameError.textContent = 'Guild name can only contain letters, numbers, spaces, hyphens and underscores';
+            nameError.classList.add('visible');
+            hasError = true;
+        } else {
+            nameError.classList.remove('visible');
+        }
+        
+        // Tag validation
+        const tagError = document.getElementById('guild-tag-error');
+        if (tag.length < 3 || tag.length > 4) {
+            tagError.textContent = 'Tag must be 3-4 uppercase letters';
+            tagError.classList.add('visible');
+            hasError = true;
+        } else if (!/^[A-Z]{3,4}$/.test(tag)) {
+            tagError.textContent = 'Tag can only contain uppercase letters A-Z';
+            tagError.classList.add('visible');
+            hasError = true;
+        } else {
+            tagError.classList.remove('visible');
+        }
+        
+        if (hasError) return;
+        
+        // Submit
+        const submitBtn = document.getElementById('guild-create-submit');
+        submitBtn.textContent = 'Creating...';
+        submitBtn.disabled = true;
+        
+        try {
+            const response = await this.game.network.send('guild:create', {
+                name,
+                tag,
+                description
+            });
+            
+            if (response.success) {
+                document.getElementById('guild-create-modal')?.remove();
+                this.game.showNotification(`🏰 Guild [${tag}] ${name} created successfully!`, 'success');
+                this.guildData = response.guild;
+                this.open();
+            } else {
+                this.game.showNotification(response.error || 'Failed to create guild', 'error');
+                submitBtn.textContent = 'Create Guild (10,000 gold)';
+                submitBtn.disabled = false;
+            }
+        } catch (err) {
+            console.error('Create guild error:', err);
+            this.game.showNotification('Network error. Please try again.', 'error');
+            submitBtn.textContent = 'Create Guild (10,000 gold)';
+            submitBtn.disabled = false;
+        }
     }
 
     // Context menu actions (attached to window for onclick handlers)
@@ -762,8 +1320,195 @@ class GuildUI {
         }
     }
 
+    /**
+     * Show guild settings dialog
+     */
     showSettingsDialog() {
-        this.game.showNotification('Guild settings - coming soon!', 'info');
+        if (!this.guildData) return;
+        
+        const isLeader = this.guildData.myRank === 'LEADER';
+        
+        // Remove any existing modal
+        document.getElementById('guild-settings-modal')?.remove();
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'guild-modal-overlay';
+        overlay.id = 'guild-settings-modal';
+        
+        overlay.innerHTML = `
+            <div class="guild-modal">
+                <div class="guild-modal-header">
+                    <span class="guild-modal-title">⚙️ Guild Settings</span>
+                    <button class="guild-close-btn" id="guild-settings-close">×</button>
+                </div>
+                <div class="guild-modal-body">
+                    <div class="guild-form-group">
+                        <label class="guild-form-label">Message of the Day (MOTD)</label>
+                        <textarea class="guild-settings-textarea" 
+                                  id="guild-motd-input"
+                                  placeholder="Set a message for all guild members..."
+                                  maxlength="500"
+                                  ${!isLeader ? 'disabled' : ''}>${this.guildData.motd || ''}</textarea>
+                        <div class="guild-char-count" id="guild-motd-count">${(this.guildData.motd || '').length}/500</div>
+                    </div>
+                    
+                    ${isLeader ? `
+                        <div class="guild-requirements" style="margin-top: 20px;">
+                            <strong>Danger Zone</strong><br>
+                            <small>These actions cannot be undone</small>
+                        </div>
+                        
+                        <button class="guild-btn guild-btn-danger" id="guild-disband-btn" style="width: 100%;">
+                            🗑️ Disband Guild
+                        </button>
+                    ` : ''}
+                </div>
+                <div class="guild-modal-footer">
+                    <button class="guild-btn guild-btn-secondary" id="guild-settings-cancel">
+                        Cancel
+                    </button>
+                    ${isLeader ? `
+                        <button class="guild-btn guild-btn-primary" id="guild-settings-save">
+                            Save Changes
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        // Event listeners
+        document.getElementById('guild-settings-close').addEventListener('click', () => {
+            overlay.remove();
+        });
+        
+        document.getElementById('guild-settings-cancel').addEventListener('click', () => {
+            overlay.remove();
+        });
+        
+        // Character counter
+        const motdInput = document.getElementById('guild-motd-input');
+        if (motdInput) {
+            motdInput.addEventListener('input', (e) => {
+                document.getElementById('guild-motd-count').textContent = `${e.target.value.length}/500`;
+            });
+        }
+        
+        // Save button
+        if (isLeader) {
+            document.getElementById('guild-settings-save').addEventListener('click', () => {
+                this.saveGuildSettings();
+            });
+            
+            // Disband button
+            document.getElementById('guild-disband-btn').addEventListener('click', () => {
+                this.confirmDisbandGuild();
+            });
+        }
+    }
+    
+    /**
+     * Save guild settings
+     */
+    async saveGuildSettings() {
+        const motd = document.getElementById('guild-motd-input').value.trim();
+        
+        const saveBtn = document.getElementById('guild-settings-save');
+        saveBtn.textContent = 'Saving...';
+        saveBtn.disabled = true;
+        
+        try {
+            const response = await this.game.network.send('guild:update_info', {
+                motd: motd || null
+            });
+            
+            if (response.success) {
+                document.getElementById('guild-settings-modal')?.remove();
+                this.game.showNotification('Guild settings saved!', 'success');
+                this.refreshGuildData();
+            } else {
+                this.game.showNotification(response.error || 'Failed to save settings', 'error');
+                saveBtn.textContent = 'Save Changes';
+                saveBtn.disabled = false;
+            }
+        } catch (err) {
+            console.error('Save settings error:', err);
+            this.game.showNotification('Network error. Please try again.', 'error');
+            saveBtn.textContent = 'Save Changes';
+            saveBtn.disabled = false;
+        }
+    }
+    
+    /**
+     * Confirm disband guild
+     */
+    confirmDisbandGuild() {
+        const modal = document.getElementById('guild-settings-modal');
+        
+        // Replace content with confirmation
+        modal.querySelector('.guild-modal-body').innerHTML = `
+            <div style="text-align: center; padding: 20px;">
+                <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                <div style="font-size: 18px; font-weight: bold; color: #ff6666; margin-bottom: 12px;">
+                    Disband Guild?
+                </div>
+                <div style="color: #aaa; margin-bottom: 20px;">
+                    This will permanently delete <strong>[${this.guildData.tag}] ${this.guildData.name}</strong>.<br>
+                    All members will be removed and this action cannot be undone.
+                </div>
+                <div style="background: rgba(255,0,0,0.1); border: 1px solid #ff6666; padding: 12px; border-radius: 6px; margin-bottom: 20px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="guild-disband-confirm">
+                        <span>I understand this cannot be undone</span>
+                    </label>
+                </div>
+            </div>
+        `;
+        
+        modal.querySelector('.guild-modal-footer').innerHTML = `
+            <button class="guild-btn guild-btn-secondary" id="guild-disband-cancel">
+                Cancel
+            </button>
+            <button class="guild-btn guild-btn-danger" id="guild-disband-confirm-btn" disabled>
+                Disband Guild
+            </button>
+        `;
+        
+        document.getElementById('guild-disband-cancel').addEventListener('click', () => {
+            modal.remove();
+            this.showSettingsDialog();
+        });
+        
+        document.getElementById('guild-disband-confirm').addEventListener('change', (e) => {
+            document.getElementById('guild-disband-confirm-btn').disabled = !e.target.checked;
+        });
+        
+        document.getElementById('guild-disband-confirm-btn').addEventListener('click', () => {
+            this.disbandGuild();
+        });
+    }
+    
+    /**
+     * Disband guild
+     */
+    async disbandGuild() {
+        try {
+            const response = await this.game.network.send('guild:disband', {});
+            
+            if (response.success) {
+                document.getElementById('guild-settings-modal')?.remove();
+                this.game.showNotification(`Guild [${this.guildData.tag}] has been disbanded.`, 'success');
+                this.guildData = null;
+                this.close();
+                this.open(); // Show no guild view
+            } else {
+                this.game.showNotification(response.error || 'Failed to disband guild', 'error');
+            }
+        } catch (err) {
+            console.error('Disband guild error:', err);
+            this.game.showNotification('Network error. Please try again.', 'error');
+        }
     }
 }
 
