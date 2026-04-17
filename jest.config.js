@@ -12,7 +12,8 @@ module.exports = {
     'client/**/*.js',
     '!client/dist/**',
     '!**/node_modules/**',
-    '!**/coverage/**'
+    '!**/coverage/**',
+    '!server/guild/GuildDatabase.pg.js'
   ],
   coverageDirectory: 'coverage',
   coverageReporters: [
