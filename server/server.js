@@ -37,6 +37,12 @@ const PathfindingSystem = require("./ai/PathfindingSystem.js");
 const AIBossController = require("./ai/AIBossController.js");
 const DecisionTree = require("./ai/DecisionTree.js");
 
+// Import Guild System v0.5.0
+const GuildDatabase = require("./guild/GuildDatabase.js");
+const GuildManager = require("./guild/GuildManager.js");
+const GuildChatHandler = require("./guild/GuildChatHandler.js");
+const GuildInvitationManager = require("./guild/GuildInvitationManager.js");
+
 // Import modules
 const CombatModule = require("./modules/CombatModule.js");
 const QuestModule = require("./modules/QuestModule.js");
@@ -132,6 +138,17 @@ class MMOServer {
         this.decisionTree = new DecisionTree();
         this.eventReactions = new EventReactions();
         
+        // Initialize Guild System v0.5.0
+        this.guildDatabase = new GuildDatabase(this.db || database);
+        this.guildManager = new GuildManager(this.guildDatabase, this.playerDataManager, null);
+        this.guildChatHandler = new GuildChatHandler(this.guildManager, this.guildDatabase);
+        this.guildInvitationManager = new GuildInvitationManager(this.guildManager, this.guildDatabase);
+        
+        // Initialize guild systems
+        this.guildManager.initialize();
+        this.guildChatHandler.initialize();
+        this.guildInvitationManager.initialize();
+        
         // Set server references
         if (this.mobSpawner && typeof this.mobSpawner.setServer === 'function') {
             this.mobSpawner.setServer(this);
@@ -199,8 +216,28 @@ class MMOServer {
             console.log(`👾 Sent ${mobs.length} mobs to player ${socket.id}`);
         }
         
+        // Notify guild system of player online
+        if (this.guildManager) {
+            this.guildManager.handlePlayerOnline(socket.id);
+        }
+        
         // Send connection event
         this.eventEmitter.emit('playerConnected', socket.id);
+    }
+    
+    handlePlayerDisconnection(socket) {
+        console.log(`👋 Player disconnected: ${socket.id}`);
+        
+        // Notify guild system of player offline
+        if (this.guildManager) {
+            this.guildManager.handlePlayerOffline(socket.id);
+        }
+        
+        // Remove player from server
+        this.players.delete(socket.id);
+        
+        // Send disconnection event
+        this.eventEmitter.emit('playerDisconnected', socket.id);
     }
     
     setupPlayerEventHandlers(socket) {
@@ -350,6 +387,157 @@ class MMOServer {
         socket.on(NET_EVENTS.TALENT_SELECT, (data) => {
             console.log("🌟 TALENT_SELECT recebido:", data);
             this.handleTalentSelect(socket, data);
+        });
+        
+        // Guild System Handlers v0.5.0
+        this.setupGuildEventHandlers(socket);
+    }
+    
+    /**
+     * Setup Guild System event handlers
+     */
+    setupGuildEventHandlers(socket) {
+        // Guild info
+        socket.on("guild:get_info", async () => {
+            const result = await this.guildManager.getPlayerGuildInfo(socket.id);
+            socket.emit("guild:info", result);
+        });
+        
+        // Create guild
+        socket.on("guild:create", async (data) => {
+            const player = this.players.get(socket.id);
+            if (!player) return;
+            
+            const result = await this.guildManager.createGuild(socket.id, data);
+            socket.emit("guild:created", result);
+            
+            if (result.success) {
+                this.io.emit("notification", {
+                    message: `[${result.guild.tag}] ${result.guild.name} has been founded!`,
+                    type: "guild"
+                });
+            }
+        });
+        
+        // Disband guild
+        socket.on("guild:disband", async () => {
+            const membership = await this.guildManager.db.getPlayerGuild(socket.id);
+            if (!membership) {
+                socket.emit("guild:error", { error: "Not in a guild" });
+                return;
+            }
+            
+            const result = await this.guildManager.disbandGuild(socket.id, membership.guild_id);
+            socket.emit("guild:disbanded", result);
+        });
+        
+        // Invite player
+        socket.on("guild:invite", async (data) => {
+            const membership = await this.guildManager.db.getPlayerGuild(socket.id);
+            if (!membership) {
+                socket.emit("guild:error", { error: "Not in a guild" });
+                return;
+            }
+            
+            // Find player by username
+            let targetPlayerId = null;
+            for (const [id, player] of this.players.entries()) {
+                if (player.name.toLowerCase() === data.username.toLowerCase()) {
+                    targetPlayerId = id;
+                    break;
+                }
+            }
+            
+            if (!targetPlayerId) {
+                socket.emit("guild:invite_result", { 
+                    success: false, 
+                    error: "Player not found or offline" 
+                });
+                return;
+            }
+            
+            const result = await this.guildManager.invitePlayer(socket.id, membership.guild_id, data.username);
+            socket.emit("guild:invite_result", result);
+        });
+        
+        // Get invitations
+        socket.on("guild:get_invitations", async () => {
+            const result = await this.guildManager.getPlayerInvitations(socket.id);
+            socket.emit("guild:invitations", result);
+        });
+        
+        // Respond to invitation
+        socket.on("guild:respond_invite", async (data) => {
+            const result = await this.guildManager.respondToInvitation(socket.id, data.invitationId, data.accept);
+            socket.emit("guild:invite_response", result);
+        });
+        
+        // Leave guild
+        socket.on("guild:leave", async () => {
+            const result = await this.guildManager.leaveGuild(socket.id);
+            socket.emit("guild:left", result);
+        });
+        
+        // Kick member
+        socket.on("guild:kick", async (data) => {
+            const result = await this.guildManager.kickMember(socket.id, data.playerId);
+            socket.emit("guild:kick_result", result);
+        });
+        
+        // Promote/Demote
+        socket.on("guild:promote", async (data) => {
+            const result = await this.guildManager.promoteMember(socket.id, data.playerId, data.newRank);
+            socket.emit("guild:promote_result", result);
+        });
+        
+        // Transfer leadership
+        socket.on("guild:transfer_leadership", async (data) => {
+            const result = await this.guildManager.transferLeadership(socket.id, data.playerId);
+            socket.emit("guild:leadership_transferred", result);
+        });
+        
+        // Update guild info
+        socket.on("guild:update_info", async (data) => {
+            const result = await this.guildManager.updateGuildInfo(socket.id, data);
+            socket.emit("guild:info_updated", result);
+        });
+        
+        // Chat
+        socket.on("guild:chat", async (data) => {
+            const result = await this.guildChatHandler.handleChat(socket.id, data.message);
+            if (!result.success) {
+                socket.emit("guild:chat_error", { error: result.error });
+            }
+        });
+        
+        socket.on("guild:officer_chat", async (data) => {
+            const result = await this.guildChatHandler.handleOfficerChat(socket.id, data.message);
+            if (!result.success) {
+                socket.emit("guild:chat_error", { error: result.error });
+            }
+        });
+        
+        // Browse guilds
+        socket.on("guild:browse", async (data) => {
+            const result = await this.guildManager.browseGuilds(data);
+            socket.emit("guild:browse_result", result);
+        });
+        
+        // Listen for guild events to broadcast
+        this.guildManager.on('guild:member_joined', (data) => {
+            this.io.to(data.guildId).emit('guild:member_joined', data);
+        });
+        
+        this.guildManager.on('guild:member_left', (data) => {
+            this.io.to(data.guildId).emit('guild:member_left', data);
+        });
+        
+        this.guildManager.on('guild:member_kicked', (data) => {
+            this.io.to(data.guildId).emit('guild:member_kicked', data);
+        });
+        
+        this.guildManager.on('guild:chat_message', (data) => {
+            // Already handled by GuildChatHandler
         });
     }
     
