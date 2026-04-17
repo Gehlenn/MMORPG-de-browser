@@ -4,7 +4,8 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
   testMatch: [
     '<rootDir>/tests/**/*.test.js',
-    '<rootDir>/tests-essential/**/*.test.js'
+    '<rootDir>/tests-essential/**/*.test.js',
+    '<rootDir>/server/guild/__tests__/**/*.test.js'
   ],
   collectCoverageFrom: [
     'server/**/*.js',
@@ -41,6 +42,12 @@ module.exports = {
       statements: 97
     },
     './client/game/': {
+      branches: 90,
+      functions: 90,
+      lines: 90,
+      statements: 90
+    },
+    './server/guild/': {
       branches: 90,
       functions: 90,
       lines: 90,
