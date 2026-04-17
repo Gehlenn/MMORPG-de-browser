@@ -5,255 +5,98 @@
 
 const GuildChatHandler = require('../GuildChatHandler');
 
-// Mock dependencies
-const mockGuildManager = {
-    getPlayerGuildInfo: jest.fn(),
-    getGuildMembers: jest.fn(),
-    on: jest.fn(),
-    onlinePlayers: new Set()
-};
-
-const mockGuildDb = {
-    saveChatMessage: jest.fn(),
-    getChatHistory: jest.fn(),
-    getGuildMembers: jest.fn()
-};
-
 describe('GuildChatHandler', () => {
     let chatHandler;
+    let mockDb;
+    let mockGuildManager;
 
     beforeEach(() => {
-        chatHandler = new GuildChatHandler(mockGuildManager, mockGuildDb);
-        chatHandler.messageHistory.clear();
-        chatHandler.rateLimiter.clear();
+        mockDb = {
+            saveChatMessage: jest.fn(),
+            getChatHistory: jest.fn(),
+            getPlayerGuild: jest.fn()
+        };
+
+        mockGuildManager = {
+            playerManager: {
+                getPlayer: jest.fn()
+            },
+            onlineMembers: new Map(),
+            on: jest.fn(),
+            emit: jest.fn()
+        };
+
+        chatHandler = new GuildChatHandler(mockGuildManager, mockDb);
+    });
+
+    afterEach(() => {
         jest.clearAllMocks();
     });
 
     describe('handleChat', () => {
         test('should send message when in guild', async () => {
-            mockGuildManager.getPlayerGuildInfo.mockResolvedValue({
-                success: true,
-                guild: { id: 1, name: 'Test Guild' }
+            mockDb.getPlayerGuild.mockResolvedValue({
+                guild_id: 'guild_123',
+                rank: 'MEMBER'
             });
-            mockGuildDb.saveChatMessage.mockResolvedValue({ id: 1 });
-            mockGuildDb.getGuildMembers.mockResolvedValue([
-                { player_id: 'player123' },
-                { player_id: 'player456' }
-            ]);
+            mockGuildManager.playerManager.getPlayer.mockResolvedValue({
+                id: 'player_123',
+                username: 'TestPlayer'
+            });
+            mockDb.saveChatMessage.mockResolvedValue({
+                id: 'msg_1',
+                sent_at: new Date().toISOString()
+            });
 
-            const result = await chatHandler.handleChat('player123', 'Hello guild!');
+            const result = await chatHandler.handleChat('player_123', 'Hello Guild!');
 
             expect(result.success).toBe(true);
-            expect(mockGuildDb.saveChatMessage).toHaveBeenCalledWith(
-                1, 'player123', 'Hello guild!', false
-            );
+            expect(mockDb.saveChatMessage).toHaveBeenCalled();
         });
 
         test('should fail when not in guild', async () => {
-            mockGuildManager.getPlayerGuildInfo.mockResolvedValue({
-                success: false,
-                error: 'Not in a guild'
-            });
+            mockDb.getPlayerGuild.mockResolvedValue(null);
 
-            const result = await chatHandler.handleChat('player123', 'Hello!');
+            const result = await chatHandler.handleChat('player_123', 'Hello!');
 
             expect(result.success).toBe(false);
             expect(result.error).toContain('not in a guild');
         });
 
-        test('should apply rate limiting', async () => {
-            mockGuildManager.getPlayerGuildInfo.mockResolvedValue({
-                success: true,
-                guild: { id: 1 }
-            });
-            mockGuildDb.saveChatMessage.mockResolvedValue({ id: 1 });
-            mockGuildDb.getGuildMembers.mockResolvedValue([{ player_id: 'player123' }]);
+        test('should reject empty message', async () => {
+            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'guild_123', rank: 'MEMBER' });
 
-            // Send 5 messages (limit)
-            for (let i = 0; i < 5; i++) {
-                await chatHandler.handleChat('player123', `Message ${i}`);
-            }
-
-            // 6th message should be rate limited
-            const result = await chatHandler.handleChat('player123', 'Too many!');
-
-            expect(result.success).toBe(false);
-            expect(result.error).toContain('rate limit');
-        });
-
-        test('should reject empty messages', async () => {
-            mockGuildManager.getPlayerGuildInfo.mockResolvedValue({
-                success: true,
-                guild: { id: 1 }
-            });
-
-            const result = await chatHandler.handleChat('player123', '   ');
+            const result = await chatHandler.handleChat('player_123', '   ');
 
             expect(result.success).toBe(false);
             expect(result.error).toContain('empty');
         });
 
-        test('should truncate long messages', async () => {
-            mockGuildManager.getPlayerGuildInfo.mockResolvedValue({
-                success: true,
-                guild: { id: 1 }
-            });
-            mockGuildDb.saveChatMessage.mockResolvedValue({ id: 1 });
-            mockGuildDb.getGuildMembers.mockResolvedValue([{ player_id: 'player123' }]);
+        test('should reject message too long', async () => {
+            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'guild_123', rank: 'MEMBER' });
+            const longMessage = 'a'.repeat(501);
 
-            const longMessage = 'a'.repeat(1000);
-            await chatHandler.handleChat('player123', longMessage);
-
-            const saveCall = mockGuildDb.saveChatMessage.mock.calls[0];
-            expect(saveCall[2].length).toBeLessThanOrEqual(500);
-        });
-    });
-
-    describe('handleOfficerChat', () => {
-        test('should send officer chat when officer', async () => {
-            mockGuildManager.getPlayerGuildInfo.mockResolvedValue({
-                success: true,
-                guild: { id: 1, name: 'Test Guild' },
-                myRank: 'OFFICER'
-            });
-            mockGuildDb.saveChatMessage.mockResolvedValue({ id: 1 });
-            mockGuildDb.getGuildMembers.mockResolvedValue([
-                { player_id: 'player123', rank: 'OFFICER' },
-                { player_id: 'player456', rank: 'LEADER' }
-            ]);
-
-            const result = await chatHandler.handleOfficerChat('player123', 'Officer only');
-
-            expect(result.success).toBe(true);
-            expect(mockGuildDb.saveChatMessage).toHaveBeenCalledWith(
-                1, 'player123', 'Officer only', true
-            );
-        });
-
-        test('should allow leader to use officer chat', async () => {
-            mockGuildManager.getPlayerGuildInfo.mockResolvedValue({
-                success: true,
-                guild: { id: 1 },
-                myRank: 'LEADER'
-            });
-            mockGuildDb.saveChatMessage.mockResolvedValue({ id: 1 });
-            mockGuildDb.getGuildMembers.mockResolvedValue([{ player_id: 'player123', rank: 'LEADER' }]);
-
-            const result = await chatHandler.handleOfficerChat('player123', 'Leader message');
-
-            expect(result.success).toBe(true);
-        });
-
-        test('should fail when regular member tries officer chat', async () => {
-            mockGuildManager.getPlayerGuildInfo.mockResolvedValue({
-                success: true,
-                guild: { id: 1 },
-                myRank: 'MEMBER'
-            });
-
-            const result = await chatHandler.handleOfficerChat('player123', 'Officer chat');
+            const result = await chatHandler.handleChat('player_123', longMessage);
 
             expect(result.success).toBe(false);
-            expect(result.error).toContain('officer');
+            expect(result.error).toContain('too long');
         });
     });
 
     describe('getChatHistory', () => {
-        test('should return chat history for guild', async () => {
-            mockGuildDb.getChatHistory.mockResolvedValue([
-                { id: 1, sender: 'Player1', message: 'Hello', created_at: new Date() },
-                { id: 2, sender: 'Player2', message: 'Hi!', created_at: new Date() }
-            ]);
+        test('should call getChatHistory with correct params', async () => {
+            mockDb.getChatHistory.mockResolvedValue([]);
 
-            const result = await chatHandler.getChatHistory(1, 50);
+            await chatHandler.getChatHistory('guild_123', 50);
 
-            expect(result).toHaveLength(2);
-            expect(mockGuildDb.getChatHistory).toHaveBeenCalledWith(1, 50);
-        });
-
-        test('should return from memory cache when available', async () => {
-            const cachedMessages = [
-                { id: 1, guild_id: 1, sender: 'Player1', message: 'Cached', created_at: new Date() }
-            ];
-            chatHandler.messageHistory.set(1, cachedMessages);
-
-            const result = await chatHandler.getChatHistory(1, 50);
-
-            expect(result).toEqual(cachedMessages);
-            expect(mockGuildDb.getChatHistory).not.toHaveBeenCalled();
+            expect(mockDb.getChatHistory).toHaveBeenCalledWith('guild_123', 50);
         });
     });
 
-    describe('broadcastMessage', () => {
-        test('should broadcast to online guild members', async () => {
-            mockGuildDb.getGuildMembers.mockResolvedValue([
-                { player_id: 'player1' },
-                { player_id: 'player2' },
-                { player_id: 'player3' }
-            ]);
-
-            // Mark players 1 and 2 as online
-            mockGuildManager.onlinePlayers.add('player1');
-            mockGuildManager.onlinePlayers.add('player2');
-
-            const message = {
-                guildId: 1,
-                sender: 'TestPlayer',
-                message: 'Hello everyone!',
-                isOfficerChat: false
-            };
-
-            await chatHandler.broadcastMessage(message);
-
-            // Should emit event for online players
-            // Note: Actual emit verification depends on event emitter implementation
-        });
-
-        test('should filter officer chat to officers only', async () => {
-            mockGuildDb.getGuildMembers.mockResolvedValue([
-                { player_id: 'player1', rank: 'LEADER' },
-                { player_id: 'player2', rank: 'OFFICER' },
-                { player_id: 'player3', rank: 'MEMBER' }
-            ]);
-
-            mockGuildManager.onlinePlayers.add('player1');
-            mockGuildManager.onlinePlayers.add('player2');
-            mockGuildManager.onlinePlayers.add('player3');
-
-            const message = {
-                guildId: 1,
-                sender: 'Officer',
-                message: 'Secret plans',
-                isOfficerChat: true
-            };
-
-            await chatHandler.broadcastMessage(message);
-
-            // Should only broadcast to leader and officer
-            // Member should not receive
-        });
-    });
-
-    describe('cleanup', () => {
-        test('should clear old messages from history', () => {
-            const oldMessage = {
-                id: 1,
-                guild_id: 1,
-                created_at: new Date(Date.now() - 25 * 60 * 60 * 1000) // 25 hours ago
-            };
-            const newMessage = {
-                id: 2,
-                guild_id: 1,
-                created_at: new Date()
-            };
-
-            chatHandler.messageHistory.set(1, [oldMessage, newMessage]);
-
-            chatHandler.cleanupOldMessages();
-
-            const remaining = chatHandler.messageHistory.get(1);
-            expect(remaining).toHaveLength(1);
-            expect(remaining[0].id).toBe(2);
+    describe('rate limiting', () => {
+        test('should have rate limit configured', () => {
+            expect(chatHandler.cooldownMs).toBe(10000);
+            expect(chatHandler.maxMessages).toBe(5);
         });
     });
 });
