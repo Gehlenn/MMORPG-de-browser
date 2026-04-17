@@ -7,7 +7,7 @@ const GuildChatHandler = require('../GuildChatHandler');
 const GuildManager = require('../GuildManager');
 const GuildInvitationManager = require('../GuildInvitationManager');
 
-describe('Specific Uncovered Lines - Extended', () => {
+describe('Specific Lines Coverage Tests', () => {
     let mockDb, mockPlayerManager;
     let consoleSpy;
 
