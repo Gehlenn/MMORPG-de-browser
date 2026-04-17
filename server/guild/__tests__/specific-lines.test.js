@@ -7,12 +7,13 @@ const GuildChatHandler = require('../GuildChatHandler');
 const GuildManager = require('../GuildManager');
 const GuildInvitationManager = require('../GuildInvitationManager');
 
-describe('Specific Uncovered Lines', () => {
+describe('Specific Uncovered Lines - Extended', () => {
     let mockDb, mockPlayerManager;
+    let consoleSpy;
 
     beforeEach(() => {
         jest.clearAllMocks();
-        jest.spyOn(console, 'log').mockImplementation(() => {});
+        consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
         
         mockDb = {
             run: jest.fn((sql, params, callback) => callback.call({ lastID: 1, changes: 1 }, null)),
@@ -43,7 +44,7 @@ describe('Specific Uncovered Lines', () => {
     });
 
     afterEach(() => {
-        console.log.mockRestore();
+        consoleSpy?.mockRestore();
     });
 
     describe('GuildChatHandler - Line 39 (leadership_transferred)', () => {

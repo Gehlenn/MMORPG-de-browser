@@ -444,6 +444,17 @@ class GuildManager extends EventEmitter {
     }
 
     /**
+     * Demote member (alias for promoteMember with lower rank)
+     * @param {string} leaderId - Leader player ID
+     * @param {string} targetPlayerId - Target player ID
+     * @param {string} newRank - New rank (must be lower than current)
+     * @returns {Promise<Object>}
+     */
+    async demoteMember(leaderId, targetPlayerId, newRank) {
+        return this.promoteMember(leaderId, targetPlayerId, newRank);
+    }
+
+    /**
      * Transfer guild leadership
      * @param {string} leaderId - Current leader ID
      * @param {string} newLeaderId - New leader ID
@@ -643,6 +654,43 @@ class GuildManager extends EventEmitter {
                 playerId
             });
         }
+    }
+
+    /**
+     * Alias for handlePlayerOnline for test compatibility
+     * @param {string} guildId - Guild ID (optional, for cache pre-initialization)
+     * @param {string} playerId - Player ID
+     */
+    async setPlayerOnline(guildId, playerId) {
+        // Initialize cache for guild if provided
+        if (guildId && !this.onlineMembers.has(guildId)) {
+            this.onlineMembers.set(guildId, new Set());
+        }
+        return this.handlePlayerOnline(playerId);
+    }
+
+    /**
+     * Alias for handlePlayerOffline for test compatibility
+     * @param {string} guildId - Guild ID
+     * @param {string} playerId - Player ID
+     */
+    async setPlayerOffline(guildId, playerId) {
+        const guildMembers = this.onlineMembers.get(guildId);
+        if (guildMembers) {
+            guildMembers.delete(playerId);
+        }
+        return this.handlePlayerOffline(playerId);
+    }
+
+    /**
+     * Check if a player is online in a specific guild
+     * @param {string} guildId - Guild ID
+     * @param {string} playerId - Player ID
+     * @returns {boolean}
+     */
+    isPlayerOnline(guildId, playerId) {
+        const guildMembers = this.onlineMembers.get(guildId);
+        return guildMembers ? guildMembers.has(playerId) : false;
     }
 
     /**
