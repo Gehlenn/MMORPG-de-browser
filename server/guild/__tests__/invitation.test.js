@@ -47,7 +47,7 @@ describe('GuildInvitationManager Coverage', () => {
             const result = await invitationManager.createInvitation('g1', 'p1', 'p2');
             
             expect(result.success).toBe(false);
-            expect(result.error).toContain('not in a guild');
+            expect(result.error).toContain('Not in this guild');
         });
 
         test('fails when inviter lacks permission', async () => {
@@ -56,7 +56,7 @@ describe('GuildInvitationManager Coverage', () => {
             const result = await invitationManager.createInvitation('g1', 'p1', 'p2');
             
             expect(result.success).toBe(false);
-            expect(result.error).toContain('permission');
+            expect(result.error).toContain('Only officers can invite');
         });
 
         test('fails when invitee not found', async () => {
@@ -83,8 +83,11 @@ describe('GuildInvitationManager Coverage', () => {
         });
 
         test('fails when guild invitation limit reached', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
-            mockDb.getPlayerGuild.mockResolvedValue(null); // invitee not in guild
+            mockDb.getPlayerGuild
+                .mockResolvedValueOnce({ guild_id: 'g1', rank: 'LEADER' })  // inviter
+                .mockResolvedValueOnce(null);  // invitee not in guild
+            mockDb.getGuildById.mockResolvedValue({ id: 'g1', memberCount: 5, maxMembers: 100 });
+            mockDb.getGuildInvitations.mockResolvedValue([]);
             mockGuildManager.playerManager.getPlayerByUsername.mockResolvedValue({ id: 'p2' });
             mockDb.countGuildInvitations.mockResolvedValue(50);
             
@@ -95,8 +98,11 @@ describe('GuildInvitationManager Coverage', () => {
         });
 
         test('fails when player invitation limit reached', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
-            mockDb.getPlayerGuild.mockResolvedValue(null);
+            mockDb.getPlayerGuild
+                .mockResolvedValueOnce({ guild_id: 'g1', rank: 'LEADER' })
+                .mockResolvedValueOnce(null);
+            mockDb.getGuildById.mockResolvedValue({ id: 'g1', memberCount: 5, maxMembers: 100 });
+            mockDb.getGuildInvitations.mockResolvedValue([]);
             mockGuildManager.playerManager.getPlayerByUsername.mockResolvedValue({ id: 'p2' });
             mockDb.countGuildInvitations.mockResolvedValue(10);
             mockDb.countPlayerInvitations.mockResolvedValue(10);
@@ -111,6 +117,9 @@ describe('GuildInvitationManager Coverage', () => {
             mockDb.getPlayerGuild
                 .mockResolvedValueOnce({ guild_id: 'g1', rank: 'LEADER' })
                 .mockResolvedValueOnce(null);
+            mockDb.getGuildById.mockResolvedValue({ id: 'g1', memberCount: 5, maxMembers: 100 });
+            mockDb.getGuildInvitations.mockResolvedValue([]);
+            mockDb.getPlayerInvitations.mockResolvedValue([]);
             mockGuildManager.playerManager.getPlayerByUsername.mockResolvedValue({
                 id: 'p2', username: 'Invitee'
             });
@@ -120,7 +129,8 @@ describe('GuildInvitationManager Coverage', () => {
                 id: 'inv_123',
                 guild_id: 'g1',
                 invitee_id: 'p2',
-                status: 'PENDING'
+                status: 'PENDING',
+                created_at: '2024-01-01'
             });
             
             const result = await invitationManager.createInvitation('g1', 'p1', 'p2');
