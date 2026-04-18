@@ -45,8 +45,10 @@ describe('GuildInvitationManager Targeted Lines', () => {
             };
 
             mockDb.getInvitationById.mockResolvedValue(invitation);
-            mockDb.getPlayerGuild.mockResolvedValueOnce(null);
-            mockGuildManager.respondToInvitation.mockResolvedValue({ 
+            mockDb.getPlayerGuild.mockResolvedValue(null); // Not in any guild
+            mockDb.getPlayerInvitations.mockResolvedValue([]); // For declineAllOtherInvitations
+            mockDb.respondToInvitation.mockResolvedValue({ changes: 1 });
+            mockGuildManager.respondToInvitation = jest.fn().mockResolvedValue({ 
                 success: true, 
                 invitation: { ...invitation, status: 'ACCEPTED' }
             });
@@ -67,8 +69,10 @@ describe('GuildInvitationManager Targeted Lines', () => {
             };
 
             mockDb.getInvitationById.mockResolvedValue(invitation);
-            mockDb.getPlayerGuild.mockResolvedValueOnce(null);
-            mockGuildManager.respondToInvitation.mockResolvedValue({ 
+            mockDb.getPlayerGuild.mockResolvedValue(null);
+            mockDb.getPlayerInvitations.mockResolvedValue([]);
+            mockDb.respondToInvitation.mockResolvedValue({ changes: 1 });
+            mockGuildManager.respondToInvitation = jest.fn().mockResolvedValue({ 
                 success: true,
                 guild: { id: 'g1', name: 'Test' },
                 newRank: 'MEMBER'
@@ -91,7 +95,7 @@ describe('GuildInvitationManager Targeted Lines', () => {
             };
 
             mockDb.getInvitationById.mockResolvedValue(invitation);
-            mockGuildManager.respondToInvitation.mockResolvedValue({ 
+            mockGuildManager.respondToInvitation = jest.fn().mockResolvedValue({ 
                 success: true, 
                 invitation: { ...invitation, status: 'DECLINED' }
             });
@@ -179,53 +183,46 @@ describe('GuildInvitationManager Targeted Lines', () => {
         });
     });
 
-    describe('formatInvitation lines 419-420', () => {
+    describe('formatInvitation lines 399-409', () => {
         test('formats invitation with all fields', () => {
             const rawInvitation = {
                 id: 'inv1',
-                guild_id: 'g1',
-                guild_name: 'Test Guild',
-                guild_tag: 'TST',
-                guild_member_count: 5,
-                guild_max_members: 100,
-                inviter_id: 'p1',
-                inviter_name: 'Leader',
-                invitee_id: 'p2',
-                status: 'PENDING',
                 created_at: '2024-01-01T00:00:00.000Z',
-                expires_at: '2024-01-02T00:00:00.000Z'
+                expires_at: '2024-01-02T00:00:00.000Z',
+                status: 'PENDING'
+            };
+            const guild = {
+                id: 'g1',
+                name: 'Test Guild',
+                tag: 'TST'
             };
 
-            const result = im.formatInvitation(rawInvitation);
+            const result = im.formatInvitation(rawInvitation, guild);
 
             expect(result.id).toBe('inv1');
             expect(result.guildId).toBe('g1');
             expect(result.guildName).toBe('Test Guild');
             expect(result.guildTag).toBe('TST');
-            expect(result.guildMemberCount).toBe(5);
-            expect(result.guildMaxMembers).toBe(100);
-            expect(result.inviterId).toBe('p1');
-            expect(result.inviterName).toBe('Leader');
-            expect(result.inviteeId).toBe('p2');
-            expect(result.status).toBe('PENDING');
             expect(result.createdAt).toBe('2024-01-01T00:00:00.000Z');
             expect(result.expiresAt).toBe('2024-01-02T00:00:00.000Z');
+            expect(result.status).toBe('PENDING');
         });
 
         test('handles missing fields gracefully', () => {
             const rawInvitation = {
                 id: 'inv1',
-                guild_id: 'g1',
-                inviter_id: 'p1',
-                invitee_id: 'p2',
-                status: 'PENDING',
-                created_at: '2024-01-01T00:00:00.000Z'
+                created_at: '2024-01-01T00:00:00.000Z',
+                status: 'PENDING'
+            };
+            const guild = {
+                id: 'g1',
+                name: 'Test Guild'
             };
 
-            const result = im.formatInvitation(rawInvitation);
+            const result = im.formatInvitation(rawInvitation, guild);
 
             expect(result.id).toBe('inv1');
-            expect(result.guildName).toBeUndefined();
+            expect(result.guildName).toBe('Test Guild');
             expect(result.expiresAt).toBeUndefined();
         });
     });
