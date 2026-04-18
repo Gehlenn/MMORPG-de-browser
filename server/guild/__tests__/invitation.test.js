@@ -60,7 +60,12 @@ describe('GuildInvitationManager Coverage', () => {
         });
 
         test('fails when invitee not found', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
+            mockDb.getPlayerGuild
+                .mockResolvedValueOnce({ guild_id: 'g1', rank: 'LEADER' })
+                .mockResolvedValueOnce(null);
+            mockDb.getGuildById.mockResolvedValue({ id: 'g1', memberCount: 5, maxMembers: 100 });
+            mockDb.getGuildInvitations.mockResolvedValue([]);
+            mockDb.getPlayerInvitations.mockResolvedValue([]);
             mockGuildManager.playerManager.getPlayerByUsername.mockResolvedValue(null);
             
             const result = await invitationManager.createInvitation('g1', 'p1', 'unknown');
@@ -169,7 +174,7 @@ describe('GuildInvitationManager Coverage', () => {
             const result = await invitationManager.acceptInvitation('p1', 'inv1');
             
             expect(result.success).toBe(false);
-            expect(result.error).toContain('not your invitation');
+            expect(result.error).toContain('Not your invitation');
         });
 
         test('fails when already in guild', async () => {
@@ -201,7 +206,7 @@ describe('GuildInvitationManager Coverage', () => {
             const result = await invitationManager.acceptInvitation('p1', 'inv1');
             
             expect(result.success).toBe(false);
-            expect(result.error).toContain('expired');
+            expect(result.error).toContain('Expired');
         });
 
         test('fails when guild full', async () => {
@@ -269,7 +274,7 @@ describe('GuildInvitationManager Coverage', () => {
             const result = await invitationManager.declineInvitation('p1', 'inv1');
             
             expect(result.success).toBe(false);
-            expect(result.error).toContain('not your invitation');
+            expect(result.error).toContain('Not your invitation');
         });
 
         test('succeeds and cancels invitation', async () => {
@@ -317,7 +322,7 @@ describe('GuildInvitationManager Coverage', () => {
             const result = await invitationManager.cancelInvitation('p1', 'inv1');
             
             expect(result.success).toBe(false);
-            expect(result.error).toContain('not yours');
+            expect(result.error).toContain('Not authorized');
         });
 
         test('succeeds for inviter', async () => {
