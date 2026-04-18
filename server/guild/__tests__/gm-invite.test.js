@@ -100,7 +100,9 @@ describe('GuildManager invitePlayer Lines 186-219', () => {
     });
 
     test('invitePlayer succeeds with complete flow (lines 207-223)', async () => {
-        mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
+        mockDb.getPlayerGuild
+            .mockResolvedValueOnce({ guild_id: 'g1', rank: 'LEADER' }) // inviter
+            .mockResolvedValueOnce(null); // invitee not in guild
         mockDb.getGuildById.mockResolvedValue({
             id: 'g1',
             name: 'Test Guild',
@@ -109,7 +111,6 @@ describe('GuildManager invitePlayer Lines 186-219', () => {
         });
         mockPlayerManager.getPlayer.mockResolvedValue({ id: 'p1', username: 'InviterName' });
         mockPlayerManager.getPlayerByUsername.mockResolvedValue({ id: 'p2', username: 'Target' });
-        mockDb.getPlayerGuild.mockResolvedValueOnce({ guild_id: 'g1', rank: 'LEADER' });
         mockDb.createInvitation.mockResolvedValue({
             id: 'inv1',
             guild_id: 'g1',
@@ -158,7 +159,9 @@ describe('GuildManager invitePlayer Lines 186-219', () => {
     });
 
     test('invitePlayer with OFFICER rank', async () => {
-        mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'OFFICER' });
+        mockDb.getPlayerGuild
+            .mockResolvedValueOnce({ guild_id: 'g1', rank: 'OFFICER' }) // inviter
+            .mockResolvedValueOnce(null); // invitee not in guild
         mockDb.getGuildById.mockResolvedValue({
             id: 'g1',
             name: 'Test Guild',
@@ -180,7 +183,7 @@ describe('GuildManager invitePlayer Lines 186-219', () => {
         const result = await gm.invitePlayer('p1', 'g1', 'Target');
 
         expect(result.success).toBe(false);
-        expect(result.error).toContain('permission');
+        expect(result.error).toContain('Only officers can invite');
     });
 
     test('invitePlayer fails when inviter not in guild', async () => {
@@ -189,6 +192,6 @@ describe('GuildManager invitePlayer Lines 186-219', () => {
         const result = await gm.invitePlayer('p1', 'g1', 'Target');
 
         expect(result.success).toBe(false);
-        expect(result.error).toContain('not in a guild');
+        expect(result.error).toContain('Not in this guild');
     });
 });
