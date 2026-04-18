@@ -59,6 +59,19 @@ describe('GuildManager Final Lines', () => {
         });
     });
 
+    describe('disbandGuild', () => {
+        test('disband guild returns disbanded flag', async () => {
+            mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Test', leaderId: 'p1' });
+            mockDb.getGuildMembers.mockResolvedValue([{ player_id: 'p1', rank: 'LEADER' }]);
+            mockDb.disbandGuild.mockResolvedValue(true);
+
+            const result = await gm.disbandGuild('p1', 'g1');
+
+            expect(result.success).toBe(true);
+            expect(result.disbanded).toBe(true);
+        });
+    });
+
     describe('kickMember lines 249', () => {
         test('kickMember updates cache (line 249)', async () => {
             mockPlayerManager.getPlayer.mockResolvedValue({ id: 'p2', username: 'Player2' });
