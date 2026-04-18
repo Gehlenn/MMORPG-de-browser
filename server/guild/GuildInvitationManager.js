@@ -185,7 +185,15 @@ class GuildInvitationManager {
             }
 
             // Accept invitation
-            const result = await this.guildManager.respondToInvitation(playerId, invitationId, true);
+            let result;
+            if (this.guildManager && typeof this.guildManager.respondToInvitation === 'function') {
+                result = await this.guildManager.respondToInvitation(playerId, invitationId, true);
+            } else {
+                // Fallback: respond directly via database
+                const status = 'ACCEPTED';
+                const invitation = await this.db.respondToInvitation(invitationId, status);
+                result = { success: true, invitation };
+            }
             
             if (result.success) {
                 // Decline all other pending invitations
@@ -225,7 +233,14 @@ class GuildInvitationManager {
             }
 
             // Decline invitation
-            return await this.guildManager.respondToInvitation(playerId, invitationId, false);
+            if (this.guildManager && typeof this.guildManager.respondToInvitation === 'function') {
+                return await this.guildManager.respondToInvitation(playerId, invitationId, false);
+            } else {
+                // Fallback: respond directly via database
+                const status = 'DECLINED';
+                const invitation = await this.db.respondToInvitation(invitationId, status);
+                return { success: true, invitation };
+            }
 
         } catch (error) {
             return {

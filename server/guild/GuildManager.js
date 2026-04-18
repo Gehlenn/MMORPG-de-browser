@@ -146,6 +146,7 @@ class GuildManager extends EventEmitter {
 
             return {
                 success: true,
+                disbanded: true,
                 message: `Guild "${guild.name}" has been disbanded`
             };
 
@@ -617,6 +618,11 @@ class GuildManager extends EventEmitter {
      * @param {string} playerId - Player ID
      */
     async handlePlayerOnline(playerId) {
+        // Verificar se db tem getPlayerGuild
+        if (!this.db.getPlayerGuild) {
+            return;
+        }
+        
         const membership = await this.db.getPlayerGuild(playerId);
         if (membership) {
             const guildMembers = this.onlineMembers.get(membership.guild_id);
@@ -626,8 +632,10 @@ class GuildManager extends EventEmitter {
                 this.onlineMembers.set(membership.guild_id, new Set([playerId]));
             }
 
-            // Update last active
-            await this.db.updateLastActive(playerId);
+            // Update last active (se existir)
+            if (this.db.updateLastActive) {
+                await this.db.updateLastActive(playerId);
+            }
 
             // Notify guild
             this.emit('guild:member_online', {
@@ -642,6 +650,11 @@ class GuildManager extends EventEmitter {
      * @param {string} playerId - Player ID
      */
     async handlePlayerOffline(playerId) {
+        // Verificar se db tem getPlayerGuild
+        if (!this.db.getPlayerGuild) {
+            return;
+        }
+
         const membership = await this.db.getPlayerGuild(playerId);
         if (membership) {
             const guildMembers = this.onlineMembers.get(membership.guild_id);

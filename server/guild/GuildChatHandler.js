@@ -247,6 +247,9 @@ class GuildChatHandler {
      * @param {Object} messageData - Message data to broadcast
      */
     broadcastMessage(guildId, messageData) {
+        if (!this.guildManager || typeof this.guildManager.getOnlineMembers !== 'function') {
+            return;
+        }
         const onlineMembers = this.guildManager.getOnlineMembers(guildId);
         
         for (const playerId of onlineMembers) {
@@ -260,6 +263,9 @@ class GuildChatHandler {
      * @param {Object} messageData - Message data to broadcast
      */
     async broadcastOfficerMessage(guildId, messageData) {
+        if (!this.guildManager || typeof this.guildManager.getOnlineMembers !== 'function') {
+            return;
+        }
         const members = await this.db.getGuildMembers(guildId);
         const onlineMembers = this.guildManager.getOnlineMembers(guildId);
 

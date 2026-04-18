@@ -43,6 +43,26 @@ const GuildManager = require("./guild/GuildManager.js");
 const GuildChatHandler = require("./guild/GuildChatHandler.js");
 const GuildInvitationManager = require("./guild/GuildInvitationManager.js");
 
+// Import Trading & Economy System v0.5.0
+const TradeManager = require("./trading/TradeManager.js");
+const AuctionManager = require("./trading/AuctionManager.js");
+const ValuationEngine = require("./trading/ValuationEngine.js");
+const TradeSocketHandler = require("./trading/TradeSocketHandler.js");
+
+// Import Zone System v0.5.0 - Phase 3: Eldoria
+const EldoriaZone = require("./zones/EldoriaZone.js");
+const ZoneTransition = require("./zones/ZoneTransition.js");
+const KingEldor = require("./bosses/KingEldor.js");
+
+// Import Eldoria Mobs
+const ForestDeer = require("./mobs/eldoria/ForestDeer.js");
+const WildBoar = require("./mobs/eldoria/WildBoar.js");
+const Bandit = require("./mobs/eldoria/Bandit.js");
+const IronGolem = require("./mobs/eldoria/IronGolem.js");
+const CaveTroll = require("./mobs/eldoria/CaveTroll.js");
+const RoyalGuard = require("./mobs/eldoria/RoyalGuard.js");
+const Knight = require("./mobs/eldoria/Knight.js");
+
 // Import modules
 const CombatModule = require("./modules/CombatModule.js");
 const QuestModule = require("./modules/QuestModule.js");
@@ -148,6 +168,32 @@ class MMOServer {
         this.guildManager.initialize();
         this.guildChatHandler.initialize();
         this.guildInvitationManager.initialize();
+        
+        // Initialize Trading & Economy System v0.5.0
+        this.tradeManager = new TradeManager(database, this.playerDataManager, null);
+        this.auctionManager = new AuctionManager(database, this.playerDataManager);
+        this.valuationEngine = new ValuationEngine(database);
+        this.tradeSocketHandler = new TradeSocketHandler(this.io, database);
+        
+        // Initialize trading systems
+        this.tradeManager.initialize();
+        this.auctionManager.initialize();
+        this.valuationEngine.initialize();
+        
+        // Initialize Zone System v0.5.0 - Phase 3: Eldoria
+        this.zones = new Map();
+        this.eldoriaZone = new EldoriaZone(database, this.mobSpawner, this.lootModule);
+        this.zones.set('eldoria', this.eldoriaZone);
+        
+        // Initialize zone transition system
+        this.zoneTransition = new ZoneTransition(database, this.zones, this.playerDataManager);
+        
+        // Initialize Eldoria boss
+        this.kingEldor = new KingEldor(this.eldoriaZone);
+        
+        // Initialize zone systems
+        this.eldoriaZone.initialize();
+        this.zoneTransition.initialize?.();
         
         // Set server references
         if (this.mobSpawner && typeof this.mobSpawner.setServer === 'function') {
@@ -391,6 +437,9 @@ class MMOServer {
         
         // Guild System Handlers v0.5.0
         this.setupGuildEventHandlers(socket);
+        
+        // Trading & Economy System Handlers v0.5.0
+        this.setupTradingEventHandlers(socket);
     }
     
     /**
@@ -532,12 +581,300 @@ class MMOServer {
             this.io.to(data.guildId).emit('guild:member_left', data);
         });
         
-        this.guildManager.on('guild:member_kicked', (data) => {
-            this.io.to(data.guildId).emit('guild:member_kicked', data);
+        // Price: Estimate
+        socket.on("price:estimate", async (data) => {
+            const result = await this.valuationEngine.estimatePrice(data.item, data.historicalDays);
+            socket.emit("price:estimate_result", result);
         });
         
-        this.guildManager.on('guild:chat_message', (data) => {
-            // Already handled by GuildChatHandler
+        // Price: Auction Suggestion
+        socket.on("price:auction_suggestion", async (data) => {
+            const result = await this.valuationEngine.getAuctionSuggestion(data.item);
+            socket.emit("price:auction_suggestion_result", result);
+        });
+        
+        // Market: Overview
+        socket.on("market:overview", async () => {
+            const result = await this.valuationEngine.getMarketOverview();
+            socket.emit("market:overview_result", result);
+        });
+        
+        // Trade Chat: Message
+        socket.on("trade_chat:message", async (data) => {
+            // Get player info
+            const player = this.players.get(socket.id);
+            if (!player) {
+                socket.emit("trade_chat:error", { error: "Player not found" });
+                return;
+            }
+            
+            // Broadcast to all players
+            this.io.emit("trade_chat:message", {
+                playerId: socket.id,
+                playerName: player.name,
+                message: data.message,
+                messageType: data.messageType,
+                linkedItem: data.linkedItem,
+                timestamp: new Date().toISOString()
+            });
+            
+            socket.emit("trade_chat:sent", { success: true });
+        });
+        
+        // Trade Chat: Get History
+        socket.on("trade_chat:history", async (data) => {
+            const limit = data?.limit || 50;
+            // In production, query from database
+            socket.emit("trade_chat:history_result", {
+                success: true,
+                messages: [] // Placeholder
+            });
+        });
+        
+        // Listen for trade events to broadcast
+        this.tradeManager.on('trade:session_started', (data) => {
+            this.io.to(data.sessionId).emit('trade:session_started', data);
+        });
+        
+        this.tradeManager.on('trade:gold_updated', (data) => {
+            this.io.to(data.sessionId).emit('trade:gold_updated', data);
+        });
+        
+        this.tradeManager.on('trade:item_added', (data) => {
+            this.io.to(data.sessionId).emit('trade:item_added', data);
+        });
+        
+        this.tradeManager.on('trade:item_removed', (data) => {
+            this.io.to(data.sessionId).emit('trade:item_removed', data);
+        });
+        
+        this.tradeManager.on('trade:confirmed', (data) => {
+            this.io.to(data.sessionId).emit('trade:confirmed', data);
+        });
+        
+        this.tradeManager.on('trade:completed', (data) => {
+            this.io.to(data.sessionId).emit('trade:completed', data);
+            
+            // Notify participants
+            data.player1Id && this.io.to(data.player1Id).emit('notification', {
+                message: 'Trade completed successfully!',
+                type: 'success'
+            });
+            data.player2Id && this.io.to(data.player2Id).emit('notification', {
+                message: 'Trade completed successfully!',
+                type: 'success'
+            });
+        });
+        
+        this.tradeManager.on('trade:cancelled', (data) => {
+            this.io.to(data.sessionId).emit('trade:cancelled', data);
+        });
+        
+        // Listen for auction events
+        this.auctionManager.on('auction:created', (data) => {
+            this.io.emit('auction:new', data);
+        });
+        
+        this.auctionManager.on('auction:bid_placed', (data) => {
+            this.io.emit('auction:bid_update', data);
+        });
+        
+        this.auctionManager.on('auction:completed', (data) => {
+            this.io.emit('auction:sold', data);
+            
+            // Notify seller
+            this.io.to(data.sellerId).emit('notification', {
+                message: `Your ${data.itemName} sold for ${data.finalPrice}g!`,
+                type: 'success'
+            });
+            
+            // Notify buyer
+            if (data.buyerId) {
+                this.io.to(data.buyerId).emit('notification', {
+                    message: `You won the auction for ${data.itemName}!`,
+                    type: 'success'
+                });
+            }
+        });
+    }
+    
+    /**
+     * Setup Zone System event handlers
+     * Phase 3: Eldoria
+     */
+    setupZoneEventHandlers(socket) {
+        // Zone: Get Info
+        socket.on("zone:get_info", async (data) => {
+            const zone = this.zones.get(data.zoneId);
+            if (zone) {
+                socket.emit("zone:info", {
+                    success: true,
+                    zoneId: data.zoneId,
+                    zoneInfo: zone.getZoneInfo()
+                });
+            } else {
+                socket.emit("zone:info", {
+                    success: false,
+                    error: "Zone not found"
+                });
+            }
+        });
+        
+        // Zone: Get Current Zone
+        socket.on("zone:get_current", async () => {
+            const zoneInfo = await this.zoneTransition.getPlayerZoneInfo(socket.id);
+            socket.emit("zone:current", zoneInfo);
+        });
+        
+        // Zone: Travel Request
+        socket.on("zone:travel_request", async (data, callback) => {
+            console.log(`🌍 Travel request from ${socket.id} to ${data.targetZone}`);
+            
+            const player = this.players.get(socket.id);
+            if (!player) {
+                if (callback) callback({ success: false, error: "Player not found" });
+                return;
+            }
+            
+            // Check if player can use portal
+            const portalId = data.portalId || `verdantis_to_${data.targetZone}`;
+            const result = await this.zoneTransition.canUsePortal(socket.id, portalId);
+            
+            if (!result.allowed) {
+                if (callback) callback({ success: false, error: result.reason });
+                socket.emit("zone:travel_error", { error: result.reason });
+                return;
+            }
+            
+            // Execute travel
+            const travelResult = await this.zoneTransition.usePortal(socket.id, portalId);
+            
+            if (travelResult.success) {
+                // Update player position
+                player.x = travelResult.position.x;
+                player.y = travelResult.position.y;
+                player.currentZone = travelResult.zone;
+                
+                // Notify player
+                socket.emit("zone:traveled", {
+                    success: true,
+                    zone: travelResult.zone,
+                    position: travelResult.position,
+                    zoneInfo: travelResult.zoneInfo
+                });
+                
+                // Notify old zone players
+                socket.to(result.portal.fromZone).emit("player:left_zone", {
+                    playerId: socket.id,
+                    zone: result.portal.fromZone
+                });
+                
+                // Notify new zone players
+                socket.to(travelResult.zone).emit("player:joined_zone", {
+                    playerId: socket.id,
+                    playerName: player.name,
+                    zone: travelResult.zone
+                });
+                
+                if (callback) callback({ success: true });
+            } else {
+                if (callback) callback(travelResult);
+            }
+        });
+        
+        // Zone: Check Portal
+        socket.on("zone:check_portal", async (data) => {
+            const portal = this.zoneTransition.getPortalAt(data.zoneId, data.x, data.y);
+            if (portal) {
+                const canUse = await this.zoneTransition.canUsePortal(socket.id, portal.id);
+                socket.emit("zone:portal_status", {
+                    nearby: true,
+                    portal: portal,
+                    canUse: canUse.allowed,
+                    reason: canUse.reason
+                });
+            } else {
+                socket.emit("zone:portal_status", { nearby: false });
+            }
+        });
+        
+        // Zone: Get Available Portals
+        socket.on("zone:get_portals", async () => {
+            const zoneInfo = await this.zoneTransition.getPlayerZoneInfo(socket.id);
+            const portals = await this.zoneTransition.getAvailablePortals(socket.id, zoneInfo.currentZone);
+            socket.emit("zone:portals", { portals });
+        });
+        
+        // Boss: Get Info
+        socket.on("boss:get_info", async () => {
+            if (this.kingEldor) {
+                socket.emit("boss:info", this.kingEldor.getBossData());
+            }
+        });
+        
+        // Boss: Start Encounter
+        socket.on("boss:start_encounter", async (data) => {
+            const player = this.players.get(socket.id);
+            if (!player) return;
+            
+            // Get nearby players for raid group
+            const nearbyPlayers = [];
+            for (const [id, p] of this.players) {
+                if (p.currentZone === 'eldoria') {
+                    nearbyPlayers.push({ id: id, name: p.name });
+                }
+            }
+            
+            const result = this.kingEldor.startEncounter(nearbyPlayers);
+            socket.emit("boss:encounter_result", result);
+        });
+        
+        // Boss: Attack
+        socket.on("boss:attack", async (data) => {
+            const player = this.players.get(socket.id);
+            if (!player) return;
+            
+            const damage = data.damage || Math.floor(Math.random() * 50) + 20;
+            const result = this.kingEldor.takeDamage(damage, player);
+            
+            socket.emit("boss:attack_result", result);
+            
+            // Broadcast boss state to all in zone
+            this.io.to('eldoria').emit("boss:update", this.kingEldor.getBossData());
+        });
+        
+        // Listen for Eldoria zone events
+        this.eldoriaZone.on('mob:spawned', (data) => {
+            this.io.to('eldoria').emit('zone:mob_spawned', data);
+        });
+        
+        this.eldoriaZone.on('mob:died', (data) => {
+            this.io.to('eldoria').emit('zone:mob_died', data);
+        });
+        
+        this.eldoriaZone.on('boss:spawned', (data) => {
+            this.io.to('eldoria').emit('zone:boss_spawned', data);
+            this.io.emit('notification', {
+                message: `King Eldor has appeared in The Throne Room!`,
+                type: 'boss'
+            });
+        });
+        
+        // Listen for King Eldor events
+        this.kingEldor.on('boss:encounter_started', (data) => {
+            this.io.to('eldoria').emit('boss:encounter_started', data);
+        });
+        
+        this.kingEldor.on('boss:phase_transition', (data) => {
+            this.io.to('eldoria').emit('boss:phase_transition', data);
+        });
+        
+        this.kingEldor.on('boss:defeated', (data) => {
+            this.io.to('eldoria').emit('boss:defeated', data);
+            this.io.emit('notification', {
+                message: `King Eldor has been defeated! Kingslayers: ${data.participants.map(p => p.playerId).join(', ')}`,
+                type: 'achievement'
+            });
         });
     }
     
