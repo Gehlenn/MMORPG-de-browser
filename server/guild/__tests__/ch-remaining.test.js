@@ -72,6 +72,18 @@ describe('GuildChatHandler remaining lines', () => {
         });
     });
 
+    describe('Line 182 - handleOfficerChat player not found', () => {
+        test('handleOfficerChat returns error when player not found (line 182)', async () => {
+            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
+            mockGuildManager.playerManager.getPlayer.mockResolvedValue(null); // Player not found
+
+            const result = await ch.handleOfficerChat('p1', 'Hello');
+
+            expect(result.success).toBe(false);
+            expect(result.error).toBe('Player not found');
+        });
+    });
+
     describe('Lines 181-211 - handleOfficerChat success path', () => {
         test('handleOfficerChat succeeds with complete flow (lines 181-211)', async () => {
             mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
