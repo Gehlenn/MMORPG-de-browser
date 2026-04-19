@@ -17,6 +17,7 @@ describe('GuildInvitationManager Coverage', () => {
             get: jest.fn((sql, params, callback) => callback(null, null)),
             all: jest.fn((sql, params, callback) => callback(null, [])),
             getPlayerGuild: jest.fn().mockResolvedValue(null),
+            getGuildById: jest.fn().mockResolvedValue(null),
             getGuildMembers: jest.fn().mockResolvedValue([]),
             getInvitationById: jest.fn().mockResolvedValue(null),
             getPlayerInvitations: jest.fn().mockResolvedValue([]),
@@ -24,7 +25,8 @@ describe('GuildInvitationManager Coverage', () => {
             createInvitation: jest.fn().mockResolvedValue({ id: 'inv1' }),
             cancelInvitation: jest.fn().mockResolvedValue(true),
             countGuildInvitations: jest.fn().mockResolvedValue(0),
-            countPlayerInvitations: jest.fn().mockResolvedValue(0)
+            countPlayerInvitations: jest.fn().mockResolvedValue(0),
+            cleanupExpiredInvitations: jest.fn().mockResolvedValue(5)
         };
 
         mockGuildManager = {
@@ -33,6 +35,7 @@ describe('GuildInvitationManager Coverage', () => {
                 getPlayerByUsername: jest.fn().mockResolvedValue({ id: 'p2', username: 'Invitee' }),
                 sendToPlayer: jest.fn()
             },
+            respondToInvitation: jest.fn().mockResolvedValue({ success: true, invitation: { id: 'inv1' } }),
             on: jest.fn(),
             emit: jest.fn()
         };
@@ -192,24 +195,7 @@ describe('GuildInvitationManager Coverage', () => {
             expect(result.error).toContain('already in a guild');
         });
 
-        test('fails when invitation expired', async () => {
-            const expiredDate = new Date(Date.now() - 25 * 60 * 60 * 1000); // 25 hours ago
-            mockDb.getInvitationById.mockResolvedValue({
-                id: 'inv1',
-                invitee_id: 'p1',
-                guild_id: 'g1',
-                status: 'PENDING',
-                created_at: expiredDate.toISOString()
-            });
-            mockDb.getPlayerGuild.mockResolvedValue(null);
-            
-            const result = await invitationManager.acceptInvitation('p1', 'inv1');
-            
-            expect(result.success).toBe(false);
-            expect(result.error).toContain('Expired');
-        });
-
-        test('fails when guild full', async () => {
+        test('fails when respondToInvitation returns error', async () => {
             mockDb.getInvitationById.mockResolvedValue({
                 id: 'inv1',
                 invitee_id: 'p1',
@@ -218,11 +204,24 @@ describe('GuildInvitationManager Coverage', () => {
                 created_at: new Date().toISOString()
             });
             mockDb.getPlayerGuild.mockResolvedValue(null);
-            mockDb.getGuildById.mockResolvedValue({
-                id: 'g1',
-                member_count: 100,
-                max_members: 100
+            mockGuildManager.respondToInvitation.mockResolvedValue({ success: false, error: 'Invitation has expired' });
+            
+            const result = await invitationManager.acceptInvitation('p1', 'inv1');
+            
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('expired');
+        });
+
+        test('fails when guild is full', async () => {
+            mockDb.getInvitationById.mockResolvedValue({
+                id: 'inv1',
+                invitee_id: 'p1',
+                guild_id: 'g1',
+                status: 'PENDING',
+                created_at: new Date().toISOString()
             });
+            mockDb.getPlayerGuild.mockResolvedValue(null);
+            mockGuildManager.respondToInvitation.mockResolvedValue({ success: false, error: 'Guild is full' });
             
             const result = await invitationManager.acceptInvitation('p1', 'inv1');
             
@@ -332,6 +331,7 @@ describe('GuildInvitationManager Coverage', () => {
                 guild_id: 'g1',
                 status: 'PENDING'
             });
+            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
             mockDb.cancelInvitation.mockResolvedValue(true);
             
             const result = await invitationManager.cancelInvitation('p1', 'inv1');
@@ -347,6 +347,7 @@ describe('GuildInvitationManager Coverage', () => {
                 status: 'PENDING'
             });
             mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
+            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
             mockDb.cancelInvitation.mockResolvedValue(true);
             
             const result = await invitationManager.cancelInvitation('p1', 'inv1');
@@ -358,13 +359,16 @@ describe('GuildInvitationManager Coverage', () => {
     describe('getPlayerInvitations', () => {
         test('returns invitations list', async () => {
             mockDb.getPlayerInvitations.mockResolvedValue([
-                { id: 'inv1', guild_id: 'g1', status: 'PENDING' },
-                { id: 'inv2', guild_id: 'g2', status: 'PENDING' }
+                { id: 'inv1', guild_id: 'g1', inviter_id: 'p2', created_at: '2024-01-01', status: 'PENDING' },
+                { id: 'inv2', guild_id: 'g2', inviter_id: 'p3', created_at: '2024-01-01', status: 'PENDING' }
             ]);
+            mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Guild 1', tag: 'G1', memberCount: 5, maxMembers: 100 });
+            mockGuildManager.playerManager.getPlayer.mockResolvedValue({ id: 'p2', username: 'Inviter' });
             
             const result = await invitationManager.getPlayerInvitations('p1');
             
-            expect(result).toHaveLength(2);
+            expect(result.success).toBe(true);
+            expect(result.invitations).toHaveLength(2);
         });
 
         test('handles database error', async () => {
@@ -372,30 +376,30 @@ describe('GuildInvitationManager Coverage', () => {
             
             const result = await invitationManager.getPlayerInvitations('p1');
             
-            expect(result).toEqual([]);
+            expect(result.success).toBe(false);
         });
     });
 
     describe('getGuildInvitations', () => {
         test('returns guild invitations', async () => {
             mockDb.getGuildInvitations.mockResolvedValue([
-                { id: 'inv1', invitee_id: 'p1', status: 'PENDING' }
+                { id: 'inv1', invitee_id: 'p1', inviter_id: 'p2', guild_id: 'g1', created_at: '2024-01-01', status: 'PENDING' }
             ]);
+            mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Guild 1', tag: 'G1' });
+            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
             
-            const result = await invitationManager.getGuildInvitations('g1');
+            const result = await invitationManager.getGuildInvitations('g1', 'p1');
             
-            expect(result).toHaveLength(1);
+            expect(result.success).toBe(true);
+            expect(result.invitations).toHaveLength(1);
         });
     });
 
     describe('cleanupExpiredInvitations', () => {
         test('cleans up expired invitations', async () => {
-            mockDb.run.mockImplementation(function(sql, params, callback) {
-                callback.call({ changes: 5 }, null);
-            });
-            
             const result = await invitationManager.cleanupExpiredInvitations();
             
+            expect(result.success).toBe(true);
             expect(result.count).toBe(5);
         });
     });
