@@ -40,7 +40,8 @@ describe('Final Coverage Push', () => {
             cancelInvitation: jest.fn(),
             countGuildInvitations: jest.fn(),
             countPlayerInvitations: jest.fn(),
-            updateLastActive: jest.fn()
+            updateLastActive: jest.fn(),
+            cleanupExpiredInvitations: jest.fn().mockResolvedValue(5)
         };
         mockPlayerManager = {
             getPlayer: jest.fn(),
@@ -243,7 +244,8 @@ describe('Final Coverage Push', () => {
                 isOfficerChat: false
             });
 
-            expect(result).toHaveProperty('id', 'msg1');
+            expect(result).toHaveProperty('id');
+            expect(result.message).toBe('Hello');
         });
 
         test('getChatHistory returns messages', async () => {
@@ -285,7 +287,8 @@ describe('Final Coverage Push', () => {
                 inviteeId: 'p2'
             });
 
-            expect(result).toHaveProperty('id', 'inv1');
+            expect(result).toHaveProperty('id');
+            expect(result.guild_id).toBe('g1');
         });
 
         test('respondToInvitation updates status', async () => {
@@ -345,7 +348,9 @@ describe('Final Coverage Push', () => {
                 .mockResolvedValueOnce({ guild_id: 'g1', rank: 'MEMBER' });
             mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Test', tag: 'TST' });
             mockDb.updateMemberRank.mockResolvedValue(true);
-            mockPlayerManager.getPlayer.mockResolvedValue({ id: 'p2', username: 'Player2' });
+            mockPlayerManager.getPlayer
+                .mockResolvedValueOnce({ id: 'p1', username: 'Player1' })
+                .mockResolvedValueOnce({ id: 'p2', username: 'Player2' });
 
             const result = await gm.demoteMember('p1', 'p2', 'MEMBER');
 
@@ -412,21 +417,19 @@ describe('Final Coverage Push', () => {
         });
 
         test('cleanupExpiredInvitations returns count', async () => {
-            mockDb.run.mockImplementation(function(sql, params, callback) {
-                callback.call({ changes: 5 }, null);
-            });
+            mockDb.cleanupExpiredInvitations.mockResolvedValue(5);
 
             const result = await im.cleanupExpiredInvitations();
+            expect(result.success).toBe(true);
             expect(result.count).toBe(5);
         });
 
         test('cleanupExpiredInvitations handles error', async () => {
-            mockDb.run.mockImplementation((sql, params, callback) => {
-                callback(new Error('Delete Error'));
-            });
+            mockDb.cleanupExpiredInvitations.mockRejectedValue(new Error('Delete Error'));
 
             const result = await im.cleanupExpiredInvitations();
             expect(result.success).toBe(false);
+            expect(result.error).toContain('Delete Error');
         });
 
         test('getPlayerInvitations returns formatted', async () => {

@@ -8,11 +8,12 @@
  * - GuildChatHandler: 304 (filter officer chat for non-officers)
  */
 
+const GuildDatabase = require('../GuildDatabase');
 const GuildManager = require('../GuildManager');
 
 describe('Final Push Coverage', () => {
-    describe('GuildManager line 250 - accept invitation add to existing members', () => {
-        let mockDb, mockPlayerManager, gm;
+    describe('GuildManager line 250 - respondToInvitation adds to online', () => {
+        let mockDb, gm, db, mockPlayerManager;
 
         beforeEach(() => {
             mockDb = {
@@ -25,7 +26,8 @@ describe('Final Push Coverage', () => {
                 getPlayer: jest.fn(),
                 sendToPlayer: jest.fn()
             };
-            gm = new GuildManager(mockDb, mockPlayerManager);
+            db = new GuildDatabase(mockDb);
+            gm = new GuildManager(db, mockPlayerManager);
             gm.emit = jest.fn();
             
             // Set up existing online members
@@ -50,7 +52,7 @@ describe('Final Push Coverage', () => {
     });
 
     describe('GuildManager line 293 - leave guild when not in guild', () => {
-        let mockDb, gm;
+        let mockDb, gm, db;
 
         beforeEach(() => {
             mockDb = {
@@ -58,7 +60,8 @@ describe('Final Push Coverage', () => {
                 getGuildById: jest.fn(),
                 removeMember: jest.fn()
             };
-            gm = new GuildManager(mockDb, {});
+            db = new GuildDatabase(mockDb);
+            gm = new GuildManager(db, {});
             gm.emit = jest.fn();
         });
 

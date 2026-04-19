@@ -2,6 +2,7 @@
  * Tests for new GuildManager methods
  */
 
+const GuildDatabase = require('../GuildDatabase');
 const GuildManager = require('../GuildManager');
 
 describe('GuildManager New Methods', () => {
@@ -10,8 +11,20 @@ describe('GuildManager New Methods', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         mockDb = {
+            run: jest.fn((sql, params, callback) => callback.call({ lastID: 1, changes: 1 }, null)),
+            get: jest.fn((sql, params, callback) => {
+                // Return guild data for getGuildById queries
+                if (sql.includes('FROM guilds') && sql.includes('WHERE g.id =')) {
+                    callback(null, { id: 'g1', name: 'Test Guild', tag: 'TST', leader_id: 'p1' });
+                } else {
+                    callback(null, null);
+                }
+            }),
+            all: jest.fn((sql, params, callback) => callback(null, [])),
             getPlayerGuild: jest.fn(),
             getGuildById: jest.fn(),
+            getGuildByName: jest.fn(),
+            getGuildByTag: jest.fn(),
             getGuildMembers: jest.fn(),
             createGuild: jest.fn(),
             addGuildMember: jest.fn(),
@@ -27,7 +40,8 @@ describe('GuildManager New Methods', () => {
             updateGold: jest.fn()
         };
         
-        gm = new GuildManager(mockDb, mockPlayerManager);
+        const db = new GuildDatabase(mockDb);
+        gm = new GuildManager(db, mockPlayerManager);
         gm.emit = jest.fn();
     });
 
@@ -238,6 +252,9 @@ describe('GuildManager New Methods', () => {
 
             const result = await gm.createGuild('p1', { name: 'Test', tag: 'TST', description: 'A guild' });
 
+            if (!result.success) {
+                throw new Error(`createGuild failed: ${result.error}`);
+            }
             expect(result.success).toBe(true);
             expect(result.guild).toHaveProperty('id', 'g1');
             expect(gm.emit).toHaveBeenCalledWith('guild:created', expect.any(Object));

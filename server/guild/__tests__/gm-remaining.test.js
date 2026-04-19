@@ -40,7 +40,8 @@ describe('GuildManager Remaining Lines', () => {
             sendToPlayer: jest.fn()
         };
         
-        gm = new GuildManager(mockDb, mockPlayerManager);
+        const db = new GuildDatabase(mockDb);
+        gm = new GuildManager(db, mockPlayerManager);
         gm.on = jest.fn();
         gm.emit = jest.fn();
     });

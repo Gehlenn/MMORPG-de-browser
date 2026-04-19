@@ -135,13 +135,37 @@ describe('More Guild Coverage', () => {
         });
 
         test('respondToInvitation updates status', async () => {
+            let callCount = 0;
             mockDb.run.mockImplementation(function(sql, params, callback) {
                 callback.call({ changes: 1 }, null);
+            });
+            mockDb.get.mockImplementation((sql, params, callback) => {
+                callCount++;
+                // First call: get invitation by id
+                // Second call: check if player already in guild (SELECT id FROM guild_members)
+                // Third call: get member count for guild
+                // Fourth call: get max_members from guilds
+                if (callCount === 1) {
+                    // Return invitation
+                    callback(null, { id: 'inv1', status: 'ACCEPTED', invitee_id: 'p1', guild_id: 'g1' });
+                } else if (callCount === 2) {
+                    // Check for existing membership by player_id - return null (not in guild)
+                    callback(null, null);
+                } else if (callCount === 3) {
+                    // Member count query
+                    callback(null, { count: 5 });
+                } else if (callCount === 4) {
+                    // Guild capacity check
+                    callback(null, { max_members: 100 });
+                } else {
+                    callback(null, null);
+                }
             });
 
             const result = await db.respondToInvitation('inv1', 'ACCEPTED');
 
-            expect(result.success).toBe(true);
+            expect(result).toHaveProperty('id', 'inv1');
+            expect(result).toHaveProperty('status', 'ACCEPTED');
         });
 
         test('saveChatMessage saves message', async () => {
@@ -207,7 +231,7 @@ describe('More Guild Coverage', () => {
             const result = await gm.disbandGuild('p1', 'g1');
 
             expect(result.success).toBe(false);
-            expect(result.error).toContain('Only the leader can promote/demote');
+            expect(result.error).toContain('Only the guild leader can disband');
         });
 
         test('leaveGuild fails when not in guild', async () => {
@@ -318,7 +342,7 @@ describe('More Guild Coverage', () => {
             const result = await gm.browseGuilds({ page: 1, limit: 10 });
 
             expect(result.success).toBe(true);
-            expect(result.guilds).toHaveLength(2);
+            expect(result.guilds.guilds).toHaveLength(2);
         });
 
         test('handlePlayerOnline sets member online', async () => {
@@ -332,11 +356,14 @@ describe('More Guild Coverage', () => {
         });
 
         test('handlePlayerOffline sets member offline', async () => {
+            // Setup: player in guild
+            let callCount = 0;
             mockDb.get.mockImplementation((sql, params, callback) => {
+                callCount++;
                 callback(null, { guild_id: 'g1', player_id: 'p1', rank: 'MEMBER' });
             });
 
-            gm.setPlayerOnline('g1', 'p1');
+            await gm.setPlayerOnline('g1', 'p1');
             expect(gm.isPlayerOnline('g1', 'p1')).toBe(true);
 
             await gm.handlePlayerOffline('p1');

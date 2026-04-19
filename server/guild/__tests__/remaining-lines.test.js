@@ -100,13 +100,16 @@ describe('Remaining Uncovered Lines', () => {
                 getGuildById: jest.fn(),
                 respondToInvitation: jest.fn(),
                 getGuildMembers: jest.fn(),
-                removeMember: jest.fn()
+                removeMember: jest.fn(),
+                addGuildMember: jest.fn(),
+                updateLastActive: jest.fn()
             };
             mockPlayerManager = {
                 getPlayer: jest.fn(),
                 sendToPlayer: jest.fn()
             };
-            gm = new GuildManager(mockDb, mockPlayerManager);
+            const db = new GuildDatabase(mockDb);
+            gm = new GuildManager(db, mockPlayerManager);
             gm.emit = jest.fn();
         });
 

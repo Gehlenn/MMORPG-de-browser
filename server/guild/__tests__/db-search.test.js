@@ -9,8 +9,9 @@ describe('GuildDatabase browseGuilds search (lines 374-375)', () => {
 
     beforeEach(() => {
         db = new GuildDatabase(':memory:');
-        // Mock the all method to capture the SQL query
+        // Mock the all and get methods to capture the SQL query
         jest.spyOn(db, 'all').mockResolvedValue([]);
+        jest.spyOn(db, 'get').mockResolvedValue({ count: 0 });
     });
 
     afterEach(() => {
