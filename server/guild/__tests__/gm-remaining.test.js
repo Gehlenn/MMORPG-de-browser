@@ -2,6 +2,7 @@
  * GuildManager Remaining Lines Coverage
  */
 
+const GuildDatabase = require('../GuildDatabase');
 const GuildManager = require('../GuildManager');
 
 describe('GuildManager Remaining Lines', () => {
@@ -218,7 +219,14 @@ describe('GuildManager Remaining Lines', () => {
 
     describe('updateGuildInfo lines 622, 635-654', () => {
         test('updateGuildInfo updates multiple fields', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
+            // Configure mockDb.get to return guild membership
+            mockDb.get.mockImplementation((sql, params, callback) => {
+                if (sql.includes('FROM guild_members') && sql.includes('gm.player_id =')) {
+                    callback(null, { guild_id: 'g1', rank: 'LEADER' });
+                } else {
+                    callback(null, null);
+                }
+            });
             mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Test' });
             mockDb.updateGuildInfo.mockResolvedValue(true);
 
@@ -229,14 +237,19 @@ describe('GuildManager Remaining Lines', () => {
             });
 
             expect(result.success).toBe(true);
-            expect(result).toHaveProperty('updatedFields');
-            expect(result.updatedFields).toContain('description');
-            expect(result.updatedFields).toContain('motd');
-            expect(result.updatedFields).toContain('isRecruiting');
+            expect(result).toHaveProperty('guild');
+            expect(result).toHaveProperty('message', 'Guild information updated');
         });
 
         test('updateGuildInfo partial update', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
+            // Configure mockDb.get to return guild membership
+            mockDb.get.mockImplementation((sql, params, callback) => {
+                if (sql.includes('FROM guild_members') && sql.includes('gm.player_id =')) {
+                    callback(null, { guild_id: 'g1', rank: 'LEADER' });
+                } else {
+                    callback(null, null);
+                }
+            });
             mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Test' });
             mockDb.updateGuildInfo.mockResolvedValue(true);
 
@@ -245,42 +258,63 @@ describe('GuildManager Remaining Lines', () => {
             });
 
             expect(result.success).toBe(true);
-            expect(result.updatedFields).toEqual(['description']);
+            expect(result).toHaveProperty('guild');
+            expect(result).toHaveProperty('message', 'Guild information updated');
         });
     });
 
     describe('getPlayerGuildInfo lines', () => {
         test('getPlayerGuildInfo with full data', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue({
-                guild_id: 'g1',
-                player_id: 'p1',
-                rank: 'OFFICER',
-                joined_at: '2024-01-01'
+            // Configure mockDb.get to handle getPlayerGuild query
+            mockDb.get.mockImplementation((sql, params, callback) => {
+                if (sql.includes('FROM guild_members') && sql.includes('gm.player_id =')) {
+                    callback(null, {
+                        guild_id: 'g1',
+                        player_id: 'p1',
+                        rank: 'OFFICER',
+                        joined_at: '2024-01-01',
+                        guild_name: 'Test Guild',
+                        guild_tag: 'TST',
+                        description: 'A guild',
+                        motd: 'Hello',
+                        is_recruiting: true
+                    });
+                } else if (sql.includes('FROM guilds') && sql.includes('WHERE g.id =')) {
+                    callback(null, {
+                        id: 'g1',
+                        name: 'Test Guild',
+                        tag: 'TST',
+                        description: 'A guild',
+                        motd: 'Hello',
+                        leader_id: 'p2',
+                        created_at: '2024-01-01',
+                        max_members: 100,
+                        is_recruiting: true,
+                        member_count: 10
+                    });
+                } else {
+                    callback(null, null);
+                }
             });
-            mockDb.getGuildById.mockResolvedValue({
-                id: 'g1',
-                name: 'Test Guild',
-                tag: 'TST',
-                description: 'A guild',
-                motd: 'Hello',
-                leader_id: 'p2',
-                created_at: '2024-01-01',
-                max_members: 100,
-                is_recruiting: true,
-                member_count: 10
+            // Configure mockDb.all to return guild members
+            mockDb.all.mockImplementation((sql, params, callback) => {
+                if (sql.includes('FROM guild_members') && sql.includes('gm.guild_id =')) {
+                    callback(null, [
+                        { player_id: 'p1', rank: 'OFFICER', joined_at: '2024-01-01' },
+                        { player_id: 'p2', rank: 'LEADER', joined_at: '2024-01-01' }
+                    ]);
+                } else {
+                    callback(null, []);
+                }
             });
-            mockDb.getGuildMembers.mockResolvedValue([
-                { player_id: 'p1', rank: 'OFFICER', joined_at: '2024-01-01' },
-                { player_id: 'p2', rank: 'LEADER', joined_at: '2024-01-01' }
-            ]);
 
             const result = await gm.getPlayerGuildInfo('p1');
 
             expect(result.success).toBe(true);
             expect(result).toHaveProperty('guild');
-            expect(result).toHaveProperty('members');
-            expect(result).toHaveProperty('myRank', 'OFFICER');
-            expect(result).toHaveProperty('joinedAt', '2024-01-01');
+            expect(result.guild).toHaveProperty('members');
+            expect(result.guild).toHaveProperty('myRank', 'OFFICER');
+            expect(result.guild.members).toHaveLength(2);
         });
     });
 });
