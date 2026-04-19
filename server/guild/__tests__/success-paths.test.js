@@ -193,11 +193,25 @@ describe('GuildManager Success Paths', () => {
 
     describe('promoteMember - Success Path', () => {
         test('promoteMember succeeds for leader', async () => {
-            mockDb.getPlayerGuild
-                .mockResolvedValueOnce({ guild_id: 'g1', player_id: 'p1', rank: 'LEADER' })
-                .mockResolvedValueOnce({ guild_id: 'g1', player_id: 'p2', rank: 'MEMBER' });
-            mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Test' });
-            mockDb.updateMemberRank.mockResolvedValue(true);
+            let callCount = 0;
+            mockDb.get.mockImplementation((sql, params, callback) => {
+                if (sql.includes('FROM guild_members gm') && sql.includes('gm.player_id =')) {
+                    callCount++;
+                    if (callCount === 1) {
+                        callback(null, { guild_id: 'g1', player_id: 'p1', rank: 'LEADER' });
+                    } else {
+                        callback(null, { guild_id: 'g1', player_id: 'p2', rank: 'MEMBER' });
+                    }
+                } else if (sql.includes('FROM guilds g') && sql.includes('WHERE g.id =')) {
+                    callback(null, { id: 'g1', name: 'Test', leader_id: 'p1' });
+                } else {
+                    callback(null, null);
+                }
+            });
+            mockDb.run.mockImplementation((sql, params, callback) => {
+                callback.call({ changes: 1 }, null);
+            });
+            mockPlayerManager.getPlayer.mockResolvedValue({ id: 'p2', username: 'Target' });
 
             const result = await gm.promoteMember('p1', 'p2', 'OFFICER');
 
@@ -207,11 +221,25 @@ describe('GuildManager Success Paths', () => {
         });
 
         test('promoteMember to INITIATE', async () => {
-            mockDb.getPlayerGuild
-                .mockResolvedValueOnce({ guild_id: 'g1', player_id: 'p1', rank: 'LEADER' })
-                .mockResolvedValueOnce({ guild_id: 'g1', player_id: 'p2', rank: 'MEMBER' });
-            mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Test' });
-            mockDb.updateMemberRank.mockResolvedValue(true);
+            let callCount = 0;
+            mockDb.get.mockImplementation((sql, params, callback) => {
+                if (sql.includes('FROM guild_members gm') && sql.includes('gm.player_id =')) {
+                    callCount++;
+                    if (callCount === 1) {
+                        callback(null, { guild_id: 'g1', player_id: 'p1', rank: 'LEADER' });
+                    } else {
+                        callback(null, { guild_id: 'g1', player_id: 'p2', rank: 'MEMBER' });
+                    }
+                } else if (sql.includes('FROM guilds g') && sql.includes('WHERE g.id =')) {
+                    callback(null, { id: 'g1', name: 'Test', leader_id: 'p1' });
+                } else {
+                    callback(null, null);
+                }
+            });
+            mockDb.run.mockImplementation((sql, params, callback) => {
+                callback.call({ changes: 1 }, null);
+            });
+            mockPlayerManager.getPlayer.mockResolvedValue({ id: 'p2', username: 'Target' });
 
             const result = await gm.promoteMember('p1', 'p2', 'INITIATE');
 
@@ -221,11 +249,24 @@ describe('GuildManager Success Paths', () => {
 
     describe('transferLeadership - Success Path', () => {
         test('transferLeadership succeeds', async () => {
-            mockDb.getPlayerGuild
-                .mockResolvedValueOnce({ guild_id: 'g1', player_id: 'p1', rank: 'LEADER' })
-                .mockResolvedValueOnce({ guild_id: 'g1', player_id: 'p2', rank: 'OFFICER' });
-            mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Test' });
-            mockDb.transferLeadership.mockResolvedValue(true);
+            let callCount = 0;
+            mockDb.get.mockImplementation((sql, params, callback) => {
+                if (sql.includes('FROM guild_members gm') && sql.includes('gm.player_id =')) {
+                    callCount++;
+                    if (callCount === 1) {
+                        callback(null, { guild_id: 'g1', player_id: 'p1', rank: 'LEADER' });
+                    } else {
+                        callback(null, { guild_id: 'g1', player_id: 'p2', rank: 'OFFICER' });
+                    }
+                } else if (sql.includes('FROM guilds g') && sql.includes('WHERE g.id =')) {
+                    callback(null, { id: 'g1', name: 'Test', leader_id: 'p1' });
+                } else {
+                    callback(null, null);
+                }
+            });
+            mockDb.run.mockImplementation((sql, params, callback) => {
+                callback.call({ changes: 1 }, null);
+            });
 
             const result = await gm.transferLeadership('p1', 'p2');
 
@@ -465,14 +506,10 @@ describe('GuildManager Success Paths', () => {
         });
 
         test('handlePlayerOffline sets member offline', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue({
-                guild_id: 'g1',
-                player_id: 'p1',
-                rank: 'MEMBER'
-            });
+            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'MEMBER' });
             
             // Set online first
-            gm.setPlayerOnline('g1', 'p1');
+            await gm.setPlayerOnline('g1', 'p1');
             expect(gm.isPlayerOnline('g1', 'p1')).toBe(true);
 
             await gm.handlePlayerOffline('p1');
@@ -480,21 +517,25 @@ describe('GuildManager Success Paths', () => {
             expect(gm.isPlayerOnline('g1', 'p1')).toBe(false);
         });
 
-        test('getOnlineGuildMembers returns array', () => {
-            gm.setPlayerOnline('g1', 'p1');
-            gm.setPlayerOnline('g1', 'p2');
-            gm.setPlayerOnline('g2', 'p3');
+        test('getOnlineMembers returns Set', async () => {
+            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'MEMBER' });
+            
+            await gm.setPlayerOnline('g1', 'p1');
+            await gm.setPlayerOnline('g1', 'p2');
+            await gm.setPlayerOnline('g2', 'p3');
 
-            const members = gm.getOnlineGuildMembers('g1');
+            const members = gm.getOnlineMembers('g1');
 
-            expect(members).toHaveLength(2);
-            expect(members).toContain('p1');
-            expect(members).toContain('p2');
+            expect(members).toBeInstanceOf(Set);
+            expect(members.size).toBe(2);
+            expect(members.has('p1')).toBe(true);
+            expect(members.has('p2')).toBe(true);
         });
 
-        test('getOnlineGuildMembers returns empty for unknown guild', () => {
-            const members = gm.getOnlineGuildMembers('unknown');
-            expect(members).toEqual([]);
+        test('getOnlineMembers returns empty for unknown guild', () => {
+            const members = gm.getOnlineMembers('unknown');
+            expect(members).toBeInstanceOf(Set);
+            expect(members.size).toBe(0);
         });
     });
 
