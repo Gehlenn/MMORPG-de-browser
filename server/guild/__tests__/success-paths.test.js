@@ -10,19 +10,77 @@ describe('GuildManager Success Paths', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        
+        // Track call counts for sequential mock returns
+        let getPlayerGuildCallCount = 0;
+        const getPlayerGuildResults = [];
+        
         mockDb = {
             run: jest.fn((sql, params, callback) => callback.call({ lastID: 1, changes: 1 }, null)),
-            get: jest.fn((sql, params, callback) => callback(null, null)),
-            all: jest.fn((sql, params, callback) => callback(null, [])),
-            // GuildDatabase methods
+            get: jest.fn((sql, params, callback) => {
+                // getPlayerGuild: Check guild membership
+                if (sql.includes('FROM guild_members gm') && sql.includes('JOIN guilds g') && sql.includes('gm.player_id =')) {
+                    // Return sequential values if set, otherwise null
+                    const result = getPlayerGuildResults[getPlayerGuildCallCount++] || null;
+                    callback(null, result);
+                }
+                // getGuildByName: Check name uniqueness
+                else if (sql.includes('FROM guilds') && sql.includes('LOWER(name)')) {
+                    callback(null, null); // No conflict by default
+                }
+                // getGuildByTag: Check tag uniqueness
+                else if (sql.includes('FROM guilds') && sql.includes('tag = UPPER')) {
+                    callback(null, null); // No conflict by default
+                }
+                // getGuildById: Get guild details
+                else if (sql.includes('FROM guilds g') && sql.includes('WHERE g.id =')) {
+                    callback(null, { id: 'g1', name: 'Test Guild', tag: 'TST', leader_id: 'p1', member_count: 1 });
+                }
+                // respondToInvitation: Get invitation
+                else if (sql.includes('FROM guild_invitations') && sql.includes('WHERE id =')) {
+                    callback(null, { id: 'inv1', guild_id: 'g1', invitee_id: 'p1', inviter_id: 'p2', status: 'ACCEPTED' });
+                }
+                // respondToInvitation: Check if player already in guild
+                else if (sql.includes('FROM guild_members') && sql.includes('WHERE player_id =') && !sql.includes('gm.')) {
+                    callback(null, null); // Not in guild
+                }
+                // respondToInvitation: Get member count
+                else if (sql.includes('COUNT(*)') && sql.includes('FROM guild_members')) {
+                    callback(null, { count: 5 });
+                }
+                // respondToInvitation: Get max members
+                else if (sql.includes('max_members FROM guilds')) {
+                    callback(null, { max_members: 100 });
+                }
+                // browseGuilds: Count guilds
+                else if (sql.includes('COUNT(*) as count FROM guilds') && !sql.includes('guild_members')) {
+                    callback(null, { count: 25 });
+                }
+                else {
+                    callback(null, null);
+                }
+            }),
+            all: jest.fn((sql, params, callback) => {
+                // getGuildMembers: Get members of a guild
+                if (sql.includes('FROM guild_members') && sql.includes('gm.guild_id =')) {
+                    callback(null, [
+                        { player_id: 'p1', rank: 'LEADER', joined_at: '2024-01-01' }
+                    ]);
+                }
+                else {
+                    callback(null, []);
+                }
+            }),
+            // GuildDatabase methods - these will be mocked per test
             createGuild: jest.fn(),
             getGuildById: jest.fn(),
             getGuildByName: jest.fn(),
             getGuildByTag: jest.fn(),
             getPlayerGuild: jest.fn(),
+            _setPlayerGuildResults: (results) => { getPlayerGuildResults.length = 0; results.forEach(r => getPlayerGuildResults.push(r)); getPlayerGuildCallCount = 0; },
             getGuildMembers: jest.fn(),
             disbandGuild: jest.fn(),
-            removeGuildMember: jest.fn(),
+            removeMember: jest.fn(),
             updateMemberRank: jest.fn(),
             transferLeadership: jest.fn(),
             updateGuildInfo: jest.fn(),
@@ -145,20 +203,17 @@ describe('GuildManager Success Paths', () => {
 
     describe('leaveGuild - Success Path', () => {
         test('leaveGuild succeeds for member', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue({
-                guild_id: 'g1',
-                player_id: 'p1',
-                rank: 'MEMBER'
-            });
+            mockDb._setPlayerGuildResults([
+                { guild_id: 'g1', player_id: 'p1', rank: 'MEMBER' }
+            ]);
             mockDb.getGuildById.mockResolvedValue({
                 id: 'g1',
                 name: 'Test',
                 memberCount: 5
             });
-            mockDb.removeGuildMember.mockResolvedValue(true);
+            mockDb.removeMember.mockResolvedValue(true);
 
             const result = await gm.leaveGuild('p1');
-
             expect(result.success).toBe(true);
             expect(gm.emit).toHaveBeenCalledWith('guild:member_left', expect.any(Object));
         });
@@ -166,11 +221,12 @@ describe('GuildManager Success Paths', () => {
 
     describe('kickMember - Success Paths', () => {
         test('kickMember succeeds for leader', async () => {
-            mockDb.getPlayerGuild
-                .mockResolvedValueOnce({ guild_id: 'g1', player_id: 'p1', rank: 'LEADER' })
-                .mockResolvedValueOnce({ guild_id: 'g1', player_id: 'p2', rank: 'MEMBER' });
+            mockDb._setPlayerGuildResults([
+                { guild_id: 'g1', player_id: 'p1', rank: 'LEADER' },
+                { guild_id: 'g1', player_id: 'p2', rank: 'MEMBER' }
+            ]);
             mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Test' });
-            mockDb.removeGuildMember.mockResolvedValue(true);
+            mockDb.removeMember.mockResolvedValue(true);
 
             const result = await gm.kickMember('p1', 'p2');
 
@@ -179,11 +235,12 @@ describe('GuildManager Success Paths', () => {
         });
 
         test('kickMember succeeds for officer kicking member', async () => {
-            mockDb.getPlayerGuild
-                .mockResolvedValueOnce({ guild_id: 'g1', player_id: 'p1', rank: 'OFFICER' })
-                .mockResolvedValueOnce({ guild_id: 'g1', player_id: 'p2', rank: 'MEMBER' });
+            mockDb._setPlayerGuildResults([
+                { guild_id: 'g1', player_id: 'p1', rank: 'OFFICER' },
+                { guild_id: 'g1', player_id: 'p2', rank: 'MEMBER' }
+            ]);
             mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Test' });
-            mockDb.removeGuildMember.mockResolvedValue(true);
+            mockDb.removeMember.mockResolvedValue(true);
 
             const result = await gm.kickMember('p1', 'p2');
 
