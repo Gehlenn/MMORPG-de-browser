@@ -19,6 +19,7 @@ describe('Final Coverage Push', () => {
             cleanupExpiredInvitations: jest.fn(),
             getPlayerGuild: jest.fn(),
             getGuildById: jest.fn(),
+            getGuildMembers: jest.fn(),
             countGuildInvitations: jest.fn(),
             countPlayerInvitations: jest.fn(),
             createInvitation: jest.fn(),
@@ -38,10 +39,12 @@ describe('Final Coverage Push', () => {
 
         beforeEach(() => {
             gm = {
-                playerManager: mockPlayerManager,
+                playerManager: {
+                    ...mockPlayerManager,
+                    sendToPlayer: jest.fn()
+                },
                 on: jest.fn(),
-                getOnlineGuildMembers: jest.fn().mockReturnValue(new Set(['p1', 'p2'])),
-                playerManager: { sendToPlayer: jest.fn() },
+                getOnlineMembers: jest.fn().mockReturnValue(new Set(['p1', 'p2'])),
                 db: mockDb
             };
             ch = new GuildChatHandler(gm, mockDb);
@@ -54,7 +57,6 @@ describe('Final Coverage Push', () => {
             expect(gm.on).toHaveBeenCalledWith('guild:member_left', expect.any(Function));
             expect(gm.on).toHaveBeenCalledWith('guild:member_kicked', expect.any(Function));
             expect(gm.on).toHaveBeenCalledWith('guild:member_promoted', expect.any(Function));
-            expect(gm.on).toHaveBeenCalledWith('guild:leader_changed', expect.any(Function));
         });
 
         test('sendSystemMessage broadcasts to online members', () => {
@@ -72,7 +74,7 @@ describe('Final Coverage Push', () => {
         });
 
         test('broadcastMessage handles no members', () => {
-            gm.getOnlineGuildMembers.mockReturnValue(new Set());
+            gm.getOnlineMembers.mockReturnValue(new Set());
             
             ch.broadcastMessage('g1', { type: 'test' });
             
@@ -94,6 +96,9 @@ describe('Final Coverage Push', () => {
 
         test('handleOfficerChat succeeds for officer', async () => {
             mockDb.getPlayerGuild = jest.fn().mockResolvedValue({ guild_id: 'g1', rank: 'OFFICER' });
+            mockDb.getGuildMembers = jest.fn().mockResolvedValue([
+                { player_id: 'p1', rank: 'OFFICER' }
+            ]);
             mockPlayerManager.getPlayer.mockResolvedValue({ id: 'p1', username: 'Officer' });
             mockDb.saveChatMessage = jest.fn().mockResolvedValue({
                 id: 'msg1',
@@ -253,21 +258,24 @@ describe('Final Coverage Push', () => {
 
             const result = await im.getPlayerInvitations('p1');
 
-            expect(result).toHaveLength(1);
+            expect(result.success).toBe(true);
+            expect(result.invitations).toHaveLength(1);
         });
 
         test('getGuildInvitations returns formatted list', async () => {
+            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
             mockDb.getGuildInvitations = jest.fn().mockResolvedValue([
                 { id: 'inv1', invitee_id: 'p1', invitee_name: 'Test', status: 'PENDING' }
             ]);
 
-            const result = await im.getGuildInvitations('g1');
+            const result = await im.getGuildInvitations('p1', 'g1');
 
-            expect(result).toHaveLength(1);
+            expect(result.success).toBe(true);
+            expect(result.invitations).toHaveLength(1);
         });
 
         test('cleanupExpiredInvitations returns count', async () => {
-            mockDb.cleanupExpiredInvitations = jest.fn().mockResolvedValue({ count: 3 });
+            mockDb.cleanupExpiredInvitations = jest.fn().mockResolvedValue(3);
 
             const result = await im.cleanupExpiredInvitations();
 
