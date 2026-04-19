@@ -28,6 +28,8 @@ describe('Specific Lines Coverage Tests', () => {
             getChatHistory: jest.fn(),
             createGuild: jest.fn(),
             createInvitation: jest.fn(),
+            countGuildInvitations: jest.fn(),
+            countPlayerInvitations: jest.fn(),
             getInvitationById: jest.fn(),
             getPlayerInvitations: jest.fn(),
             respondToInvitation: jest.fn(),
@@ -152,7 +154,7 @@ describe('Specific Lines Coverage Tests', () => {
             const result = await ch.getChatHistory('p1', 50);
 
             expect(result.success).toBe(true);
-            expect(result.messages).toHaveLength(1);
+            expect(result.history).toHaveLength(1);
         });
     });
 
@@ -234,14 +236,32 @@ describe('Specific Lines Coverage Tests', () => {
             expect(gm.emit).toHaveBeenCalledWith('initialized');
         });
 
-        test('setPlayerOnline adds to cache', () => {
-            gm.setPlayerOnline('g1', 'p1');
+        test('setPlayerOnline adds to cache', async () => {
+            // Mock getPlayerGuild to return player is in guild g1
+            mockDb.get.mockImplementation((sql, params, callback) => {
+                if (sql.includes('FROM guild_members gm') && sql.includes('gm.player_id =')) {
+                    callback(null, { guild_id: 'g1', player_id: 'p1', rank: 'MEMBER' });
+                } else {
+                    callback(null, null);
+                }
+            });
+            
+            await gm.setPlayerOnline('g1', 'p1');
             expect(gm.isPlayerOnline('g1', 'p1')).toBe(true);
         });
 
-        test('setPlayerOffline removes from cache', () => {
-            gm.setPlayerOnline('g1', 'p1');
-            gm.setPlayerOffline('g1', 'p1');
+        test('setPlayerOffline removes from cache', async () => {
+            // Mock getPlayerGuild to return player is in guild g1
+            mockDb.get.mockImplementation((sql, params, callback) => {
+                if (sql.includes('FROM guild_members gm') && sql.includes('gm.player_id =')) {
+                    callback(null, { guild_id: 'g1', player_id: 'p1', rank: 'MEMBER' });
+                } else {
+                    callback(null, null);
+                }
+            });
+            
+            await gm.setPlayerOnline('g1', 'p1');
+            await gm.setPlayerOffline('g1', 'p1');
             expect(gm.isPlayerOnline('g1', 'p1')).toBe(false);
         });
     });
@@ -273,44 +293,49 @@ describe('Specific Lines Coverage Tests', () => {
         test('notifyPlayerOfInvitation sends correct format', () => {
             const invitation = {
                 id: 'inv1',
-                guild_id: 'g1',
-                guild_name: 'Test Guild',
-                guild_tag: 'TST',
-                inviter_name: 'Leader'
+                created_at: new Date().toISOString(),
+                expires_at: new Date(Date.now() + 86400000).toISOString()
+            };
+            const guild = {
+                id: 'g1',
+                name: 'Test Guild',
+                tag: 'TST',
+                memberCount: 5,
+                maxMembers: 100
             };
 
-            im.notifyPlayerOfInvitation('p1', invitation);
+            im.notifyPlayerOfInvitation('p1', invitation, guild, 'p2');
 
             expect(mockPlayerManager.sendToPlayer).toHaveBeenCalledWith('p1', expect.objectContaining({
-                type: 'guild:invitation_received',
-                invitation: expect.objectContaining({
-                    id: 'inv1',
+                type: 'guild:invited',
+                data: expect.objectContaining({
+                    invitationId: 'inv1',
                     guildId: 'g1',
                     guildName: 'Test Guild',
-                    guildTag: 'TST',
-                    inviterName: 'Leader'
+                    guildTag: 'TST'
                 })
             }));
         });
 
-        test('formatInvitation handles null values', () => {
-            const raw = {
+        test('formatInvitation handles basic values', () => {
+            const invitation = {
                 id: 'inv1',
-                guild_id: null,
-                guild_name: null,
-                guild_tag: null,
-                inviter_id: null,
-                inviter_name: null,
-                invitee_id: null,
-                invitee_name: null,
-                created_at: null,
-                expires_at: null,
-                status: null
+                created_at: new Date().toISOString(),
+                expires_at: new Date(Date.now() + 86400000).toISOString(),
+                status: 'PENDING'
+            };
+            const guild = {
+                id: 'g1',
+                name: 'Test Guild',
+                tag: 'TST'
             };
 
-            const formatted = im.formatInvitation(raw);
+            const formatted = im.formatInvitation(invitation, guild);
 
             expect(formatted).toHaveProperty('id', 'inv1');
+            expect(formatted).toHaveProperty('guildId', 'g1');
+            expect(formatted).toHaveProperty('guildName', 'Test Guild');
+            expect(formatted).toHaveProperty('guildTag', 'TST');
         });
 
         test('acceptInvitation handles db error', async () => {
@@ -345,6 +370,28 @@ describe('Specific Lines Coverage Tests', () => {
 
     describe('Integration Tests', () => {
         test('full guild workflow', async () => {
+            // Setup mockDb.get to handle both getGuildByName/getGuildByTag and getGuildById
+            mockDb.get.mockImplementation((sql, params, callback) => {
+                if (sql.includes('LOWER(name)')) {
+                    callback(null, null); // No existing guild with this name
+                } else if (sql.includes('tag = UPPER')) {
+                    callback(null, null); // No existing guild with this tag
+                } else if (sql.includes('FROM guilds g') && sql.includes('WHERE g.id =')) {
+                    // Return guild after creation
+                    callback(null, { 
+                        id: 'g1', 
+                        name: 'Test', 
+                        tag: 'TST', 
+                        leader_id: 'p1',
+                        member_count: 1 
+                    });
+                } else if (sql.includes('FROM guild_members gm') && sql.includes('gm.player_id =')) {
+                    callback(null, null); // Not in guild yet
+                } else {
+                    callback(null, null);
+                }
+            });
+            
             const db = new GuildDatabase(mockDb);
             const gm = new GuildManager(db, mockPlayerManager);
             gm.on = jest.fn();
@@ -352,24 +399,28 @@ describe('Specific Lines Coverage Tests', () => {
 
             // Create guild
             mockPlayerManager.getPlayer.mockResolvedValue({ id: 'p1', level: 15, gold: 15000 });
-            mockDb.getPlayerGuild.mockResolvedValue(null);
-            mockDb.getGuildByName.mockResolvedValue(null);
-            mockDb.getGuildByTag.mockResolvedValue(null);
             mockPlayerManager.updateGold.mockResolvedValue(true);
-            mockDb.createGuild.mockResolvedValue({
-                id: 'g1',
-                name: 'Test',
-                tag: 'TST',
-                leaderId: 'p1'
-            });
 
             const createResult = await gm.createGuild('p1', { name: 'Test', tag: 'TST' });
             expect(createResult.success).toBe(true);
 
-            // Get guild info
-            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
-            mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Test', member_count: 1 });
-            mockDb.getGuildMembers.mockResolvedValue([{ player_id: 'p1', rank: 'LEADER' }]);
+            // Get guild info - now player is in guild
+            mockDb.get.mockImplementation((sql, params, callback) => {
+                if (sql.includes('FROM guild_members gm') && sql.includes('gm.player_id =')) {
+                    callback(null, { guild_id: 'g1', player_id: 'p1', rank: 'LEADER' });
+                } else if (sql.includes('FROM guilds g') && sql.includes('WHERE g.id =')) {
+                    callback(null, { id: 'g1', name: 'Test', leader_id: 'p1', member_count: 1 });
+                } else {
+                    callback(null, null);
+                }
+            });
+            mockDb.all.mockImplementation((sql, params, callback) => {
+                if (sql.includes('FROM guild_members') && sql.includes('gm.guild_id')) {
+                    callback(null, [{ player_id: 'p1', rank: 'LEADER' }]);
+                } else {
+                    callback(null, []);
+                }
+            });
 
             const infoResult = await gm.getPlayerGuildInfo('p1');
             expect(infoResult.success).toBe(true);
