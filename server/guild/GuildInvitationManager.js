@@ -419,8 +419,10 @@ class GuildInvitationManager {
             if (expired > 0) {
                 console.log(`  → Expired ${expired} invitations`);
             }
+            return { success: true, count: expired || 0 };
         } catch (error) {
             console.error('Error cleaning up invitations:', error);
+            return { success: false, error: error.message };
         }
     }
 }

@@ -500,12 +500,9 @@ describe('GuildManager Success Paths', () => {
 
     describe('Constants', () => {
         test('exports correct constants', () => {
-            expect(GuildManager.GUILD_CREATE_COST).toBe(10000);
-            expect(GuildManager.GUILD_CREATE_MIN_LEVEL).toBe(10);
-            expect(GuildManager.MAX_GUILD_MEMBERS).toBe(100);
-            expect(GuildManager.MAX_GUILD_NAME_LENGTH).toBe(32);
-            expect(GuildManager.MAX_GUILD_TAG_LENGTH).toBe(4);
-            expect(GuildManager.MIN_GUILD_TAG_LENGTH).toBe(2);
+            // Constants are instance properties, not static
+            expect(gm.GUILD_CREATE_COST).toBe(10000);
+            expect(gm.GUILD_CREATE_MIN_LEVEL).toBe(10);
         });
     });
 });

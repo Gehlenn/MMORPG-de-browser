@@ -135,9 +135,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  console.log.mockRestore();
-  console.warn.mockRestore();
-  console.error.mockRestore();
+  console.log.mockRestore?.();
+  console.warn.mockRestore?.();
+  console.error.mockRestore?.();
 });
 
 // Set up global test helpers
