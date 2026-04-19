@@ -8,18 +8,30 @@ const GuildManager = require('../GuildManager');
 describe('GuildManager New Methods', () => {
     let mockDb, mockPlayerManager, gm;
 
+    // Default mock implementation for SQLite get
+    const defaultMockGet = jest.fn((sql, params, callback) => {
+        // Return guild data for getGuildById queries
+        if (sql.includes('FROM guilds') && sql.includes('WHERE g.id =')) {
+            callback(null, { id: 'g1', name: 'Test Guild', tag: 'TST', leader_id: 'p1' });
+        } else if (sql.includes('FROM guild_members') && sql.includes('gm.player_id =')) {
+            // getPlayerGuild - return null by default (player not in guild)
+            callback(null, null);
+        } else if (sql.includes('WHERE LOWER(name) = LOWER')) {
+            // getGuildByName - return null by default (no existing guild)
+            callback(null, null);
+        } else if (sql.includes('WHERE tag = UPPER')) {
+            // getGuildByTag - return null by default (no existing guild)
+            callback(null, null);
+        } else {
+            callback(null, null);
+        }
+    });
+
     beforeEach(() => {
         jest.clearAllMocks();
         mockDb = {
             run: jest.fn((sql, params, callback) => callback.call({ lastID: 1, changes: 1 }, null)),
-            get: jest.fn((sql, params, callback) => {
-                // Return guild data for getGuildById queries
-                if (sql.includes('FROM guilds') && sql.includes('WHERE g.id =')) {
-                    callback(null, { id: 'g1', name: 'Test Guild', tag: 'TST', leader_id: 'p1' });
-                } else {
-                    callback(null, null);
-                }
-            }),
+            get: defaultMockGet,
             all: jest.fn((sql, params, callback) => callback(null, [])),
             getPlayerGuild: jest.fn(),
             getGuildById: jest.fn(),
@@ -47,7 +59,14 @@ describe('GuildManager New Methods', () => {
 
     describe('setPlayerOnline', () => {
         test('initializes cache and adds player', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'MEMBER' });
+            // Configure mockDb.get to return guild membership for getPlayerGuild query
+            mockDb.get = jest.fn((sql, params, callback) => {
+                if (sql.includes('FROM guild_members') && sql.includes('gm.player_id =')) {
+                    callback(null, { guild_id: 'g1', rank: 'MEMBER' });
+                } else {
+                    callback(null, null);
+                }
+            });
             mockDb.updateLastActive.mockResolvedValue(true);
 
             await gm.setPlayerOnline('g1', 'p1');
@@ -57,7 +76,14 @@ describe('GuildManager New Methods', () => {
         });
 
         test('adds to existing cache', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'MEMBER' });
+            // Configure mockDb.get to return guild membership for getPlayerGuild query
+            mockDb.get = jest.fn((sql, params, callback) => {
+                if (sql.includes('FROM guild_members') && sql.includes('gm.player_id =')) {
+                    callback(null, { guild_id: 'g1', rank: 'MEMBER' });
+                } else {
+                    callback(null, null);
+                }
+            });
             mockDb.updateLastActive.mockResolvedValue(true);
 
             await gm.setPlayerOnline('g1', 'p1');
@@ -69,7 +95,14 @@ describe('GuildManager New Methods', () => {
         });
 
         test('does nothing when player not in guild', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue(null);
+            // Configure mockDb.get to return null (player not in guild)
+            mockDb.get = jest.fn((sql, params, callback) => {
+                if (sql.includes('FROM guild_members') && sql.includes('gm.player_id =')) {
+                    callback(null, null); // Player not in guild
+                } else {
+                    callback(null, null);
+                }
+            });
 
             await gm.setPlayerOnline('g1', 'p1');
 
@@ -80,7 +113,14 @@ describe('GuildManager New Methods', () => {
 
     describe('setPlayerOffline', () => {
         test('removes player from cache', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'MEMBER' });
+            // Configure mockDb.get to return guild membership for getPlayerGuild query
+            mockDb.get = jest.fn((sql, params, callback) => {
+                if (sql.includes('FROM guild_members') && sql.includes('gm.player_id =')) {
+                    callback(null, { guild_id: 'g1', rank: 'MEMBER' });
+                } else {
+                    callback(null, null);
+                }
+            });
             mockDb.updateLastActive.mockResolvedValue(true);
 
             await gm.setPlayerOnline('g1', 'p1');
@@ -91,7 +131,14 @@ describe('GuildManager New Methods', () => {
         });
 
         test('emits offline event', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'MEMBER' });
+            // Configure mockDb.get to return guild membership for getPlayerGuild query
+            mockDb.get = jest.fn((sql, params, callback) => {
+                if (sql.includes('FROM guild_members') && sql.includes('gm.player_id =')) {
+                    callback(null, { guild_id: 'g1', rank: 'MEMBER' });
+                } else {
+                    callback(null, null);
+                }
+            });
 
             await gm.setPlayerOffline('g1', 'p1');
 
@@ -104,7 +151,14 @@ describe('GuildManager New Methods', () => {
 
     describe('isPlayerOnline', () => {
         test('returns true when player online', async () => {
-            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'MEMBER' });
+            // Configure mockDb.get to return guild membership for getPlayerGuild query
+            mockDb.get = jest.fn((sql, params, callback) => {
+                if (sql.includes('FROM guild_members') && sql.includes('gm.player_id =')) {
+                    callback(null, { guild_id: 'g1', rank: 'MEMBER' });
+                } else {
+                    callback(null, null);
+                }
+            });
             mockDb.updateLastActive.mockResolvedValue(true);
 
             await gm.setPlayerOnline('g1', 'p1');
@@ -123,11 +177,27 @@ describe('GuildManager New Methods', () => {
 
     describe('demoteMember', () => {
         test('calls promoteMember with same parameters', async () => {
-            mockDb.getPlayerGuild
-                .mockResolvedValueOnce({ guild_id: 'g1', rank: 'LEADER' })
-                .mockResolvedValueOnce({ guild_id: 'g1', rank: 'OFFICER' });
+            // Track calls to return different values for leader and target
+            let callCount = 0;
+            mockDb.get = jest.fn((sql, params, callback) => {
+                if (sql.includes('FROM guild_members') && sql.includes('gm.player_id =')) {
+                    callCount++;
+                    if (callCount === 1) {
+                        callback(null, { guild_id: 'g1', rank: 'LEADER' }); // Leader (p1)
+                    } else {
+                        callback(null, { guild_id: 'g1', rank: 'OFFICER' }); // Target (p2)
+                    }
+                } else if (sql.includes('FROM guilds') && sql.includes('WHERE g.id =')) {
+                    callback(null, { id: 'g1', name: 'Test', tag: 'TST', leader_id: 'p1' });
+                } else {
+                    callback(null, null);
+                }
+            });
             mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Test' });
             mockDb.updateMemberRank.mockResolvedValue(true);
+            mockPlayerManager.getPlayer
+                .mockResolvedValueOnce({ id: 'p1', username: 'Leader' })
+                .mockResolvedValueOnce({ id: 'p2', username: 'Target' });
 
             const result = await gm.demoteMember('p1', 'p2', 'MEMBER');
 
@@ -165,7 +235,14 @@ describe('GuildManager New Methods', () => {
 
         test('fails when already in guild', async () => {
             mockPlayerManager.getPlayer.mockResolvedValue({ id: 'p1', level: 15, gold: 15000 });
-            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'MEMBER' });
+            // Configure mockDb.get to return guild membership for getPlayerGuild query
+            mockDb.get = jest.fn((sql, params, callback) => {
+                if (sql.includes('FROM guild_members') && sql.includes('gm.player_id =')) {
+                    callback(null, { guild_id: 'g1', rank: 'MEMBER' }); // Player is in guild
+                } else {
+                    callback(null, null);
+                }
+            });
 
             const result = await gm.createGuild('p1', { name: 'Test', tag: 'TST' });
 
@@ -216,7 +293,16 @@ describe('GuildManager New Methods', () => {
         test('fails when name exists', async () => {
             mockPlayerManager.getPlayer.mockResolvedValue({ id: 'p1', level: 15, gold: 15000 });
             mockDb.getPlayerGuild.mockResolvedValue(null);
-            mockDb.getGuildByName.mockResolvedValue({ id: 'g2', name: 'Test' });
+            // Create new mock for this test that returns existing guild for getGuildByName
+            mockDb.get = jest.fn((sql, params, callback) => {
+                if (sql.includes('WHERE LOWER(name) = LOWER')) {
+                    callback(null, { id: 'g2', name: 'Test' }); // Existing guild
+                } else if (sql.includes('WHERE tag = UPPER')) {
+                    callback(null, null);
+                } else {
+                    callback(null, null);
+                }
+            });
 
             const result = await gm.createGuild('p1', { name: 'Test', tag: 'TST' });
 
@@ -227,8 +313,16 @@ describe('GuildManager New Methods', () => {
         test('fails when tag exists', async () => {
             mockPlayerManager.getPlayer.mockResolvedValue({ id: 'p1', level: 15, gold: 15000 });
             mockDb.getPlayerGuild.mockResolvedValue(null);
-            mockDb.getGuildByName.mockResolvedValue(null);
-            mockDb.getGuildByTag.mockResolvedValue({ id: 'g2', tag: 'TST' });
+            // Create new mock for this test that returns existing guild for getGuildByTag
+            mockDb.get = jest.fn((sql, params, callback) => {
+                if (sql.includes('WHERE LOWER(name) = LOWER')) {
+                    callback(null, null);
+                } else if (sql.includes('WHERE tag = UPPER')) {
+                    callback(null, { id: 'g2', tag: 'TST' }); // Existing guild
+                } else {
+                    callback(null, null);
+                }
+            });
 
             const result = await gm.createGuild('p1', { name: 'Test', tag: 'TST' });
 
