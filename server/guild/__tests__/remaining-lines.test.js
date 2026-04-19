@@ -6,6 +6,7 @@
  */
 
 const GuildChatHandler = require('../GuildChatHandler');
+const GuildDatabase = require('../GuildDatabase');
 const GuildManager = require('../GuildManager');
 
 describe('Remaining Uncovered Lines', () => {
@@ -96,9 +97,24 @@ describe('Remaining Uncovered Lines', () => {
 
         beforeEach(() => {
             mockDb = {
+                run: jest.fn((sql, params, callback) => callback.call({ lastID: 1, changes: 1 }, null)),
+                get: jest.fn((sql, params, callback) => {
+                    if (sql.includes('FROM guild_invitations') && sql.includes('WHERE id =')) {
+                        callback(null, { id: 'inv1', guild_id: 'g1', invitee_id: 'p1', status: 'ACCEPTED' });
+                    } else if (sql.includes('FROM guild_members') && sql.includes('WHERE player_id =')) {
+                        callback(null, null); // Player not in guild yet
+                    } else if (sql.includes('SELECT COUNT(*)') && sql.includes('FROM guild_members')) {
+                        callback(null, { count: 5 }); // 5 members
+                    } else if (sql.includes('SELECT max_members FROM guilds')) {
+                        callback(null, { max_members: 100 }); // Max 100 members
+                    } else {
+                        callback(null, null);
+                    }
+                }),
+                all: jest.fn((sql, params, callback) => callback(null, [])),
                 getPlayerGuild: jest.fn(),
                 getGuildById: jest.fn(),
-                respondToInvitation: jest.fn(),
+                respondToInvitation: jest.fn().mockResolvedValue({ id: 'inv1', guild_id: 'g1', status: 'ACCEPTED' }),
                 getGuildMembers: jest.fn(),
                 removeMember: jest.fn(),
                 addGuildMember: jest.fn(),
@@ -127,18 +143,13 @@ describe('Remaining Uncovered Lines', () => {
         });
 
         test('respondToInvitation adds to online cache when accepted (line 250)', async () => {
-            mockDb.respondToInvitation.mockResolvedValue({
-                id: 'inv1',
-                guild_id: 'g1',
-                status: 'ACCEPTED'
-            });
-            mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Test' });
+            mockDb.getGuildById.mockResolvedValue({ id: 'g1', name: 'Test', tag: 'TST' });
 
             // Online cache doesn't exist yet
             expect(gm.onlineMembers.has('g1')).toBe(false);
 
             const result = await gm.respondToInvitation('p1', 'inv1', true);
-
+            
             expect(result.success).toBe(true);
             // Should create the cache and add player
             expect(gm.onlineMembers.has('g1')).toBe(true);
