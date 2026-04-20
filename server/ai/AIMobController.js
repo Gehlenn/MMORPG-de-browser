@@ -278,6 +278,7 @@ class AIMobController {
         this.memorySystem.delete(mobId);
         
         console.log(`[AIMobController] Mob ${mobId} removido do AI system`);
+        return true;
     }
     
     /**
