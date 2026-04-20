@@ -107,8 +107,23 @@ describe('GuildChatHandler remaining lines', () => {
     });
 
     describe('Lines 269-276 - broadcastOfficerMessage', () => {
-        test.skip('broadcastOfficerMessage sends to online officers (lines 269-276) - TODO: fix mock', async () => {
-            // This test is skipped due to mock issues - will address later
+        test('broadcastOfficerMessage sends to online officers (lines 269-276)', async () => {
+            // Mock guild members - 2 officers (1 online, 1 offline) and 1 member
+            mockDb.getGuildMembers.mockResolvedValue([
+                { player_id: 'p1', rank: 'LEADER' },
+                { player_id: 'p2', rank: 'OFFICER' },
+                { player_id: 'p3', rank: 'MEMBER' }
+            ]);
+            // Only p1 (LEADER) is online
+            mockGuildManager.getOnlineMembers.mockReturnValue(new Set(['p1']));
+
+            const messageData = { type: 'test', data: 'message' };
+            await ch.broadcastOfficerMessage('g1', messageData);
+
+            // Should send only to online leader (p1), not to offline officer (p2) or member (p3)
+            expect(mockGuildManager.playerManager.sendToPlayer).toHaveBeenCalledWith('p1', messageData);
+            expect(mockGuildManager.playerManager.sendToPlayer).not.toHaveBeenCalledWith('p2', expect.anything());
+            expect(mockGuildManager.playerManager.sendToPlayer).not.toHaveBeenCalledWith('p3', expect.anything());
         });
     });
 });

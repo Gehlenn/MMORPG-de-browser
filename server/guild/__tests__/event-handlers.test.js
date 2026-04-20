@@ -76,15 +76,6 @@ describe('Event Handlers Coverage', () => {
             expect(mockPlayerManager.sendToPlayer).toHaveBeenCalled();
         });
 
-        test.skip('guild:member_demoted sends system message', () => {
-            // Handler for guild:member_demoted is not implemented in GuildChatHandler
-            ch.initialize();
-            
-            gm.emit('guild:member_demoted', { guildId: 'g1', playerName: 'Demoted', newRank: 'MEMBER' });
-            
-            expect(mockPlayerManager.sendToPlayer).toHaveBeenCalled();
-        });
-
         test('guild:leadership_transferred sends system message', () => {
             ch.initialize();
             
@@ -172,22 +163,6 @@ describe('Event Handlers Coverage', () => {
     });
 
     describe('GuildInvitationManager Event Handlers', () => {
-        test.skip('player:online sends pending invitations', async () => {
-            // NOTE: player:online event handler is not implemented in GuildInvitationManager
-            im.initialize();
-            
-            mockDb.getPlayerInvitations.mockResolvedValue([
-                { id: 'inv1', guild_id: 'g1', guild_name: 'Test', status: 'PENDING' }
-            ]);
-
-            gm.emit('player:online', { playerId: 'p1' });
-            
-            // Wait for async
-            await new Promise(resolve => setTimeout(resolve, 10));
-            
-            expect(mockPlayerManager.sendToPlayer).toHaveBeenCalled();
-        });
-
         test('player:offline does nothing', () => {
             im.initialize();
             
@@ -224,17 +199,6 @@ describe('Event Handlers Coverage', () => {
 
             expect(result.success).toBe(false);
             expect(result.error).toContain('already in a guild');
-        });
-
-        test.skip('createInvitation fails when invitee not found', async () => {
-            // NOTE: createInvitation does not verify if invitee exists - it uses ID directly
-            mockDb.getPlayerGuild.mockResolvedValue({ guild_id: 'g1', rank: 'LEADER' });
-            mockPlayerManager.getPlayerByUsername.mockResolvedValue(null);
-
-            const result = await im.createInvitation('g1', 'p1', 'Nonexistent');
-
-            expect(result.success).toBe(false);
-            expect(result.error).toContain('not found');
         });
 
         test('createInvitation fails when guild full', async () => {
