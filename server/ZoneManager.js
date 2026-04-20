@@ -219,6 +219,15 @@ class ZoneManager {
     }
     
     /**
+     * Obtém mobs em uma zona
+     */
+    getMobsInZone(zoneId) {
+        const zone = this.zones.get(zoneId);
+        if (!zone) return [];
+        return zone.currentMobs || [];
+    }
+    
+    /**
      * Adiciona um mob a uma zona
      */
     addMobToZone(mobId, zoneId, position) {

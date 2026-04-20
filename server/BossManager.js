@@ -637,6 +637,19 @@ class BossManager {
         
         return Math.floor(totalInterval / (history.length - 1));
     }
+    
+    /**
+     * Calcula tempo de respawn para um tipo de boss
+     */
+    calculateRespawnTime(bossType) {
+        const definition = this.bossDefinitions[bossType];
+        if (!definition) {
+            console.warn(`[BossManager] Tipo de boss desconhecido: ${bossType}`);
+            return 0;
+        }
+        
+        return definition.respawnTime || 1800000; // Default 30 minutos
+    }
 }
 
 module.exports = BossManager;

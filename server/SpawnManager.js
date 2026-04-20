@@ -20,28 +20,35 @@ class SpawnManager {
             spawnAnimationDuration: 1000 // 1 segundo
         };
         
-        // Zone definitions
+        // Zone definitions - matching ZoneManager
         this.zones = {
-            'zone_1': {
-                name: 'Forest Zone',
+            'zone_forest': {
+                name: 'Floresta Verdejante',
                 levelRange: [1, 5],
                 mobTypes: ['goblin', 'wolf'],
                 limit: 8,
-                bounds: { x: 0, y: 0, width: 400, height: 300 }
+                bounds: { x: 0, y: 0, width: 500, height: 400 }
             },
-            'zone_2': {
-                name: 'Mountain Zone',
+            'zone_mountain': {
+                name: 'Montanhas Rochosas',
                 levelRange: [6, 10],
                 mobTypes: ['orc', 'hobgoblin'],
                 limit: 6,
-                bounds: { x: 400, y: 0, width: 400, height: 300 }
+                bounds: { x: 500, y: 0, width: 500, height: 400 }
             },
-            'zone_3': {
-                name: 'Dark Zone',
+            'zone_swamp': {
+                name: 'Pântano Sombrio',
+                levelRange: [8, 12],
+                mobTypes: ['swamp_creature', 'poison_frog'],
+                limit: 5,
+                bounds: { x: 0, y: 400, width: 500, height: 400 }
+            },
+            'zone_dark': {
+                name: 'Terras Escuras',
                 levelRange: [11, 15],
                 mobTypes: ['troll', 'ogre'],
                 limit: 4,
-                bounds: { x: 800, y: 0, width: 400, height: 300 }
+                bounds: { x: 500, y: 400, width: 500, height: 400 }
             }
         };
         

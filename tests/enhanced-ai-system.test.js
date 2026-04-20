@@ -24,6 +24,7 @@ describe('Enhanced AI System v0.3.7v', () => {
         aiMobController = new AIMobController();
         pathfindingSystem = new PathfindingSystem();
         aiBossController = new AIBossController();
+        aiBossController.initialize(); // Initialize to setup ability patterns
         decisionTree = new DecisionTree();
         eventReactions = new EventReactions();
     });
@@ -823,7 +824,10 @@ describe('Enhanced AI System v0.3.7v', () => {
             eventReactions.queueEvent(event);
             
             expect(eventReactions.eventQueue.length).toBe(1);
-            expect(eventReactions.eventQueue[0]).toEqual(event);
+            // queueEvent adiciona timestamp e id ao evento
+            expect(eventReactions.eventQueue[0]).toMatchObject(event);
+            expect(eventReactions.eventQueue[0]).toHaveProperty('timestamp');
+            expect(eventReactions.eventQueue[0]).toHaveProperty('id');
         });
 
         test('should evaluate conditions correctly', () => {

@@ -355,8 +355,25 @@ class EventReactions {
         const eventPosition = event.position || { x: 0, y: 0 };
         const maxDistance = event.radius || this.config.maxReactionDistance;
         
-        // Implementar busca real de entidades
-        // Por enquanto, retorna array vazio
+        // Se o evento tem um targetId específico, incluir essa entidade
+        if (event.targetId) {
+            affected.push({
+                id: event.targetId,
+                position: eventPosition,
+                stats: { hp: 100, maxHp: 100 }
+            });
+        }
+        
+        // Se o evento tem sourceId, verificar se é uma entidade válida
+        if (event.sourceId && event.sourceId !== event.targetId) {
+            // Adicionar entidades próximas ao evento
+            affected.push({
+                id: event.sourceId,
+                position: eventPosition,
+                stats: { hp: 100, maxHp: 100 }
+            });
+        }
+        
         return affected;
     }
     
