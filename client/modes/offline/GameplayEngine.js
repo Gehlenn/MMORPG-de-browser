@@ -1057,14 +1057,12 @@ class IntegratedGameplayEngine {
         }
         
         // Calcular nova posição
-        const newX = this.player.x + dx * this.player.speed;
-        const newY = this.player.y + dy * this.player.speed;
+        const moveSpeed = this.keys['shift'] ? this.player.speed * 1.5 : this.player.speed;
+        const deltaX = dx * moveSpeed;
+        const deltaY = dy * moveSpeed;
         
-        // Verificar colisões
-        if (!this.checkCollision(newX, newY, this.player.width, this.player.height)) {
-            this.player.x = newX;
-            this.player.y = newY;
-        }
+        // Verificar colisões com sliding em eixos separados
+        this.handleMovementWithSliding(deltaX, deltaY);
         
         // Atualizar facing
         if (dx > 0) this.player.facing = 'right';
@@ -1816,6 +1814,44 @@ class IntegratedGameplayEngine {
             this.ctx.fillText(`Player: (${Math.round(this.player.x)}, ${Math.round(this.player.y)})`, 10, 35);
             this.ctx.fillText(`Mobs: ${this.mobs.length}`, 10, 50);
             this.ctx.fillText(`Camera: (${Math.round(this.camera.x)}, ${Math.round(this.camera.y)})`, 10, 65);
+            this.ctx.fillText(`Collision: ${this.checkCollisionWithAll(this.player.x, this.player.y, this.player.width, this.player.height) ? 'YES' : 'NO'}`, 10, 80);
+            this.ctx.fillText('Press F1 to toggle debug', 10, this.canvas.height - 10);
+        }
+        
+        // Debug visual de colisões (sobreposto ao mundo)
+        if (this.config.debug && this.player) {
+            // Salvar contexto para desenhar no espaço do mundo
+            this.ctx.save();
+            this.ctx.translate(-this.camera.x, -this.camera.y);
+            
+            // Hitbox do player (verde = livre, vermelho = colidindo)
+            const hitbox = this.getPlayerHitbox();
+            const isColliding = this.checkCollisionWithAll(this.player.x, this.player.y, this.player.width, this.player.height);
+            this.ctx.strokeStyle = isColliding ? '#ff0000' : '#00ff00';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(hitbox.x, hitbox.y, hitbox.width, hitbox.height);
+            
+            // Visual hitbox (amarelo - o que o jogador vê)
+            this.ctx.strokeStyle = '#ffff00';
+            this.ctx.setLineDash([5, 5]);
+            this.ctx.strokeRect(this.player.x, this.player.y, this.player.width, this.player.height);
+            this.ctx.setLineDash([]);
+            
+            // Hitboxes de mobs
+            this.ctx.strokeStyle = '#ff6600';
+            for (const mob of this.mobs.slice(0, 5)) { // Limitar a 5 para não poluir
+                this.ctx.strokeRect(mob.x, mob.y, mob.width || 32, mob.height || 32);
+            }
+            
+            // Hitboxes de obstáculos próximos
+            this.ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+            for (const obstacle of this.map.obstacles.slice(0, 20)) {
+                if (this.isOnScreen(obstacle.x, obstacle.y, 50)) {
+                    this.ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+                }
+            }
+            
+            this.ctx.restore();
         }
     }
 
@@ -1833,24 +1869,116 @@ class IntegratedGameplayEngine {
                y <= this.camera.y + this.canvas.height + margin;
     }
 
-    checkCollision(x, y, width, height) {
-        // Verificar colisão com obstáculos
+    handleMovementWithSliding(deltaX, deltaY) {
+        const hitbox = this.getPlayerHitbox();
+        let canMoveX = true;
+        let canMoveY = true;
+        
+        // Tentar mover em X primeiro
+        if (deltaX !== 0) {
+            const testX = this.player.x + deltaX;
+            if (this.checkCollisionWithAll(testX, this.player.y, hitbox.width, hitbox.height)) {
+                canMoveX = false;
+            }
+        }
+        
+        // Tentar mover em Y depois
+        if (deltaY !== 0) {
+            const testY = this.player.y + deltaY;
+            if (this.checkCollisionWithAll(this.player.x, testY, hitbox.width, hitbox.height)) {
+                canMoveY = false;
+            }
+        }
+        
+        // Se ambos bloqueados, tentar com posição combinada (canto)
+        if (!canMoveX && !canMoveY && deltaX !== 0 && deltaY !== 0) {
+            const testX = this.player.x + deltaX;
+            const testY = this.player.y + deltaY;
+            if (!this.checkCollisionWithAll(testX, testY, hitbox.width, hitbox.height)) {
+                canMoveX = true;
+                canMoveY = true;
+            }
+        }
+        
+        // Aplicar movimento
+        if (canMoveX) this.player.x += deltaX;
+        if (canMoveY) this.player.y += deltaY;
+        
+        // Retornar se houve colisão para feedback visual/sonoro
+        return { blockedX: !canMoveX && deltaX !== 0, blockedY: !canMoveY && deltaY !== 0 };
+    }
+    
+    getPlayerHitbox() {
+        // Hitbox ligeiramente menor que o visual para melhor UX
+        const margin = 4;
+        return {
+            x: this.player.x + margin,
+            y: this.player.y + margin,
+            width: this.player.width - margin * 2,
+            height: this.player.height - margin * 2
+        };
+    }
+    
+    checkCollisionWithAll(x, y, width, height) {
+        return this.checkObstacleCollision(x, y, width, height) ||
+               this.checkEntityCollision(x, y, width, height) ||
+               this.checkMapBounds(x, y, width, height);
+    }
+    
+    checkObstacleCollision(x, y, width, height) {
+        // Verificar colisão com obstáculos (com pequena margem)
+        const buffer = 2;
         for (const obstacle of this.map.obstacles) {
-            if (x < obstacle.x + obstacle.width &&
-                x + width > obstacle.x &&
-                y < obstacle.y + obstacle.height &&
-                y + height > obstacle.y) {
+            if (x + buffer < obstacle.x + obstacle.width &&
+                x + width - buffer > obstacle.x &&
+                y + buffer < obstacle.y + obstacle.height &&
+                y + height - buffer > obstacle.y) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    checkEntityCollision(x, y, width, height) {
+        // Verificar colisão com mobs
+        for (const mob of this.mobs) {
+            if (mob.x < x + width && mob.x + mob.width > x &&
+                mob.y < y + height && mob.y + mob.height > y) {
                 return true;
             }
         }
         
-        // Verificar limites do mapa
-        if (x < 0 || x + width > this.map.width ||
-            y < 0 || y + height > this.map.height) {
-            return true;
+        // Verificar colisão com NPCs
+        for (const npc of this.npcs) {
+            if (npc.x < x + width && npc.x + npc.width > x &&
+                npc.y < y + height && npc.y + npc.height > y) {
+                return true;
+            }
+        }
+        
+        // Verificar colisão com outros jogadores
+        for (const player of this.remotePlayers) {
+            if (player.x < x + width && player.x + (player.width || 32) > x &&
+                player.y < y + height && player.y + (player.height || 32) > y) {
+                return true;
+            }
         }
         
         return false;
+    }
+    
+    checkMapBounds(x, y, width, height) {
+        // Verificar limites do mapa com margem
+        const margin = 5;
+        return x < margin || 
+               x + width > this.map.width - margin ||
+               y < margin || 
+               y + height > this.map.height - margin;
+    }
+    
+    checkCollision(x, y, width, height) {
+        // Método legado - manter para compatibilidade
+        return this.checkCollisionWithAll(x, y, width, height);
     }
     
     handleKeyDown(key) {
