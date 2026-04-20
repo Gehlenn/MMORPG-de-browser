@@ -417,35 +417,211 @@ class NPCSystem {
     }
   }
 
-  renderNPCs(ctx, camera) {
+  renderNPCs(ctx, camera, playerX, playerY) {
+    // Calcular tempo para animações
+    const time = Date.now() / 1000;
+    
     for (const [id, npc] of this.npcs) {
       const screenX = npc.position.x - camera.x + ctx.canvas.width / 2;
       const screenY = npc.position.y - camera.y + ctx.canvas.height / 2 + (npc.animation?.offset || 0);
 
-      // Draw NPC
+      // Verificar se player está próximo
+      const canInteract = playerX !== undefined && playerY !== undefined && 
+                         this.canInteractWithNPC(playerX, playerY, npc);
+      
+      // Efeito de pulso se pode interagir
+      let pulseScale = 1;
+      let glowIntensity = 0;
+      if (canInteract) {
+        pulseScale = 1 + Math.sin(time * 4) * 0.05;
+        glowIntensity = 0.3 + Math.sin(time * 4) * 0.2;
+      }
+
+      // Glow effect quando pode interagir
+      if (canInteract) {
+        ctx.save();
+        ctx.shadowColor = '#FFD700';
+        ctx.shadowBlur = 15 + Math.sin(time * 4) * 5;
+        ctx.fillStyle = `rgba(255, 215, 0, ${glowIntensity})`;
+        ctx.fillRect(
+          screenX - (npc.appearance.size * pulseScale)/2 - 4, 
+          screenY - (npc.appearance.size * pulseScale)/2 - 4, 
+          npc.appearance.size * pulseScale + 8, 
+          npc.appearance.size * pulseScale + 8
+        );
+        ctx.restore();
+      }
+
+      // Draw NPC (com escala de pulso)
       ctx.fillStyle = npc.appearance.color;
-      ctx.fillRect(screenX - npc.appearance.size/2, screenY - npc.appearance.size/2, npc.appearance.size, npc.appearance.size);
+      ctx.fillRect(
+        screenX - (npc.appearance.size * pulseScale)/2, 
+        screenY - (npc.appearance.size * pulseScale)/2, 
+        npc.appearance.size * pulseScale, 
+        npc.appearance.size * pulseScale
+      );
       
       // Draw border
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(screenX - npc.appearance.size/2, screenY - npc.appearance.size/2, npc.appearance.size, npc.appearance.size);
+      ctx.strokeStyle = canInteract ? '#FFD700' : '#000000';
+      ctx.lineWidth = canInteract ? 3 : 2;
+      ctx.strokeRect(
+        screenX - (npc.appearance.size * pulseScale)/2, 
+        screenY - (npc.appearance.size * pulseScale)/2, 
+        npc.appearance.size * pulseScale, 
+        npc.appearance.size * pulseScale
+      );
       
       // Draw symbol
       ctx.fillStyle = '#FFFFFF';
       ctx.font = '16px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText(npc.appearance.symbol, screenX, screenY - npc.appearance.size/2 - 5);
+      ctx.fillText(npc.appearance.symbol, screenX, screenY - npc.appearance.size/2 - 8);
       
       // Draw name
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '12px Arial';
+      ctx.fillStyle = canInteract ? '#FFD700' : '#FFFFFF';
+      ctx.font = canInteract ? 'bold 12px Arial' : '12px Arial';
       ctx.fillText(npc.name, screenX, screenY + npc.appearance.size/2 + 15);
       
       // Draw title
       ctx.fillStyle = '#FFD700';
       ctx.font = '10px Arial';
       ctx.fillText(npc.title, screenX, screenY + npc.appearance.size/2 + 28);
+      
+      // Indicador "Pressione E" flutuante
+      if (canInteract) {
+        this.renderInteractionPrompt(ctx, screenX, screenY - npc.appearance.size/2 - 35, time);
+      }
+      
+      // Renderizar speech bubble se NPC estiver falando
+      if (npc.speechBubble) {
+        this.renderSpeechBubble(ctx, screenX, screenY - npc.appearance.size/2 - 45, npc.speechBubble);
+      }
+    }
+  }
+  
+  renderInteractionPrompt(ctx, x, y, time) {
+    const bounce = Math.sin(time * 6) * 3;
+    const text = 'Pressione E';
+    
+    ctx.font = 'bold 11px Arial';
+    const metrics = ctx.measureText(text);
+    const padding = 8;
+    const width = metrics.width + padding * 2;
+    const height = 22;
+    
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(x - width/2, y + bounce - height/2, width, height, 4);
+    ctx.fill();
+    
+    // Border
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Seta para baixo
+    ctx.beginPath();
+    ctx.moveTo(x - 6, y + bounce + height/2);
+    ctx.lineTo(x, y + bounce + height/2 + 6);
+    ctx.lineTo(x + 6, y + bounce + height/2);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fill();
+    ctx.stroke();
+    
+    // Texto
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y + bounce);
+  }
+  
+  renderSpeechBubble(ctx, x, y, bubble) {
+    const time = Date.now();
+    const age = time - bubble.startTime;
+    const maxAge = bubble.duration || 3000;
+    
+    // Fade out
+    if (age > maxAge - 500) {
+      ctx.globalAlpha = (maxAge - age) / 500;
+    }
+    
+    ctx.font = '12px Arial';
+    const lines = this.wrapText(ctx, bubble.text, 150);
+    const lineHeight = 16;
+    const padding = 10;
+    const width = 160;
+    const height = lines.length * lineHeight + padding * 2;
+    
+    const bubbleX = x - width/2;
+    const bubbleY = y - height;
+    
+    // Background
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.beginPath();
+    ctx.roundRect(bubbleX, bubbleY, width, height, 8);
+    ctx.fill();
+    
+    // Border
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Seta
+    ctx.beginPath();
+    ctx.moveTo(x - 8, bubbleY + height);
+    ctx.lineTo(x, bubbleY + height + 8);
+    ctx.lineTo(x + 8, bubbleY + height);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.fill();
+    ctx.stroke();
+    
+    // Texto
+    ctx.fillStyle = '#333';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    lines.forEach((line, i) => {
+      ctx.fillText(line, x, bubbleY + padding + lineHeight/2 + i * lineHeight);
+    });
+    
+    ctx.globalAlpha = 1;
+  }
+  
+  wrapText(ctx, text, maxWidth) {
+    const words = text.split(' ');
+    const lines = [];
+    let currentLine = words[0];
+    
+    for (let i = 1; i < words.length; i++) {
+      const width = ctx.measureText(currentLine + ' ' + words[i]).width;
+      if (width < maxWidth) {
+        currentLine += ' ' + words[i];
+      } else {
+        lines.push(currentLine);
+        currentLine = words[i];
+      }
+    }
+    lines.push(currentLine);
+    return lines;
+  }
+  
+  showNPCSpeech(npcId, text, duration = 3000) {
+    const npc = this.npcs.get(npcId);
+    if (npc) {
+      npc.speechBubble = {
+        text,
+        startTime: Date.now(),
+        duration
+      };
+      
+      // Auto-remove após duração
+      setTimeout(() => {
+        if (npc.speechBubble && npc.speechBubble.text === text) {
+          npc.speechBubble = null;
+        }
+      }, duration);
     }
   }
 }

@@ -967,6 +967,11 @@ class IntegratedGameplayEngine {
             this.advancedMobSystem.update(deltaTime * 1000, this.player);
         }
         
+        // NOVO: Update NPCSystem (animações e speech bubbles)
+        if (this.npcSystem) {
+            this.npcSystem.updateNPCs(deltaTime);
+        }
+        
         // Update HUD
         this.updateHUD();
         
@@ -1218,6 +1223,11 @@ class IntegratedGameplayEngine {
         
         // Renderizar entidades
         this.renderEntities();
+        
+        // Renderizar NPCs (NOVO: com sistema de interação visual)
+        if (this.npcSystem) {
+            this.npcSystem.renderNPCs(this.ctx, this.camera, this.player?.x, this.player?.y);
+        }
         
         // Renderizar mobs
         this.renderMobs();
@@ -2004,14 +2014,14 @@ class IntegratedGameplayEngine {
             this.performAttack();
         }
         
-        // Coletar loot com E
+        // Interagir com E (NPC ou Loot - NPC tem prioridade)
         if (key === 'e') {
-            this.manualCollectLoot();
+            this.handleInteraction();
         }
         
-        // Interagir com quest giver usando F
+        // Diálogo rápido com F (só NPCs)
         if (key === 'f') {
-            this.interactWithNearestQuestGiver();
+            this.handleNPCDialog();
         }
         
         // NOVO: Gathering de recursos usando G
@@ -3183,6 +3193,69 @@ class IntegratedGameplayEngine {
                     this.hud.addChatMessage(`${nearestNPC.npc.name}: ${dialog.text}`, '#FFD700');
                 }
             }
+        }
+    }
+
+    /**
+     * Manipula interação com E - tenta NPC primeiro, depois loot
+     */
+    handleInteraction() {
+        if (!this.player) return;
+        
+        // 1. Tentar interagir com NPC mais próximo
+        if (this.npcSystem) {
+            const nearestNPC = this.npcSystem.getNearestNPC(this.player.x, this.player.y);
+            
+            if (nearestNPC && nearestNPC.distance <= this.npcSystem.interactionRange) {
+                // Iniciar interação
+                const dialog = this.npcSystem.startInteraction(nearestNPC.npc, this.player);
+                if (dialog) {
+                    // Mostrar fala do NPC em speech bubble
+                    this.npcSystem.showNPCSpeech(nearestNPC.npc.id, dialog.text, 4000);
+                    
+                    // Log no chat
+                    if (this.hud) {
+                        this.hud.addChatMessage(`${nearestNPC.npc.name}: ${dialog.text}`, '#FFD700');
+                        
+                        // Mostrar opções de diálogo
+                        if (dialog.options && dialog.options.length > 0) {
+                            dialog.options.forEach((opt, i) => {
+                                this.hud.addChatMessage(`  ${i + 1}. ${opt.text}`, '#AAAAAA');
+                            });
+                        }
+                    }
+                    
+                    console.log(`💬 Interagindo com ${nearestNPC.npc.name}: "${dialog.text}"`);
+                    return; // Interação concluída
+                }
+            }
+        }
+        
+        // 2. Se não há NPC próximo, tentar coletar loot
+        this.manualCollectLoot();
+    }
+
+    /**
+     * Diálogo rápido com F - apenas NPCs
+     */
+    handleNPCDialog() {
+        if (!this.player || !this.npcSystem) return;
+        
+        const nearestNPC = this.npcSystem.getNearestNPC(this.player.x, this.player.y);
+        
+        if (nearestNPC && nearestNPC.distance <= this.npcSystem.interactionRange) {
+            // Apenas mostrar saudação básica
+            const npc = nearestNPC.npc;
+            const greeting = npc.dialog?.greeting || `Olá, sou ${npc.name}!`;
+            
+            // Mostrar em speech bubble
+            this.npcSystem.showNPCSpeech(npc.id, greeting, 3000);
+            
+            if (this.hud) {
+                this.hud.addChatMessage(`${npc.name}: ${greeting}`, '#FFD700');
+            }
+            
+            console.log(`👋 ${npc.name} cumprimentou`);
         }
     }
 
