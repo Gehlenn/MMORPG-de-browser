@@ -60,6 +60,9 @@ module.exports = {
   transform: {
     '^.+\\.js$': 'babel-jest'
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(jsdom|html-encoding-sniffer)/)'
+  ],
   collectCoverage: true,
   verbose: true,
   testTimeout: 10000,

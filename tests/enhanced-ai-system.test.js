@@ -3,8 +3,7 @@
  * Comprehensive testing for AIMobController, PathfindingSystem, AIBossController, DecisionTree, EventReactions
  */
 
-const { describe, test, expect, beforeEach, afterEach } = require('@vitest/runner');
-const { vi } = require('vitest');
+const { describe, test, expect, beforeEach, afterEach } = require('@jest/globals');
 
 // Import AI systems to test
 const AIMobController = require('../server/ai/AIMobController.js');

@@ -3,8 +3,7 @@
  * Comprehensive testing for SpawnManager, ZoneManager, BossManager, EventManager
  */
 
-const { describe, test, expect, beforeEach, afterEach } = require('@vitest/runner');
-const { vi } = require('vitest');
+const { describe, test, expect, beforeEach, afterEach } = require('@jest/globals');
 
 // Import systems to test
 const SpawnManager = require('../server/SpawnManager.js');
@@ -116,14 +115,14 @@ describe('Spawn System v0.3.6v', () => {
             expect(mob).toBeDefined();
             
             // Mock setTimeout to test scheduling
-            vi.useFakeTimers();
+            jest.useFakeTimers();
             
             spawnManager.removeMob(mob.id, 'death');
             
             // Check timer was created
             expect(spawnManager.respawnTimers.has(mob.id)).toBe(true);
             
-            vi.useRealTimers();
+            jest.useRealTimers();
         });
 
         test('should respawn mob after timer', () => {
@@ -133,7 +132,7 @@ describe('Spawn System v0.3.6v', () => {
             expect(mob).toBeDefined();
             
             // Mock setTimeout and trigger respawn
-            vi.useFakeTimers();
+            jest.useFakeTimers();
             
             let respawnedMob = null;
             spawnManager.onRespawn = (newMob, originalMob) => {
@@ -143,14 +142,14 @@ describe('Spawn System v0.3.6v', () => {
             spawnManager.removeMob(mob.id, 'death');
             
             // Fast-forward time
-            vi.advanceTimersByTime(10000);
+            jest.advanceTimersByTime(10000);
             
             expect(respawnedMob).toBeDefined();
             expect(respawnedMob.type).toBe(mob.type);
             expect(respawnedMob.zoneId).toBe(mob.zoneId);
             expect(respawnedMob.isRespawn).toBe(true);
             
-            vi.useRealTimers();
+            jest.useRealTimers();
         });
 
         test('should generate valid positions', () => {
