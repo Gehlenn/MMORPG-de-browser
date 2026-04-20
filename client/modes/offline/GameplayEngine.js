@@ -1157,36 +1157,464 @@ class IntegratedGameplayEngine {
         
         const ctx = this.systems.minimap.ctx;
         const canvas = this.systems.minimap.canvas;
-        
-        // Limpar
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const width = canvas.width;
+        const height = canvas.height;
         
         // Escala
-        const scale = canvas.width / this.map.width;
+        const scale = width / this.map.width;
         
-        // Desenhar player
-        ctx.fillStyle = '#4CAF50';
-        const playerX = this.player.x * scale;
-        const playerY = this.player.y * scale;
-        ctx.fillRect(playerX - 2, playerY - 2, 4, 4);
+        // Criar máscara circular
+        ctx.clearRect(0, 0, width, height);
         
-        // Desenhar mobs
-        ctx.fillStyle = '#f44336';
-        this.mobs.forEach(mob => {
-            const mobX = mob.x * scale;
-            const mobY = mob.y * scale;
-            ctx.fillRect(mobX - 1, mobY - 1, 2, 2);
+        // Background com gradiente
+        const bgGradient = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, width/2);
+        bgGradient.addColorStop(0, 'rgba(20, 30, 40, 0.95)');
+        bgGradient.addColorStop(1, 'rgba(10, 20, 30, 0.98)');
+        ctx.fillStyle = bgGradient;
+        ctx.beginPath();
+        ctx.arc(width/2, height/2, width/2 - 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Borda decorativa
+        ctx.strokeStyle = 'rgba(100, 150, 200, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(width/2, height/2, width/2 - 1, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Anel interno
+        ctx.strokeStyle = 'rgba(100, 150, 200, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(width/2, height/2, width/2 - 8, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Grade sutil
+        ctx.strokeStyle = 'rgba(100, 150, 200, 0.1)';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i <= 4; i++) {
+            const pos = 10 + (i * (width - 20) / 4);
+            ctx.beginPath();
+            ctx.moveTo(pos, 10);
+            ctx.lineTo(pos, height - 10);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(10, pos);
+            ctx.lineTo(width - 10, pos);
+            ctx.stroke();
+        }
+        
+        // Zona atual (se disponível)
+        if (this.currentZone) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.font = '9px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(this.currentZone, width/2, 15);
+        }
+        
+        // Área descoberta (simulação de fog of war)
+        this.renderDiscoveredArea(ctx, scale, width, height);
+        
+        // Loot drops (pontos amarelos pequenos)
+        this.lootDrops.slice(0, 10).forEach(drop => { // Limitar a 10 para performance
+            const x = drop.x * scale;
+            const y = drop.y * scale;
+            ctx.fillStyle = '#FFD54F';
+            ctx.beginPath();
+            ctx.arc(x, y, 2, 0, Math.PI * 2);
+            ctx.fill();
         });
         
-        // Desenhar viewport
-        ctx.strokeStyle = '#fff';
+        // NPCs (pontos azuis)
+        if (this.npcSystem) {
+            for (const [id, npc] of this.npcSystem.npcs) {
+                const x = npc.position.x * scale;
+                const y = npc.position.y * scale;
+                ctx.fillStyle = '#2196F3';
+                ctx.beginPath();
+                ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        // Outros jogadores (pontos brancos)
+        this.remotePlayers.slice(0, 5).forEach(player => {
+            const x = player.x * scale;
+            const y = player.y * scale;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(x, y, 2, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        
+        // Mobs (triângulos vermelhos)
+        this.mobs.slice(0, 20).forEach(mob => { // Limitar a 20 para performance
+            const x = mob.x * scale;
+            const y = mob.y * scale;
+            ctx.fillStyle = '#f44336';
+            ctx.beginPath();
+            ctx.moveTo(x, y - 3);
+            ctx.lineTo(x - 2.5, y + 2);
+            ctx.lineTo(x + 2.5, y + 2);
+            ctx.closePath();
+            ctx.fill();
+        });
+        
+        // Player (seta verde com direção)
+        if (this.player) {
+            const px = this.player.x * scale;
+            const py = this.player.y * scale;
+            
+            // Glow do player
+            ctx.shadowColor = '#4CAF50';
+            ctx.shadowBlur = 8;
+            
+            // Direção do player
+            const facingAngles = {
+                'up': 0,
+                'right': Math.PI / 2,
+                'down': Math.PI,
+                'left': -Math.PI / 2
+            };
+            const angle = facingAngles[this.player.facing] || 0;
+            
+            ctx.fillStyle = '#4CAF50';
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(angle);
+            ctx.beginPath();
+            ctx.moveTo(0, -5);
+            ctx.lineTo(-3, 3);
+            ctx.lineTo(0, 1);
+            ctx.lineTo(3, 3);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+            
+            ctx.shadowBlur = 0;
+            
+            // Círculo ao redor do player
+            ctx.strokeStyle = '#4CAF50';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(px, py, 6, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
+        // Viewport (retângulo branco semi-transparente)
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1;
         ctx.strokeRect(
             this.camera.x * scale,
             this.camera.y * scale,
             this.camera.width * scale,
             this.camera.height * scale
         );
+        
+        // Borda circular final (máscara)
+        ctx.strokeStyle = 'rgba(100, 150, 200, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(width/2, height/2, width/2 - 1, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    
+    renderDiscoveredArea(ctx, scale, width, height) {
+        // Simular áreas descobertas com pontos suaves
+        const discoveredPoints = [
+            {x: this.player.x, y: this.player.y, radius: 200}
+        ];
+        
+        // Adicionar pontos ao redor de locais importantes
+        if (this.npcSystem) {
+            for (const [id, npc] of this.npcSystem.npcs) {
+                discoveredPoints.push({
+                    x: npc.position.x,
+                    y: npc.position.y,
+                    radius: 100
+                });
+            }
+        }
+        
+        // Renderizar áreas descobertas com gradiente sutil
+        discoveredPoints.forEach(point => {
+            const x = point.x * scale;
+            const y = point.y * scale;
+            const r = point.radius * scale;
+            
+            const gradient = ctx.createRadialGradient(x, y, 0, x, y, r);
+            gradient.addColorStop(0, 'rgba(100, 150, 200, 0.15)');
+            gradient.addColorStop(1, 'rgba(100, 150, 200, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+    
+    toggleWorldMap() {
+        if (!this.worldMapUI) {
+            this.createWorldMapUI();
+        }
+        
+        this.worldMapVisible = !this.worldMapVisible;
+        this.worldMapUI.style.display = this.worldMapVisible ? 'flex' : 'none';
+        
+        if (this.worldMapVisible) {
+            this.renderWorldMap();
+            console.log('🗺️ World Map aberto');
+        } else {
+            console.log('🗺️ World Map fechado');
+        }
+    }
+    
+    createWorldMapUI() {
+        // Container do world map
+        this.worldMapUI = document.createElement('div');
+        this.worldMapUI.id = 'worldMapUI';
+        this.worldMapUI.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            flex-direction: column;
+        `;
+        
+        // Título
+        const title = document.createElement('h2');
+        title.textContent = '🗺️ Mapa do Mundo - Eldoria';
+        title.style.cssText = `
+            color: #FFD700;
+            margin-bottom: 20px;
+            font-family: Arial, sans-serif;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        `;
+        this.worldMapUI.appendChild(title);
+        
+        // Canvas do mapa
+        this.worldMapCanvas = document.createElement('canvas');
+        this.worldMapCanvas.width = 800;
+        this.worldMapCanvas.height = 600;
+        this.worldMapCanvas.style.cssText = `
+            border: 3px solid #4CAF50;
+            border-radius: 10px;
+            background: #1a1a2e;
+            box-shadow: 0 0 30px rgba(76, 175, 80, 0.3);
+        `;
+        this.worldMapUI.appendChild(this.worldMapCanvas);
+        
+        // Instruções
+        const instructions = document.createElement('p');
+        instructions.textContent = 'Pressione M para fechar | Use WASD para mover';
+        instructions.style.cssText = `
+            color: #aaa;
+            margin-top: 15px;
+            font-size: 14px;
+        `;
+        this.worldMapUI.appendChild(instructions);
+        
+        // Botão fechar
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = 'Fechar Mapa (M)';
+        closeBtn.style.cssText = `
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        `;
+        closeBtn.onclick = () => this.toggleWorldMap();
+        this.worldMapUI.appendChild(closeBtn);
+        
+        document.body.appendChild(this.worldMapUI);
+        this.worldMapVisible = false;
+    }
+    
+    renderWorldMap() {
+        if (!this.worldMapCanvas) return;
+        
+        const ctx = this.worldMapCanvas.getContext('2d');
+        const width = this.worldMapCanvas.width;
+        const height = this.worldMapCanvas.height;
+        
+        // Escala
+        const scaleX = width / this.map.width;
+        const scaleY = height / this.map.height;
+        
+        // Background
+        const bgGradient = ctx.createLinearGradient(0, 0, width, height);
+        bgGradient.addColorStop(0, '#1a1a2e');
+        bgGradient.addColorStop(1, '#16213e');
+        ctx.fillStyle = bgGradient;
+        ctx.fillRect(0, 0, width, height);
+        
+        // Grid
+        ctx.strokeStyle = 'rgba(100, 150, 200, 0.1)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= 10; x++) {
+            const pos = x * (width / 10);
+            ctx.beginPath();
+            ctx.moveTo(pos, 0);
+            ctx.lineTo(pos, height);
+            ctx.stroke();
+        }
+        for (let y = 0; y <= 10; y++) {
+            const pos = y * (height / 10);
+            ctx.beginPath();
+            ctx.moveTo(0, pos);
+            ctx.lineTo(width, pos);
+            ctx.stroke();
+        }
+        
+        // Áreas de interesse (zonas)
+        const zones = [
+            {name: 'Vila Korvien', x: this.map.width * 0.3, y: this.map.height * 0.3, color: '#4CAF50'},
+            {name: 'Floresta Sombria', x: this.map.width * 0.7, y: this.map.height * 0.4, color: '#2E7D32'},
+            {name: 'Montanhas Geladas', x: this.map.width * 0.5, y: this.map.height * 0.2, color: '#90CAF9'},
+            {name: 'Deserto Ardente', x: this.map.width * 0.8, y: this.map.height * 0.7, color: '#FF9800'},
+            {name: 'Cavernas Profundas', x: this.map.width * 0.2, y: this.map.height * 0.6, color: '#5D4037'}
+        ];
+        
+        zones.forEach(zone => {
+            const zx = zone.x * scaleX;
+            const zy = zone.y * scaleY;
+            
+            // Área da zona
+            ctx.fillStyle = zone.color + '20';
+            ctx.beginPath();
+            ctx.arc(zx, zy, 50, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = zone.color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(zx, zy, 50, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Nome da zona
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(zone.name, zx, zy - 60);
+        });
+        
+        // Entidades no mapa mundial
+        // Loot
+        ctx.fillStyle = '#FFD54F';
+        this.lootDrops.forEach(drop => {
+            ctx.beginPath();
+            ctx.arc(drop.x * scaleX, drop.y * scaleY, 3, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        
+        // NPCs
+        if (this.npcSystem) {
+            for (const [id, npc] of this.npcSystem.npcs) {
+                const nx = npc.position.x * scaleX;
+                const ny = npc.position.y * scaleY;
+                ctx.fillStyle = '#2196F3';
+                ctx.beginPath();
+                ctx.arc(nx, ny, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = '10px Arial';
+                ctx.fillText(npc.name, nx, ny - 8);
+            }
+        }
+        
+        // Mobs
+        ctx.fillStyle = '#f44336';
+        this.mobs.forEach(mob => {
+            ctx.beginPath();
+            ctx.moveTo(mob.x * scaleX, mob.y * scaleY - 4);
+            ctx.lineTo(mob.x * scaleX - 3, mob.y * scaleY + 3);
+            ctx.lineTo(mob.x * scaleX + 3, mob.y * scaleY + 3);
+            ctx.closePath();
+            ctx.fill();
+        });
+        
+        // Player
+        if (this.player) {
+            const px = this.player.x * scaleX;
+            const py = this.player.y * scaleY;
+            
+            // Glow
+            ctx.shadowColor = '#4CAF50';
+            ctx.shadowBlur = 15;
+            
+            ctx.fillStyle = '#4CAF50';
+            ctx.beginPath();
+            ctx.arc(px, py, 6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.shadowBlur = 0;
+            
+            // Label
+            ctx.fillStyle = '#4CAF50';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText('VOCÊ', px, py - 12);
+        }
+        
+        // Viewport atual
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+            this.camera.x * scaleX,
+            this.camera.y * scaleY,
+            this.camera.width * scaleX,
+            this.camera.height * scaleY
+        );
+        
+        // Legenda
+        this.renderWorldMapLegend(ctx, width, height);
+    }
+    
+    renderWorldMapLegend(ctx, width, height) {
+        const legendX = width - 150;
+        const legendY = 20;
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(legendX - 10, legendY - 10, 140, 110);
+        
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(legendX - 10, legendY - 10, 140, 110);
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('Legenda:', legendX, legendY);
+        
+        const items = [
+            {color: '#4CAF50', text: 'Você', y: 20},
+            {color: '#f44336', text: 'Mobs', y: 35},
+            {color: '#2196F3', text: 'NPCs', y: 50},
+            {color: '#FFD54F', text: 'Loot', y: 65},
+            {color: '#fff', text: 'Viewport', y: 80}
+        ];
+        
+        items.forEach(item => {
+            ctx.fillStyle = item.color;
+            ctx.beginPath();
+            ctx.arc(legendX + 8, legendY + item.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#aaa';
+            ctx.font = '10px Arial';
+            ctx.fillText(item.text, legendX + 18, legendY + item.y + 3);
+        });
     }
     
     render() {
@@ -2023,6 +2451,11 @@ class IntegratedGameplayEngine {
         // Diálogo rápido com F (só NPCs)
         if (key === 'f') {
             this.handleNPCDialog();
+        }
+        
+        // NOVO: World Map com M
+        if (key === 'm') {
+            this.toggleWorldMap();
         }
         
         // NOVO: Gathering de recursos usando G
