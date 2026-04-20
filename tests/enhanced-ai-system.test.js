@@ -869,6 +869,7 @@ describe('Enhanced AI System v0.3.7v', () => {
             const event = {
                 type: 'player_attack',
                 sourceId: 'player_1',
+                targetId: 'test_entity', // Especificar o alvo para que seja encontrado como afetado
                 position: { x: 120, y: 100 },
                 data: { damage: 10 }
             };
@@ -888,7 +889,7 @@ describe('Enhanced AI System v0.3.7v', () => {
             eventReactions.addReaction('player_attack', reaction);
             eventReactions.processEvent(event);
             
-            // Check if reaction was triggered
+            // Check if reaction was triggered - a entidade afetada é a targetId
             const activeReactions = eventReactions.activeReactions.get('test_entity') || [];
             expect(activeReactions.length).toBeGreaterThan(0);
         });
@@ -912,7 +913,8 @@ describe('Enhanced AI System v0.3.7v', () => {
             const originalLog = console.log;
             let actionExecuted = false;
             console.log = (...args) => {
-                if (args[0] === '[EventReactions]' && args[1].includes('change_behavior')) {
+                const message = args.join(' ');
+                if (message.includes('[EventReactions]') && message.includes('comportamento')) {
                     actionExecuted = true;
                 }
                 originalLog(...args);
