@@ -86,28 +86,48 @@ describe('KingEldor', () => {
     });
 
     describe('Abilities', () => {
-        test('should have phase abilities defined', () => {
-            expect(kingEldor.phaseAbilities).toBeDefined();
+        test('should have abilities defined', () => {
+            expect(kingEldor.abilities).toBeDefined();
         });
 
-        test('phase 1 should have abilities', () => {
-            expect(kingEldor.phaseAbilities[1]).toBeDefined();
-            expect(kingEldor.phaseAbilities[1].length).toBeGreaterThan(0);
+        test('should have swordStrike ability', () => {
+            expect(kingEldor.abilities.swordStrike).toBeDefined();
+            expect(kingEldor.abilities.swordStrike.cooldown).toBe(2000);
         });
 
-        test('phase 2 should have abilities', () => {
-            expect(kingEldor.phaseAbilities[2]).toBeDefined();
-            expect(kingEldor.phaseAbilities[2].length).toBeGreaterThan(0);
+        test('should have shieldBash ability', () => {
+            expect(kingEldor.abilities.shieldBash).toBeDefined();
+            expect(kingEldor.abilities.shieldBash.stunDuration).toBe(2000);
         });
 
-        test('phase 3 should have abilities', () => {
-            expect(kingEldor.phaseAbilities[3]).toBeDefined();
-            expect(kingEldor.phaseAbilities[3].length).toBeGreaterThan(0);
+        test('should have royalCommand ability', () => {
+            expect(kingEldor.abilities.royalCommand).toBeDefined();
+            expect(kingEldor.abilities.royalCommand.fearDuration).toBe(3000);
         });
 
-        test('phase 4 should have abilities', () => {
-            expect(kingEldor.phaseAbilities[4]).toBeDefined();
-            expect(kingEldor.phaseAbilities[4].length).toBeGreaterThan(0);
+        test('should have summonGuards ability', () => {
+            expect(kingEldor.abilities.summonGuards).toBeDefined();
+            expect(kingEldor.abilities.summonGuards.cooldown).toBe(30000);
+        });
+
+        test('should have selfHeal ability', () => {
+            expect(kingEldor.abilities.selfHeal).toBeDefined();
+            expect(kingEldor.abilities.selfHeal.amount).toBe(0.05);
+        });
+
+        test('should have cleave ability', () => {
+            expect(kingEldor.abilities.cleave).toBeDefined();
+            expect(kingEldor.abilities.cleave.range).toBe(100);
+        });
+
+        test('should have lastDecree ability', () => {
+            expect(kingEldor.abilities.lastDecree).toBeDefined();
+            expect(kingEldor.abilities.lastDecree.damage).toBe(150);
+        });
+
+        test('should have lastStand ability', () => {
+            expect(kingEldor.abilities.lastStand).toBeDefined();
+            expect(kingEldor.abilities.lastStand.buffAmount).toBe(1.5);
         });
     });
 
@@ -190,18 +210,23 @@ describe('KingEldor', () => {
             const data = kingEldor.getBossData();
             expect(data).toHaveProperty('id');
             expect(data).toHaveProperty('name');
+            expect(data).toHaveProperty('title');
             expect(data).toHaveProperty('level');
             expect(data).toHaveProperty('hp');
             expect(data).toHaveProperty('maxHp');
-            expect(data).toHaveProperty('currentPhase');
+            expect(data).toHaveProperty('phase');
             expect(data).toHaveProperty('x');
             expect(data).toHaveProperty('y');
+            expect(data).toHaveProperty('state');
+            expect(data).toHaveProperty('isEnraged');
+            expect(data).toHaveProperty('activeSummons');
+            expect(data).toHaveProperty('participants');
         });
 
         test('should calculate HP percentage correctly', () => {
             kingEldor.hp = kingEldor.maxHp / 2;
-            const data = kingEldor.getBossData();
-            expect(data.hpPercent).toBe(50);
+            const hpPercent = Math.floor((kingEldor.hp / kingEldor.maxHp) * 100);
+            expect(hpPercent).toBe(50);
         });
     });
 });

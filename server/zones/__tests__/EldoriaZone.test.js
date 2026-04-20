@@ -86,11 +86,38 @@ describe('EldoriaZone', () => {
         test('should have King Eldor boss', () => {
             expect(eldoriaZone.config.boss.id).toBe('king_eldor');
             expect(eldoriaZone.config.boss.name).toBe('King Eldor');
-            expect(eldoriaZone.config.boss.location).toEqual({ x: 1500, y: 600 });
+        });
+
+        test('should have correct boss position', () => {
+            expect(eldoriaZone.config.boss.x).toBe(1600);
+            expect(eldoriaZone.config.boss.y).toBe(700);
         });
 
         test('should have correct boss level', () => {
             expect(eldoriaZone.config.boss.level).toBe(40);
+        });
+
+        test('should be raid boss', () => {
+            expect(eldoriaZone.config.boss.isRaid).toBe(true);
+        });
+
+        test('should have min players requirement', () => {
+            expect(eldoriaZone.config.boss.minPlayers).toBe(3);
+        });
+
+        test('should have max players requirement', () => {
+            expect(eldoriaZone.config.boss.maxPlayers).toBe(5);
+        });
+
+        test('should have respawn time', () => {
+            expect(eldoriaZone.config.boss.respawnTime).toBe(6 * 60 * 60 * 1000);
+        });
+
+        test('should have boss state initialized', () => {
+            expect(eldoriaZone.bossState).toBeDefined();
+            expect(eldoriaZone.bossState.isSpawned).toBe(false);
+            expect(eldoriaZone.bossState.currentHP).toBeNull();
+            expect(eldoriaZone.bossState.phase).toBe(1);
         });
     });
 
@@ -105,14 +132,19 @@ describe('EldoriaZone', () => {
     });
 
     describe('Helper Methods', () => {
-        test('isPositionInSafeZone should return true for safe position', () => {
-            const isSafe = eldoriaZone.isPositionInSafeZone(1000, 750);
+        test('isInSafeZone should return true for safe position', () => {
+            const isSafe = eldoriaZone.isInSafeZone(1000, 750);
             expect(isSafe).toBe(true);
         });
 
-        test('isPositionInSafeZone should return false for unsafe position', () => {
-            const isSafe = eldoriaZone.isPositionInSafeZone(0, 0);
+        test('isInSafeZone should return false for unsafe position', () => {
+            const isSafe = eldoriaZone.isInSafeZone(0, 0);
             expect(isSafe).toBe(false);
+        });
+
+        test('getSafeZoneAt should return safe zone at position', () => {
+            const safeZone = eldoriaZone.getSafeZoneAt(1000, 750);
+            expect(safeZone?.name).toBe('Eldoria City');
         });
 
         test('getSubZoneAt should return sub-zone for position in Royal Forest', () => {
@@ -120,10 +152,21 @@ describe('EldoriaZone', () => {
             expect(subZone?.name).toBe('Royal Forest');
         });
 
-        test('getRecommendedLevel should return correct level for position', () => {
-            const level = eldoriaZone.getRecommendedLevel(300, 400);
-            expect(level).toBeGreaterThanOrEqual(20);
-            expect(level).toBeLessThanOrEqual(25);
+        test('getSubZoneAt should return sub-zone for position in Iron Mines', () => {
+            // Position at edge of Iron Mines, away from Royal Forest overlap
+            const subZone = eldoriaZone.getSubZoneAt(600, 200);
+            expect(subZone?.name).toBe('Iron Mines');
+        });
+
+        test('getSubZoneAt should return sub-zone for position in Castle Grounds', () => {
+            const subZone = eldoriaZone.getSubZoneAt(1500, 600);
+            expect(subZone?.name).toBe('Castle Grounds');
+        });
+
+        test('isInSubZone should work correctly', () => {
+            const forest = eldoriaZone.config.subZones.find(z => z.name === 'Royal Forest');
+            const isInForest = eldoriaZone.isInSubZone(300, 400, forest);
+            expect(isInForest).toBe(true);
         });
     });
 

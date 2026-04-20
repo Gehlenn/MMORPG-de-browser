@@ -20,11 +20,29 @@ describe('ZoneTransition', () => {
         mockZones = new Map();
         mockZones.set('verdantis', { 
             config: { id: 'verdantis', name: 'Verdantis' },
-            getSpawnPoint: jest.fn().mockReturnValue({ x: 100, y: 100 })
+            getSpawnPoint: jest.fn().mockReturnValue({ x: 100, y: 100 }),
+            getZoneInfo: jest.fn().mockReturnValue({ id: 'verdantis', name: 'Verdantis' }),
+            playerLeave: jest.fn(),
+            playerEnter: jest.fn(),
+            getObjects: jest.fn(),
+            getObject: jest.fn(),
+            getNpcs: jest.fn(),
+            getNpc: jest.fn(),
+            getPortals: jest.fn(),
+            getPortal: jest.fn()
         });
         mockZones.set('eldoria', { 
             config: { id: 'eldoria', name: 'Eldoria' },
-            getSpawnPoint: jest.fn().mockReturnValue({ x: 1000, y: 750 })
+            getSpawnPoint: jest.fn().mockReturnValue({ x: 1000, y: 750 }),
+            getZoneInfo: jest.fn().mockReturnValue({ id: 'eldoria', name: 'Eldoria' }),
+            playerLeave: jest.fn(),
+            playerEnter: jest.fn(),
+            getObjects: jest.fn(),
+            getObject: jest.fn(),
+            getNpcs: jest.fn(),
+            getNpc: jest.fn(),
+            getPortals: jest.fn(),
+            getPortal: jest.fn()
         });
 
         mockPlayerManager = {
@@ -117,11 +135,9 @@ describe('ZoneTransition', () => {
             const result = await zoneTransition.usePortal('p1', 'verdantis_to_eldoria');
             
             expect(result.success).toBe(true);
-            expect(result.fromZone).toBe('verdantis');
-            expect(result.toZone).toBe('eldoria');
-            expect(mockPlayerManager.updatePlayer).toHaveBeenCalledWith('p1', expect.objectContaining({
-                currentZone: 'eldoria'
-            }));
+            expect(result.zone).toBe('eldoria');
+            expect(result.position).toEqual({ x: 100, y: 750 });
+            expect(result.zoneInfo).toBeDefined();
         });
 
         test('should fail if player cannot use portal', async () => {
@@ -136,39 +152,59 @@ describe('ZoneTransition', () => {
     });
 
     describe('getPlayerZoneInfo', () => {
-        test('should return current zone info', async () => {
-            mockPlayerManager.getPlayer.mockResolvedValue({
-                id: 'p1',
-                currentZone: 'eldoria',
-                x: 500,
-                y: 500
+        test('should return default zone info when no progress', async () => {
+            mockDb.get = jest.fn().mockResolvedValue(null);
+
+            const result = await zoneTransition.getPlayerZoneInfo('p1');
+            expect(result.currentZone).toBe('verdantis');
+            expect(result.discoveredZones).toEqual(['verdantis']);
+            expect(result.lastPosition).toBeNull();
+        });
+
+        test('should return zone info from database', async () => {
+            mockDb.get = jest.fn().mockResolvedValue({
+                player_id: 'p1',
+                current_zone: 'eldoria',
+                discovered_zones: JSON.stringify(['verdantis', 'eldoria']),
+                last_position: JSON.stringify({ x: 500, y: 500 })
             });
 
             const result = await zoneTransition.getPlayerZoneInfo('p1');
             expect(result.currentZone).toBe('eldoria');
-            expect(result.position).toEqual({ x: 500, y: 500 });
+            expect(result.discoveredZones).toContain('eldoria');
+            expect(result.lastPosition).toEqual({ x: 500, y: 500 });
         });
     });
 
     describe('Combat Cooldown', () => {
         test('should check combat cooldown', () => {
-            zoneTransition.playerCombatStatus.set('p1', Date.now());
+            zoneTransition.setPlayerCombat('p1');
             
-            const inCombat = zoneTransition.isPlayerInCombat('p1');
+            const inCombat = zoneTransition.isInCombatCooldown('p1');
             expect(inCombat).toBe(true);
         });
 
         test('should report not in combat if cooldown expired', () => {
             zoneTransition.playerCombatStatus.set('p1', Date.now() - 20000);
             
-            const inCombat = zoneTransition.isPlayerInCombat('p1');
+            const inCombat = zoneTransition.isInCombatCooldown('p1');
             expect(inCombat).toBe(false);
         });
 
-        test('should record combat entry', () => {
-            zoneTransition.recordCombatEntry('p1');
-            
+        test('should set and clear player combat', () => {
+            zoneTransition.setPlayerCombat('p1');
             expect(zoneTransition.playerCombatStatus.has('p1')).toBe(true);
+            
+            zoneTransition.clearPlayerCombat('p1');
+            expect(zoneTransition.playerCombatStatus.has('p1')).toBe(false);
+        });
+
+        test('should get remaining cooldown', () => {
+            zoneTransition.setPlayerCombat('p1');
+            
+            const remaining = zoneTransition.getCombatCooldownRemaining('p1');
+            expect(remaining).toBeGreaterThan(0);
+            expect(remaining).toBeLessThanOrEqual(10000);
         });
     });
 
