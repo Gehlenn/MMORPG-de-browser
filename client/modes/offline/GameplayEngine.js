@@ -85,6 +85,7 @@ class IntegratedGameplayEngine {
         // Loot e Inventário
         this.lootDrops = [];
         this.inventory = [];
+        this.floatingTexts = []; // Textos flutuantes (dano, coleta, etc.)
         
         // Equipamento
         this.equipment = {
@@ -2133,15 +2134,74 @@ class IntegratedGameplayEngine {
     }
     
     createLootDrop(dropData) {
-        this.lootDrops.push({
-            id: `loot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        const newLoot = {
+            id: dropData.id || `loot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             x: dropData.x,
             y: dropData.y,
+            itemId: dropData.item?.id || dropData.itemId,
+            itemName: dropData.item?.name || dropData.itemName || 'Item',
+            quantity: dropData.quantity || dropData.item?.quantity || 1,
+            rarity: dropData.rarity || dropData.item?.rarity || 'common',
             item: dropData.item,
-            collected: false
-        });
+            collected: false,
+            createdAt: Date.now()
+        };
         
-        Logger.info('Loot drop criado:', dropData.item.name);
+        this.lootDrops.push(newLoot);
+        
+        // Efeito de spawn
+        this.spawnLootSpawnEffect(newLoot.x, newLoot.y, newLoot.rarity);
+        
+        Logger.info('Loot drop criado:', newLoot.itemName, `(${newLoot.rarity})`);
+    }
+    
+    spawnLootSpawnEffect(x, y, rarity) {
+        // Cores por raridade
+        const colors = {
+            'common': '#9E9E9E',
+            'uncommon': '#4CAF50',
+            'rare': '#2196F3',
+            'epic': '#9C27B0',
+            'legendary': '#FF9800',
+            'mythic': '#F44336'
+        };
+        const color = colors[rarity] || '#FFD54F';
+        
+        // Partículas de spawn
+        const particleCount = rarity === 'legendary' || rarity === 'mythic' ? 20 : 
+                             rarity === 'epic' ? 15 : 10;
+        
+        for (let i = 0; i < particleCount; i++) {
+            const angle = (Math.PI * 2 / particleCount) * i + Math.random() * 0.5;
+            const speed = 3 + Math.random() * 3;
+            this.particles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 2, // Ligeiramente para cima
+                life: 40,
+                maxLife: 40,
+                color: color,
+                size: 4 + Math.random() * 3,
+                gravity: 0.15
+            });
+        }
+        
+        // Flash de luz para itens raros
+        if (rarity === 'epic' || rarity === 'legendary' || rarity === 'mythic') {
+            this.particles.push({
+                x: x,
+                y: y,
+                vx: 0,
+                vy: 0,
+                life: 20,
+                maxLife: 20,
+                color: color,
+                size: 50,
+                isFlash: true,
+                alpha: 0.5
+            });
+        }
     }
     
     showEffect(effectType, x, y) {
@@ -2364,45 +2424,169 @@ class IntegratedGameplayEngine {
     }
 
     renderLootDrops() {
+        const time = Date.now();
+        
         this.lootDrops.forEach(drop => {
             // Culling: só renderiza se estiver na tela
             if (!this.isOnScreen(drop.x, drop.y, 50)) return;
             
             this.ctx.save();
+            
+            // Calcular distância do player para efeitos
+            let playerDist = Infinity;
+            let isNearby = false;
+            if (this.player) {
+                playerDist = Math.hypot(drop.x - this.player.x, drop.y - this.player.y);
+                isNearby = playerDist <= 80;
+            }
+            
+            // Efeito de magnet (puxar quando segura E)
+            if (this.keys['e'] && this.player && playerDist < 200 && playerDist > 30) {
+                // Direção para o player
+                const angle = Math.atan2(this.player.y - drop.y, this.player.x - drop.x);
+                const pullStrength = 2;
+                drop.x += Math.cos(angle) * pullStrength;
+                drop.y += Math.sin(angle) * pullStrength;
+            }
+            
+            // Cor baseada na raridade
+            const rarityColors = {
+                'common': '#9E9E9E',
+                'uncommon': '#4CAF50',
+                'rare': '#2196F3',
+                'epic': '#9C27B0',
+                'legendary': '#FF9800',
+                'mythic': '#F44336'
+            };
+            const color = rarityColors[drop.rarity] || '#FFD54F';
+            
+            // Efeito de pulso baseado na raridade
+            const pulseSpeed = drop.rarity === 'legendary' || drop.rarity === 'mythic' ? 150 : 300;
+            const pulse = Math.sin(time / pulseSpeed) * 3;
+            
+            // Glow externo maior para itens raros
+            if (drop.rarity === 'epic' || drop.rarity === 'legendary' || drop.rarity === 'mythic') {
+                const glowSize = 15 + pulse;
+                const gradient = this.ctx.createRadialGradient(drop.x, drop.y, 5, drop.x, drop.y, glowSize);
+                gradient.addColorStop(0, color + '40');
+                gradient.addColorStop(1, color + '00');
+                this.ctx.fillStyle = gradient;
+                this.ctx.beginPath();
+                this.ctx.arc(drop.x, drop.y, glowSize, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+            
+            // Brilho externo pulsante
+            this.ctx.strokeStyle = color + '80';
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.arc(drop.x, drop.y, 12 + pulse, 0, Math.PI * 2);
+            this.ctx.stroke();
 
-            // Círculo dourado para loot
-            this.ctx.fillStyle = '#FFD54F';
+            // Círculo principal
+            this.ctx.fillStyle = color;
             this.ctx.beginPath();
             this.ctx.arc(drop.x, drop.y, 8, 0, Math.PI * 2);
             this.ctx.fill();
-
-            // Borda laranja
-            this.ctx.strokeStyle = '#FFB300';
-            this.ctx.lineWidth = 2;
-            this.ctx.stroke();
-
-            // Nome do item
-            this.ctx.fillStyle = '#FFFFFF';
-            this.ctx.font = '12px Arial';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText(drop.itemName || 'Loot', drop.x, drop.y - 14);
-
-            // Efeito de brilho pulsante
-            const pulse = Math.sin(Date.now() / 200) * 2;
-            this.ctx.strokeStyle = `rgba(255, 213, 79, ${0.5 + pulse * 0.1})`;
-            this.ctx.lineWidth = 3;
+            
+            // Borda brilhante
+            this.ctx.strokeStyle = '#FFFFFF';
+            this.ctx.lineWidth = 1;
             this.ctx.beginPath();
-            this.ctx.arc(drop.x, drop.y, 10 + pulse, 0, Math.PI * 2);
+            this.ctx.arc(drop.x, drop.y, 8, 0, Math.PI * 2);
             this.ctx.stroke();
+
+            // Brilho interno
+            this.ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            this.ctx.beginPath();
+            this.ctx.arc(drop.x - 2, drop.y - 2, 3, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            // Nome do item (sempre visível se próximo, ou em raridade alta)
+            if (isNearby || drop.rarity === 'legendary' || drop.rarity === 'mythic') {
+                // Background do texto
+                const text = drop.itemName || 'Loot';
+                this.ctx.font = isNearby ? 'bold 12px Arial' : '11px Arial';
+                const metrics = this.ctx.measureText(text);
+                const textWidth = metrics.width + 8;
+                const textHeight = 16;
+                
+                this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                this.ctx.beginPath();
+                this.ctx.roundRect(drop.x - textWidth/2, drop.y - 30, textWidth, textHeight, 4);
+                this.ctx.fill();
+                
+                // Texto
+                this.ctx.fillStyle = isNearby ? '#FFFFFF' : color;
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                this.ctx.fillText(text, drop.x, drop.y - 22);
+                
+                // Quantidade
+                if (drop.quantity > 1) {
+                    this.ctx.font = 'bold 10px Arial';
+                    this.ctx.fillStyle = '#FFD54F';
+                    this.ctx.fillText(`x${drop.quantity}`, drop.x + 12, drop.y + 12);
+                }
+            }
+            
+            // Indicador "Pressione E" para loot próximo
+            if (isNearby && !this.keys['e']) {
+                const bounce = Math.sin(time / 200) * 2;
+                this.ctx.font = 'bold 10px Arial';
+                this.ctx.fillStyle = '#FFD700';
+                this.ctx.fillText('[E]', drop.x, drop.y - 38 + bounce);
+            }
 
             this.ctx.restore();
+        });
+        
+        // Renderizar floating texts de coleta
+        this.renderFloatingTexts();
+    }
+    
+    renderFloatingTexts() {
+        const time = Date.now();
+        
+        this.floatingTexts = this.floatingTexts.filter(ft => {
+            const age = time - ft.startTime;
+            return age < ft.duration;
+        });
+        
+        this.floatingTexts.forEach(ft => {
+            const age = time - ft.startTime;
+            const progress = age / ft.duration;
+            const yOffset = -progress * 40; // Sobe 40px
+            const alpha = 1 - progress;
+            
+            this.ctx.save();
+            this.ctx.globalAlpha = alpha;
+            this.ctx.font = ft.isLoot ? 'bold 14px Arial' : '12px Arial';
+            this.ctx.fillStyle = ft.color;
+            this.ctx.textAlign = 'center';
+            this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            this.ctx.shadowBlur = 3;
+            this.ctx.fillText(ft.text, ft.x, ft.y + yOffset);
+            this.ctx.restore();
+        });
+    }
+    
+    addFloatingText(text, x, y, color = '#FFFFFF', duration = 1500, isLoot = false) {
+        this.floatingTexts.push({
+            text,
+            x,
+            y,
+            color,
+            startTime: Date.now(),
+            duration,
+            isLoot
         });
     }
 
     tryCollectLoot() {
         if (!this.player || !Array.isArray(this.lootDrops)) return;
 
-        const range = 50;
+        const range = 60; // Aumentado de 50 para 60
         let nearest = null;
         let nearestDistance = Infinity;
 
@@ -2419,6 +2603,16 @@ class IntegratedGameplayEngine {
 
         if (!nearest) return;
 
+        // Usar LootManager se disponível
+        if (this.lootManager && typeof this.lootManager.tryCollectLoot === 'function') {
+            const result = this.lootManager.tryCollectLoot(nearest.id, this.player.id);
+            if (result.success) {
+                this.onLootCollectedLocally(result.item);
+            }
+            return;
+        }
+
+        // Fallback: networkManager
         if (window.networkManager && window.networkManager.isConnected()) {
             window.networkManager.collectLoot({
                 playerId: this.player.id,
@@ -2426,6 +2620,78 @@ class IntegratedGameplayEngine {
             });
 
             Logger.info('Tentativa de coleta enviada:', nearest.id);
+        } else {
+            // Modo offline: coletar diretamente
+            this.collectLootOffline(nearest);
+        }
+    }
+    
+    collectLootOffline(loot) {
+        // Remover do chão
+        this.lootDrops = this.lootDrops.filter(d => d.id !== loot.id);
+        
+        // Adicionar ao inventário
+        this.inventory.push({
+            id: loot.itemId || loot.item?.id || `item_${Date.now()}`,
+            name: loot.itemName || loot.item?.name || 'Item',
+            quantity: loot.quantity || 1,
+            rarity: loot.rarity || 'common'
+        });
+        
+        // Efeitos visuais
+        this.onLootCollectedLocally(loot);
+        
+        // Log
+        Logger.info('Loot coletado (offline):', loot.itemName);
+    }
+    
+    onLootCollectedLocally(item) {
+        // Texto flutuante
+        const rarityColors = {
+            'common': '#9E9E9E',
+            'uncommon': '#4CAF50',
+            'rare': '#2196F3',
+            'epic': '#9C27B0',
+            'legendary': '#FF9800',
+            'mythic': '#F44336'
+        };
+        const color = rarityColors[item.rarity] || '#FFD54F';
+        
+        // Posição do player ou do loot
+        const x = this.player ? this.player.x : item.x;
+        const y = this.player ? this.player.y - 20 : item.y;
+        
+        // Adicionar texto flutuante
+        this.addFloatingText(
+            `+${item.quantity || 1} ${item.itemName || item.name}`,
+            x,
+            y,
+            color,
+            2000,
+            true
+        );
+        
+        // Notificação
+        this.showNotification(`+${item.quantity || 1} ${item.itemName || item.name}`, color);
+        
+        // Partículas de coleta
+        this.spawnCollectParticles(x, y, color);
+    }
+    
+    spawnCollectParticles(x, y, color) {
+        for (let i = 0; i < 8; i++) {
+            const angle = (Math.PI * 2 / 8) * i;
+            const speed = 2 + Math.random() * 2;
+            this.particles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 30,
+                maxLife: 30,
+                color: color,
+                size: 3 + Math.random() * 2
+            });
         }
     }
 
