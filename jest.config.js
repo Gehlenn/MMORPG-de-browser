@@ -5,7 +5,9 @@ module.exports = {
   testMatch: [
     '<rootDir>/tests/**/*.test.js',
     '<rootDir>/tests-essential/**/*.test.js',
-    '<rootDir>/server/guild/__tests__/**/*.test.js'
+    '<rootDir>/server/guild/__tests__/**/*.test.js',
+    '<rootDir>/server/zones/__tests__/**/*.test.js',
+    '<rootDir>/server/bosses/__tests__/**/*.test.js'
   ],
   collectCoverageFrom: [
     'server/**/*.js',
