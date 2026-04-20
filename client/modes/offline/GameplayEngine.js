@@ -864,8 +864,13 @@ class IntegratedGameplayEngine {
                 this.player.hp = Math.max(0, data.currentHealth || (this.player.hp - data.damage));
                 console.log('💔 Você recebeu', data.damage, 'de dano! HP:', this.player.hp);
                 
+                // Som de dano recebido
+                if (window.audioManager) {
+                    window.audioManager.playSFX('hit');
+                }
+                
                 this.updateHUD();
-                this.showDamage(this.player.x, this.player.y, data.damage);
+                this.showDamage(this.player.x, this.player.y, data.damage, false, true);
                 
                 if (this.player.hp <= 0) {
                     this.handlePlayerDeath();
@@ -923,6 +928,13 @@ class IntegratedGameplayEngine {
         
         this.isRunning = true;
         this.lastFrameTime = performance.now();
+        
+        // Inicializar sistema de áudio
+        if (window.audioManager && !window.audioManager.initialized) {
+            window.audioManager.init();
+            // Criar UI de controle de volume
+            window.audioManager.createVolumeUI();
+        }
         
         console.log('🎮 Iniciando gameplay loop');
         this.gameLoop();
@@ -1938,6 +1950,11 @@ class IntegratedGameplayEngine {
         if (nearestMob) {
             console.log('⚔️ Atacando ' + nearestMob.name + ' a ' + minDistance.toFixed(2) + 'px');
             
+            // Som de ataque
+            if (window.audioManager) {
+                window.audioManager.playSFX('attack');
+            }
+            
             // Animação de ataque visual
             this.createAttackAnimation(
                 this.player.x + 16,
@@ -1966,8 +1983,13 @@ class IntegratedGameplayEngine {
                 this.processOfflineAttack(nearestMob, finalDamage, isCritical);
             }
             
-            // Efeitos visuais de impacto (com delay para sincronizar com animação)
+            // Efeitos visuais e sonoros de impacto (com delay para sincronizar com animação)
             setTimeout(() => {
+                // Som de hit ou crítico
+                if (window.audioManager) {
+                    window.audioManager.playSFX(isCritical ? 'crit' : 'hit');
+                }
+                
                 this.spawnHitEffect(
                     nearestMob.x + (nearestMob.width || 32) / 2,
                     nearestMob.y + (nearestMob.height || 32) / 2,
@@ -1991,6 +2013,10 @@ class IntegratedGameplayEngine {
             }, 100);
         } else {
             console.log('❌ Nenhum mob no alcance (60px)');
+            // Som de ataque no vazio mesmo assim
+            if (window.audioManager) {
+                window.audioManager.playSFX('attack');
+            }
             // Animação de ataque no vazio (miss)
             const facingAngles = {
                 'up': { x: 0, y: -40 },
@@ -2026,6 +2052,11 @@ class IntegratedGameplayEngine {
     
     handleMobDeath(mob) {
         console.log(`☠️ ${mob.name} foi derrotado!`);
+        
+        // Som de morte
+        if (window.audioManager) {
+            window.audioManager.playSFX('death');
+        }
         
         // Efeitos de morte
         this.spawnHitEffect(
@@ -2071,6 +2102,11 @@ class IntegratedGameplayEngine {
      */
     showLevelUpEffect(newLevel) {
         console.log('🎉 LEVEL UP! Novo level:', newLevel);
+        
+        // Som de level up
+        if (window.audioManager) {
+            window.audioManager.playSFX('levelup');
+        }
         
         // Mostrar no HUD
         if (this.hud) {
@@ -2145,6 +2181,11 @@ class IntegratedGameplayEngine {
     
     handlePlayerDeath() {
         console.log('💀 Player died - implementing death mechanics...');
+        
+        // Som de morte
+        if (window.audioManager) {
+            window.audioManager.playSFX('death');
+        }
         
         // Parar movimento
         this.player.hp = 0;
@@ -3396,6 +3437,11 @@ class IntegratedGameplayEngine {
     }
     
     onLootCollectedLocally(item) {
+        // Som de coleta
+        if (window.audioManager) {
+            window.audioManager.playSFX('collect');
+        }
+        
         // Texto flutuante
         const rarityColors = {
             'common': '#9E9E9E',
