@@ -87,6 +87,22 @@ class IntegratedGameplayEngine {
         this.inventory = [];
         this.floatingTexts = []; // Textos flutuantes (dano, coleta, etc.)
         
+        // Sistema de Combate Melhorado
+        this.combatEffects = []; // Efeitos visuais de combate
+        this.attackAnimations = []; // Animações de ataque
+        this.comboSystem = {
+            count: 0,
+            lastHitTime: 0,
+            window: 2000, // 2 segundos para combo
+            multiplier: 1.0
+        };
+        this.screenShake = {
+            active: false,
+            intensity: 0,
+            duration: 0,
+            startTime: 0
+        };
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -957,6 +973,9 @@ class IntegratedGameplayEngine {
         // Update camera
         this.updateCamera();
         
+        // Update screen shake (combat effect)
+        this.updateScreenShake();
+        
         // Update entities
         this.updateEntities(deltaTime);
         
@@ -1112,6 +1131,12 @@ class IntegratedGameplayEngine {
             // Limitar ao mapa
             this.camera.x = Math.max(0, Math.min(this.camera.x, this.map.width - this.camera.width));
             this.camera.y = Math.max(0, Math.min(this.camera.y, this.map.height - this.camera.height));
+            
+            // Aplicar screen shake se ativo
+            if (this.screenShake.active) {
+                this.camera.x += this.camera.shakeX || 0;
+                this.camera.y += this.camera.shakeY || 0;
+            }
         }
     }
     
@@ -1673,6 +1698,9 @@ class IntegratedGameplayEngine {
         // Renderizar partículas
         this.renderParticles();
         
+        // NOVO: Renderizar efeitos de combate (swings, flashes, impactos)
+        this.renderCombatEffects();
+        
         // NOVO: Renderizar AdvancedMobSystem mobs
         if (this.advancedMobSystem) {
             this.advancedMobSystem.render(this.ctx);
@@ -1900,7 +1928,8 @@ class IntegratedGameplayEngine {
             const dy = mob.y - this.player.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             
-            if (distance < minDistance && distance < 100) { // 100px de alcance
+            // Alcance de ataque: 60px
+            if (distance <= 60 && distance < minDistance) {
                 minDistance = distance;
                 nearestMob = mob;
             }
@@ -1909,65 +1938,131 @@ class IntegratedGameplayEngine {
         if (nearestMob) {
             console.log('⚔️ Atacando ' + nearestMob.name + ' a ' + minDistance.toFixed(2) + 'px');
             
+            // Animação de ataque visual
+            this.createAttackAnimation(
+                this.player.x + 16,
+                this.player.y + 16,
+                nearestMob.x + (nearestMob.width || 32) / 2,
+                nearestMob.y + (nearestMob.height || 32) / 2,
+                'normal'
+            );
+            
+            // Calcular dano com chance de crítico
+            const baseDamage = 10 + Math.floor(Math.random() * 10);
+            const isCritical = Math.random() < 0.15; // 15% chance
+            const finalDamage = isCritical ? Math.floor(baseDamage * 1.5) : baseDamage;
+            
             // NOVO: Usar sistema de combate padronizado
             if (this.socket && this.socket.connected) {
                 this.socket.emit(NET_EVENTS.COMBAT_ATTACK, {
                     targetId: nearestMob.id,
-                    targetType: 'mob'
+                    targetType: 'mob',
+                    damage: finalDamage,
+                    isCritical
                 });
             } else {
                 // Modo offline - processar localmente
                 console.log('🎮 Modo offline - ataque local');
-                this.processOfflineAttack(nearestMob);
+                this.processOfflineAttack(nearestMob, finalDamage, isCritical);
             }
             
-            // Feedback visual
-            const damage = 10 + Math.floor(Math.random() * 10);
-            this.showDamage(nearestMob.x + 16, nearestMob.y, damage);
+            // Efeitos visuais de impacto (com delay para sincronizar com animação)
+            setTimeout(() => {
+                this.spawnHitEffect(
+                    nearestMob.x + (nearestMob.width || 32) / 2,
+                    nearestMob.y + (nearestMob.height || 32) / 2,
+                    isCritical ? '#ff0000' : '#ff6600',
+                    isCritical ? 1.5 : 1
+                );
+                
+                // Feedback visual de dano
+                this.showDamage(
+                    nearestMob.x + 16,
+                    nearestMob.y,
+                    finalDamage,
+                    isCritical,
+                    false
+                );
+                
+                // Screen shake em crítico
+                if (isCritical) {
+                    this.triggerScreenShake(8, 200);
+                }
+            }, 100);
         } else {
-            console.log('❌ Nenhum mob no alcance (100px)');
+            console.log('❌ Nenhum mob no alcance (60px)');
+            // Animação de ataque no vazio (miss)
+            const facingAngles = {
+                'up': { x: 0, y: -40 },
+                'down': { x: 0, y: 40 },
+                'left': { x: -40, y: 0 },
+                'right': { x: 40, y: 0 }
+            };
+            const offset = facingAngles[this.player.facing] || { x: 0, y: 40 };
+            this.createAttackAnimation(
+                this.player.x + 16,
+                this.player.y + 16,
+                this.player.x + 16 + offset.x,
+                this.player.y + 16 + offset.y,
+                'normal'
+            );
         }
     }
     
-    processOfflineAttack(mob) {
+    processOfflineAttack(mob, damage = null, isCritical = false) {
         // Calcular dano localmente
-        const damage = 10 + Math.floor(Math.random() * 11); // 10-20 dano
+        const finalDamage = damage || (10 + Math.floor(Math.random() * 11));
         
         // Aplicar dano
-        mob.hp = Math.max(0, (mob.hp || 50) - damage);
+        mob.hp = Math.max(0, (mob.hp || 50) - finalDamage);
         
-        console.log(`💥 ${mob.name} recebeu ${damage} de dano! HP: ${mob.hp}/${mob.maxHp || 50}`);
+        console.log(`💥 ${mob.name} recebeu ${finalDamage} de dano! HP: ${mob.hp}/${mob.maxHp || 50}`);
         
         // Verificar se morreu
         if (mob.hp <= 0) {
-            console.log('💀 Mob morto:', mob.name);
-            
-            // Remover mob
-            this.mobs = this.mobs.filter(m => m.id !== mob.id);
-            
-            // Ganhar XP - usar PlayerManager como fonte única quando disponível
-            const xpGained = mob.exp || 10;
-            
-            if (this.playerManager) {
-                // Usar PlayerManager para adicionar XP (sistema consolidado)
-                const result = this.playerManager.addXp(xpGained);
-                if (result.leveledUp) {
-                    this.showLevelUpEffect(result.newLevel);
-                }
-            } else {
-                // Fallback para player local
-                this.player.exp = (this.player.exp || 0) + xpGained;
-                console.log('⭐ Ganhou', xpGained, 'XP!');
-                this.checkLevelUp();
-            }
-            
-            // Mostrar XP
-            if (this.hud) {
-                this.hud.showDamage(this.player.x, this.player.y - 40, `+${xpGained} XP`, false);
-            }
+            this.handleMobDeath(mob);
+        }
+    }
+    
+    handleMobDeath(mob) {
+        console.log(`☠️ ${mob.name} foi derrotado!`);
+        
+        // Efeitos de morte
+        this.spawnHitEffect(
+            mob.x + (mob.width || 32) / 2,
+            mob.y + (mob.height || 32) / 2,
+            '#ff0000',
+            2
+        );
+        
+        // Screen shake leve
+        this.triggerScreenShake(3, 150);
+        
+        // Remover mob
+        const index = this.mobs.indexOf(mob);
+        if (index > -1) {
+            this.mobs.splice(index, 1);
         }
         
-        this.updateHUD();
+        // XP e loot
+        const xpGained = mob.xp || mob.exp || 10;
+        this.player.xp = (this.player.xp || 0) + xpGained;
+        
+        // Mostrar XP
+        if (this.hud) {
+            this.hud.showDamage(this.player.x, this.player.y - 40, `+${xpGained} XP`, false);
+        }
+        
+        // Drop de loot
+        this.createLootDrop({
+            x: mob.x + (mob.width || 32) / 2,
+            y: mob.y + (mob.height || 32) / 2,
+            item: {
+                name: 'Gold',
+                rarity: 'common',
+                quantity: Math.floor(Math.random() * 10) + 5
+            }
+        });
     }
     
     /**
@@ -2120,34 +2215,256 @@ class IntegratedGameplayEngine {
         console.log('🔄 Player respawned at (400, 300)');
     }
     
-    showDamage(x, y, damage) {
+    showDamage(x, y, damage, isCritical = false, isPlayer = false) {
+        const time = Date.now();
+        
+        // Verificar combo
+        if (!isPlayer && time - this.comboSystem.lastHitTime < this.comboSystem.window) {
+            this.comboSystem.count++;
+            this.comboSystem.multiplier = 1 + (this.comboSystem.count * 0.1); // +10% por combo
+        } else {
+            this.comboSystem.count = 1;
+            this.comboSystem.multiplier = 1;
+        }
+        this.comboSystem.lastHitTime = time;
+        
+        // Calcular dano final com combo
+        const finalDamage = Math.floor(damage * this.comboSystem.multiplier);
+        
+        // Cor baseada no tipo de dano
+        let color = isPlayer ? '#ff4444' : '#ff6600';
+        let fontSize = isCritical ? '24px' : '18px';
+        
+        if (isCritical) {
+            color = '#ff0000';
+        }
+        
         // Mostrar número de dano flutuante
         const damageText = document.createElement('div');
-        damageText.textContent = '-' + damage;
+        damageText.textContent = isPlayer ? '-' + finalDamage : finalDamage;
         damageText.style.position = 'absolute';
         damageText.style.left = x + 'px';
         damageText.style.top = (y - 20) + 'px';
-        damageText.style.color = '#ff0000';
-        damageText.style.fontSize = '16px';
+        damageText.style.color = color;
+        damageText.style.fontSize = fontSize;
         damageText.style.fontWeight = 'bold';
         damageText.style.zIndex = '9999';
         damageText.style.pointerEvents = 'none';
         damageText.style.transition = 'all 1s ease-out';
+        damageText.style.textShadow = isCritical ? '0 0 10px #ff0000, 0 0 20px #ff0000' : '2px 2px 4px rgba(0,0,0,0.8)';
+        
+        // Adicionar indicador de combo
+        if (this.comboSystem.count > 1 && !isPlayer) {
+            damageText.textContent += ` (x${this.comboSystem.count})`;
+        }
         
         document.body.appendChild(damageText);
         
-        // Animação
+        // Animação mais dinâmica
         setTimeout(() => {
-            damageText.style.transform = 'translateY(-30px)';
+            const randomX = (Math.random() - 0.5) * 30;
+            damageText.style.transform = `translate(${randomX}px, -40px) scale(${isCritical ? 1.3 : 1})`;
             damageText.style.opacity = '0';
-        }, 100);
+        }, 50);
         
         // Remover após animação
         setTimeout(() => {
             if (damageText.parentNode) {
                 damageText.parentNode.removeChild(damageText);
             }
-        }, 1100);
+        }, 1000);
+        
+        // Adicionar floating text no canvas também
+        this.addFloatingText(
+            finalDamage.toString(),
+            x,
+            y,
+            color,
+            1000,
+            false
+        );
+    }
+    
+    triggerScreenShake(intensity = 5, duration = 300) {
+        this.screenShake = {
+            active: true,
+            intensity,
+            duration,
+            startTime: Date.now()
+        };
+    }
+    
+    updateScreenShake() {
+        if (!this.screenShake.active) return;
+        
+        const elapsed = Date.now() - this.screenShake.startTime;
+        
+        if (elapsed >= this.screenShake.duration) {
+            this.screenShake.active = false;
+            this.camera.shakeX = 0;
+            this.camera.shakeY = 0;
+            return;
+        }
+        
+        // Decaimento do shake
+        const progress = elapsed / this.screenShake.duration;
+        const currentIntensity = this.screenShake.intensity * (1 - progress);
+        
+        this.camera.shakeX = (Math.random() - 0.5) * currentIntensity;
+        this.camera.shakeY = (Math.random() - 0.5) * currentIntensity;
+    }
+    
+    spawnHitEffect(x, y, color = '#ff6600', size = 1) {
+        // Flash de impacto
+        this.combatEffects.push({
+            type: 'flash',
+            x,
+            y,
+            radius: 30 * size,
+            color,
+            life: 10,
+            maxLife: 10
+        });
+        
+        // Partículas de impacto
+        const particleCount = Math.floor(8 * size);
+        for (let i = 0; i < particleCount; i++) {
+            const angle = (Math.PI * 2 / particleCount) * i + Math.random() * 0.5;
+            const speed = 3 + Math.random() * 4;
+            this.particles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 20 + Math.random() * 10,
+                maxLife: 30,
+                color: color,
+                size: 2 + Math.random() * 3,
+                gravity: 0.2,
+                decay: 0.95
+            });
+        }
+        
+        // Linhas de impacto (radial)
+        for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI * 2 / 6) * i;
+            this.combatEffects.push({
+                type: 'impactLine',
+                x,
+                y,
+                angle,
+                length: 20 * size,
+                color,
+                life: 15,
+                maxLife: 15
+            });
+        }
+    }
+    
+    createAttackAnimation(attackerX, attackerY, targetX, targetY, type = 'normal') {
+        const angle = Math.atan2(targetY - attackerY, targetX - attackerX);
+        const distance = Math.hypot(targetX - attackerX, targetY - attackerY);
+        
+        this.attackAnimations.push({
+            type: 'swing',
+            startX: attackerX,
+            startY: attackerY,
+            targetX,
+            targetY,
+            angle,
+            distance,
+            weaponType: type,
+            life: 20,
+            maxLife: 20,
+            color: type === 'critical' ? '#ff0000' : '#ffffff'
+        });
+    }
+    
+    renderCombatEffects() {
+        const time = Date.now();
+        
+        // Renderizar flash effects
+        this.combatEffects = this.combatEffects.filter(effect => {
+            effect.life--;
+            
+            if (effect.life <= 0) return false;
+            
+            const progress = 1 - (effect.life / effect.maxLife);
+            const alpha = 1 - progress;
+            
+            this.ctx.save();
+            
+            if (effect.type === 'flash') {
+                // Flash circular de impacto
+                const gradient = this.ctx.createRadialGradient(
+                    effect.x, effect.y, 0,
+                    effect.x, effect.y, effect.radius * (1 + progress)
+                );
+                gradient.addColorStop(0, effect.color + Math.floor(alpha * 255).toString(16).padStart(2, '0'));
+                gradient.addColorStop(1, effect.color + '00');
+                
+                this.ctx.fillStyle = gradient;
+                this.ctx.beginPath();
+                this.ctx.arc(effect.x, effect.y, effect.radius * (1 + progress), 0, Math.PI * 2);
+                this.ctx.fill();
+            } else if (effect.type === 'impactLine') {
+                // Linhas radiais de impacto
+                this.ctx.strokeStyle = effect.color;
+                this.ctx.lineWidth = 2 * (1 - progress);
+                this.ctx.globalAlpha = alpha;
+                
+                const x2 = effect.x + Math.cos(effect.angle) * effect.length * (1 + progress * 0.5);
+                const y2 = effect.y + Math.sin(effect.angle) * effect.length * (1 + progress * 0.5);
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(effect.x, effect.y);
+                this.ctx.lineTo(x2, y2);
+                this.ctx.stroke();
+            }
+            
+            this.ctx.restore();
+            return true;
+        });
+        
+        // Renderizar animações de ataque
+        this.attackAnimations = this.attackAnimations.filter(anim => {
+            anim.life--;
+            
+            if (anim.life <= 0) return false;
+            
+            const progress = 1 - (anim.life / anim.maxLife);
+            
+            this.ctx.save();
+            
+            if (anim.type === 'swing') {
+                // Arco de ataque
+                this.ctx.strokeStyle = anim.color;
+                this.ctx.lineWidth = 3;
+                this.ctx.lineCap = 'round';
+                this.ctx.globalAlpha = 1 - progress;
+                
+                const arcStart = anim.angle - 0.5 + (progress * 0.3);
+                const arcEnd = anim.angle + 0.5 - (progress * 0.3);
+                const radius = 25 + (progress * 10);
+                
+                this.ctx.beginPath();
+                this.ctx.arc(anim.startX, anim.startY, radius, arcStart, arcEnd);
+                this.ctx.stroke();
+                
+                // Trajectory line
+                this.ctx.setLineDash([5, 5]);
+                this.ctx.lineWidth = 1;
+                this.ctx.globalAlpha = 0.3 * (1 - progress);
+                this.ctx.beginPath();
+                this.ctx.moveTo(anim.startX, anim.startY);
+                this.ctx.lineTo(anim.targetX, anim.targetY);
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+            }
+            
+            this.ctx.restore();
+            return true;
+        });
     }
     
     showSkillEffect(skillName, x, y) {
