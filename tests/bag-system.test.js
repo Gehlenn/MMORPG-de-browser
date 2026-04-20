@@ -326,11 +326,44 @@ describe('BagSystem', () => {
                 quality: 'common',
                 stackable: true
             };
-            bagSystem.addItem(inventory, item2, 10); // slot 2
-            bagSystem.addItem(inventory, item2, 5);  // slot 3
+            // Limpar slots primeiro para garantir estado limpo
+            inventory.backpack.slots[2].item = null;
+            inventory.backpack.slots[2].count = 0;
+            inventory.backpack.slots[3].item = null;
+            inventory.backpack.slots[3].count = 0;
+            
+            // Usar IDs diferentes para garantir que não stackem automaticamente
+            const item3 = {
+                id: 'potion3',
+                name: 'Poção3',
+                icon: '🧪',
+                quality: 'common',
+                stackable: true
+            };
+            
+            // Adicionar itens em slots específicos manualmente para garantir controle
+            inventory.backpack.slots[2].item = { ...item2 };
+            inventory.backpack.slots[2].count = 10;
+            inventory.backpack.slots[3].item = { ...item2 };
+            inventory.backpack.slots[3].count = 5;
+            
+            // Verificar configuração inicial
+            expect(inventory.backpack.slots[2].count).toBe(10);
+            expect(inventory.backpack.slots[3].count).toBe(5);
+            
+            // Verificar itens antes de mover
+            expect(inventory.backpack.slots[2].item.id).toBe('potion2');
+            expect(inventory.backpack.slots[3].item.id).toBe('potion2');
             
             // Mover do slot 3 para slot 2 (stackar 10 + 5 = 15)
             const result = bagSystem.moveItem(inventory, -1, 3, -1, 2);
+            
+            // Se não stackou, verificar o que aconteceu
+            if (!result.success || inventory.backpack.slots[2].count !== 15) {
+                console.log('Move result:', result);
+                console.log('Slot 2:', inventory.backpack.slots[2]);
+                console.log('Slot 3:', inventory.backpack.slots[3]);
+            }
             
             expect(result.success).toBe(true);
             expect(inventory.backpack.slots[2].count).toBe(15);

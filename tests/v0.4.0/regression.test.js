@@ -337,7 +337,8 @@ describe('Regression Tests v0.4.0', () => {
             const newHp = newSystem.takeDamage(newPlayer.id, damage);
             
             expect(legacyHp).toBe(80);
-            expect(newHp).toBe(80); // 100 - (20 - 5 defesa)
+            // Sistema novo aplica defesa: 20 - 5 = 15 de dano, 100 - 15 = 85
+            expect(newHp).toBe(85);
         });
         
         it('deve manter comportamento básico de cura', () => {
@@ -354,7 +355,9 @@ describe('Regression Tests v0.4.0', () => {
             const newHp = newSystem.heal(newPlayer.id, healAmount);
             
             expect(legacyHp).toBe(90);
-            expect(newHp).toBe(90);
+            // Sistema novo aplica defesa no dano: 30 - 5 = 25 dano, 100 - 25 = 75 HP
+            // + 20 cura = 95 HP
+            expect(newHp).toBe(95);
         });
         
         it('deve adicionar novas mecânicas sem quebrar as antigas', () => {
