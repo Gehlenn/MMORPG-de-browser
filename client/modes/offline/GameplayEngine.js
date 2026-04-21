@@ -116,6 +116,9 @@ class IntegratedGameplayEngine {
         this.inventoryManager = null;
         this.inventoryUI = null;
         
+        // Quest UI
+        this.questUI = null;
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -980,6 +983,13 @@ class IntegratedGameplayEngine {
             }
             
             console.log('🎒 Inventory Manager inicializado');
+        }
+        
+        // Inicializar Quest UI
+        if (window.QuestUI) {
+            this.questUI = new QuestUI(window.questManager);
+            this.questUI.init();
+            console.log('📜 Quest UI inicializado');
         }
         
         // Transição de entrada
@@ -2148,6 +2158,11 @@ class IntegratedGameplayEngine {
         const index = this.mobs.indexOf(mob);
         if (index > -1) {
             this.mobs.splice(index, 1);
+        }
+        
+        // Reportar kill para QuestManager
+        if (window.questManager && mob.type) {
+            window.questManager.reportKill(mob.type, 1);
         }
         
         // XP e loot

@@ -268,6 +268,140 @@ class QuestManager {
     this.activeQuests.clear();
     Logger.info('[QuestManager] Quests limpas');
   }
+
+  /**
+   * Abandona uma quest ativa
+   */
+  abandonQuest(questId) {
+    if (!this.activeQuests.has(questId)) {
+      Logger.warn('[QuestManager] Tentativa de abandonar quest não ativa:', questId);
+      return false;
+    }
+
+    const quest = this.activeQuests.get(questId);
+    this.activeQuests.delete(questId);
+
+    Logger.info('[QuestManager] Quest abandonada:', questId);
+
+    if (window.hud) {
+      window.hud.addChatMessage(`Quest abandonada: ${quest.title}`, '#E57373');
+    }
+
+    if (typeof this.onQuestUpdate === 'function') {
+      this.onQuestUpdate(questId, null);
+    }
+
+    return true;
+  }
+
+  /**
+   * Reporta progresso de coleta de item
+   */
+  reportItemCollect(itemId, quantity = 1) {
+    let updated = false;
+
+    for (const [questId, quest] of this.activeQuests) {
+      if (quest.type === 'collect') {
+        const objective = quest.objectives?.find(obj => 
+          obj.type === 'collect' && obj.itemId === itemId
+        );
+
+        if (objective) {
+          // Atualizar progresso
+          const currentProgress = quest.progress?.[0] || 0;
+          const newProgress = Math.min(objective.target, currentProgress + quantity);
+          
+          if (!quest.progress) quest.progress = [];
+          quest.progress[0] = newProgress;
+
+          Logger.info('[QuestManager] Progresso de coleta:', questId, newProgress);
+          updated = true;
+
+          // Verificar se completou
+          if (newProgress >= objective.target) {
+            quest.status = 'ready_to_complete';
+          }
+
+          if (typeof this.onQuestUpdate === 'function') {
+            this.onQuestUpdate(questId, quest);
+          }
+        }
+      }
+    }
+
+    return updated;
+  }
+
+  /**
+   * Reporta progresso de descoberta
+   */
+  reportDiscovery(locationId) {
+    let updated = false;
+
+    for (const [questId, quest] of this.activeQuests) {
+      if (quest.type === 'discover') {
+        const objectiveIndex = quest.objectives?.findIndex(obj => 
+          obj.type === 'discover' && obj.locationId === locationId
+        );
+
+        if (objectiveIndex !== -1) {
+          if (!quest.progress) quest.progress = [];
+          quest.progress[objectiveIndex] = 1;
+
+          Logger.info('[QuestManager] Localização descoberta:', questId, locationId);
+          updated = true;
+
+          // Verificar se todas as localizações foram descobertas
+          const allDiscovered = quest.objectives.every((obj, idx) => 
+            quest.progress?.[idx] >= obj.target
+          );
+
+          if (allDiscovered) {
+            quest.status = 'ready_to_complete';
+          }
+
+          if (typeof this.onQuestUpdate === 'function') {
+            this.onQuestUpdate(questId, quest);
+          }
+        }
+      }
+    }
+
+    return updated;
+  }
+
+  /**
+   * Carrega quests do localStorage
+   */
+  loadFromStorage() {
+    try {
+      const saved = localStorage.getItem('quests_progress');
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (data.completedQuests) {
+          this.completedQuests = new Set(data.completedQuests);
+        }
+        Logger.info('[QuestManager] Progresso de quests carregado');
+      }
+    } catch (e) {
+      Logger.warn('[QuestManager] Erro ao carregar progresso:', e);
+    }
+  }
+
+  /**
+   * Salva quests no localStorage
+   */
+  saveToStorage() {
+    try {
+      const data = {
+        completedQuests: Array.from(this.completedQuests),
+        savedAt: Date.now()
+      };
+      localStorage.setItem('quests_progress', JSON.stringify(data));
+    } catch (e) {
+      Logger.warn('[QuestManager] Erro ao salvar progresso:', e);
+    }
+  }
 }
 
 // Instância global
