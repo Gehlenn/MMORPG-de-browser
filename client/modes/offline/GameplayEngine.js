@@ -106,6 +106,12 @@ class IntegratedGameplayEngine {
         // Performance Optimizer
         this.perfOptimizer = null;
         
+        // Effects Manager (transições, toasts, dicas)
+        this.effectsManager = null;
+        
+        // Tutorial Manager
+        this.tutorialManager = null;
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -945,6 +951,24 @@ class IntegratedGameplayEngine {
             this.perfOptimizer.init();
         }
         
+        // Inicializar Effects Manager
+        if (window.EffectsManager) {
+            this.effectsManager = new EffectsManager(this.canvas);
+            this.effectsManager.init();
+            window.effectsManager = this.effectsManager;
+        }
+        
+        // Inicializar Tutorial Manager
+        if (window.TutorialManager) {
+            this.tutorialManager = new TutorialManager(this);
+            this.tutorialManager.init();
+        }
+        
+        // Transição de entrada
+        if (this.effectsManager) {
+            this.effectsManager.fadeIn(500);
+        }
+        
         console.log('🎮 Iniciando gameplay loop');
         this.gameLoop();
     }
@@ -1020,6 +1044,11 @@ class IntegratedGameplayEngine {
         // NOVO: Update AdvancedMobSystem
         if (this.advancedMobSystem) {
             this.advancedMobSystem.update(deltaTime * 1000, this.player);
+        }
+        
+        // NOVO: Update Tutorial Manager
+        if (this.tutorialManager) {
+            this.tutorialManager.update();
         }
         
         // NOVO: Update NPCSystem (animações e speech bubbles)
@@ -1739,6 +1768,11 @@ class IntegratedGameplayEngine {
         // NOVO: Renderizar AdvancedMobSystem mobs
         if (this.advancedMobSystem) {
             this.advancedMobSystem.render(this.ctx);
+        }
+        
+        // NOVO: Renderizar effects (weather, ambient, screen effects)
+        if (this.effectsManager) {
+            this.effectsManager.render(this.ctx, this.canvas);
         }
         
         // Restaurar contexto
