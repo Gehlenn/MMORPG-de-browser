@@ -112,6 +112,10 @@ class IntegratedGameplayEngine {
         // Tutorial Manager
         this.tutorialManager = null;
         
+        // Inventory Manager
+        this.inventoryManager = null;
+        this.inventoryUI = null;
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -962,6 +966,20 @@ class IntegratedGameplayEngine {
         if (window.TutorialManager) {
             this.tutorialManager = new TutorialManager(this);
             this.tutorialManager.init();
+        }
+        
+        // Inicializar Inventory Manager
+        if (window.InventoryManager) {
+            this.inventoryManager = new InventoryManager(this.playerId || 'player_1');
+            this.inventoryManager.init();
+            window.inventoryManager = this.inventoryManager;
+            
+            if (window.InventoryUI) {
+                this.inventoryUI = new InventoryUI(this.inventoryManager);
+                this.inventoryUI.init();
+            }
+            
+            console.log('🎒 Inventory Manager inicializado');
         }
         
         // Transição de entrada
@@ -3502,6 +3520,32 @@ class IntegratedGameplayEngine {
         // Som de coleta
         if (window.audioManager) {
             window.audioManager.playSFX('collect');
+        }
+        
+        // Adicionar ao inventário (ou gold)
+        if (this.inventoryManager) {
+            const itemName = item.itemName || item.name || '';
+            
+            if (itemName.toLowerCase() === 'gold' || item.type === 'currency') {
+                // É gold - adicionar diretamente
+                this.inventoryManager.addGold(item.quantity || item.amount || 1);
+                if (this.inventoryUI && this.inventoryUI.visible) {
+                    this.inventoryUI.render();
+                }
+            } else {
+                // É um item normal
+                const result = this.inventoryManager.addItem(item, item.quantity || 1, 'loot');
+                
+                if (!result.success && result.reason === 'inventory_full') {
+                    if (this.effectsManager) {
+                        this.effectsManager.showToast('Inventário cheio!', '⚠️', '#ff4444');
+                    }
+                }
+                
+                if (this.inventoryUI && this.inventoryUI.visible) {
+                    this.inventoryUI.render();
+                }
+            }
         }
         
         // Texto flutuante
