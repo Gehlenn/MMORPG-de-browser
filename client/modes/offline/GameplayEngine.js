@@ -103,6 +103,9 @@ class IntegratedGameplayEngine {
             startTime: 0
         };
         
+        // Performance Optimizer
+        this.perfOptimizer = null;
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -936,6 +939,12 @@ class IntegratedGameplayEngine {
             window.audioManager.createVolumeUI();
         }
         
+        // Inicializar Performance Optimizer
+        if (window.PerformanceOptimizer) {
+            this.perfOptimizer = new PerformanceOptimizer(this);
+            this.perfOptimizer.init();
+        }
+        
         console.log('🎮 Iniciando gameplay loop');
         this.gameLoop();
     }
@@ -956,14 +965,23 @@ class IntegratedGameplayEngine {
         if (!this.isRunning) return;
         
         const currentTime = performance.now();
-        const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.05); // Cap at 50ms
+        const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.1); // Cap at 100ms para evitar spiral
         this.lastTime = currentTime;
         
-        // Update
-        this.update(deltaTime);
+        // Update performance metrics
+        if (this.perfOptimizer) {
+            this.perfOptimizer.updateMetrics(deltaTime * 1000);
+        }
         
-        // Render
-        this.render();
+        // Update (com throttling opcional)
+        if (!this.perfOptimizer || this.perfOptimizer.shouldUpdate()) {
+            this.update(deltaTime);
+        }
+        
+        // Render (com throttling opcional)
+        if (!this.perfOptimizer || this.perfOptimizer.shouldRender()) {
+            this.render();
+        }
         
         // Calcular FPS
         this.frameCount++;
@@ -993,6 +1011,11 @@ class IntegratedGameplayEngine {
         
         // Update particles
         this.updateParticles(deltaTime);
+        
+        // NOVO: Atualizar spatial grid para colisões otimizadas
+        if (this.perfOptimizer) {
+            this.perfOptimizer.updateSpatialGrid();
+        }
         
         // NOVO: Update AdvancedMobSystem
         if (this.advancedMobSystem) {
@@ -2613,6 +2636,11 @@ class IntegratedGameplayEngine {
             this.ctx.fillText(`Camera: (${Math.round(this.camera.x)}, ${Math.round(this.camera.y)})`, 10, 65);
             this.ctx.fillText(`Collision: ${this.checkCollisionWithAll(this.player.x, this.player.y, this.player.width, this.player.height) ? 'YES' : 'NO'}`, 10, 80);
             this.ctx.fillText('Press F1 to toggle debug', 10, this.canvas.height - 10);
+            
+            // NOVO: Performance Optimizer debug info
+            if (this.perfOptimizer) {
+                this.perfOptimizer.renderDebugInfo(this.ctx);
+            }
         }
         
         // Debug visual de colisões (sobreposto ao mundo)
