@@ -829,6 +829,9 @@ class DecisionTree {
         } else if (typeof value === 'object' && value.type === 'variable') {
             // Objeto de variável
             return this.getVariableValue(value.name, context);
+        } else if (typeof value === 'object' && value.type === 'literal') {
+            // Valor literal
+            return value.value;
         } else if (typeof value === 'object' && value.type === 'function') {
             // Chamada de função
             const func = context.functions.get(value.name);
@@ -843,7 +846,7 @@ class DecisionTree {
             return this.evaluateExpression(value.expression, context);
         }
         
-        // Valor literal
+        // Valor literal direto
         return value;
     }
     

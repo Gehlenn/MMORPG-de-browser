@@ -266,11 +266,13 @@ class AIBossController {
      * Remove um boss do sistema AI
      */
     removeBoss(bossId) {
+        const existed = this.bosses.has(bossId);
         this.bosses.delete(bossId);
         this.patterns.delete(bossId);
         this.adaptiveDifficulty.delete(bossId);
         
         console.log(`[AIBossController] Boss ${bossId} removido do AI system`);
+        return existed;
     }
     
     /**
@@ -906,7 +908,7 @@ class AIBossController {
             from: oldPhase,
             to: newPhase,
             timestamp: Date.now(),
-            health_percentage: bossData.currentHp / bossData.maxHp
+            health_percentage: bossAI.currentHp / bossAI.maxHp
         });
         
         // Trigger event
