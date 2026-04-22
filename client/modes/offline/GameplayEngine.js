@@ -127,6 +127,10 @@ class IntegratedGameplayEngine {
         this.merchantManager = null;
         this.merchantUI = null;
         
+        // Trading System
+        this.tradeManager = null;
+        this.tradeUI = null;
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -1028,6 +1032,21 @@ class IntegratedGameplayEngine {
             
             console.log('🏪 Merchant System inicializado');
             console.log('   - Mercadores:', window.MerchantDatabase ? window.MerchantDatabase.getAll().length : 0);
+        }
+        
+        // Inicializar Trading System
+        if (window.TradeManager) {
+            this.tradeManager = new TradeManager(this.playerId || 'player_1');
+            this.tradeManager.init(this.inventoryManager, this.inventoryManager);
+            window.tradeManager = this.tradeManager;
+            
+            if (window.TradeUI && this.inventoryManager) {
+                this.tradeUI = new TradeUI(this.tradeManager, this.inventoryManager);
+                this.tradeUI.init();
+                window.tradeUI = this.tradeUI;
+            }
+            
+            console.log('🤝 Trading System inicializado');
         }
         
         // Transição de entrada
