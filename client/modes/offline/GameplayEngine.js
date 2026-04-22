@@ -131,6 +131,9 @@ class IntegratedGameplayEngine {
         this.tradeManager = null;
         this.tradeUI = null;
         
+        // Loot Drop System
+        this.lootDropManager = null;
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -1047,6 +1050,16 @@ class IntegratedGameplayEngine {
             }
             
             console.log('🤝 Trading System inicializado');
+        }
+        
+        // Inicializar Loot Drop System
+        if (window.LootDropManager) {
+            this.lootDropManager = new LootDropManager();
+            this.lootDropManager.init(this.inventoryManager);
+            window.lootDropManager = this.lootDropManager;
+            
+            console.log('💰 Loot Drop System inicializado');
+            console.log('   - Mobs com tabela de loot:', window.LootDatabase ? Object.keys(window.LootDatabase).length - 5 : 0); // -5 para funções helper
         }
         
         // Transição de entrada
@@ -2231,16 +2244,32 @@ class IntegratedGameplayEngine {
             this.hud.showDamage(this.player.x, this.player.y - 40, `+${xpGained} XP`, false);
         }
         
-        // Drop de loot
-        this.createLootDrop({
-            x: mob.x + (mob.width || 32) / 2,
-            y: mob.y + (mob.height || 32) / 2,
-            item: {
-                name: 'Gold',
-                rarity: 'common',
-                quantity: Math.floor(Math.random() * 10) + 5
-            }
-        });
+        // Drop de loot usando o novo LootDropManager
+        if (this.lootDropManager) {
+            const mobLevel = mob.level || 1;
+            const luckBonus = this.player?.luck || 0;
+            
+            this.lootDropManager.generateMobDrops(
+                mob.type,
+                {
+                    x: mob.x + (mob.width || 32) / 2,
+                    y: mob.y + (mob.height || 32) / 2
+                },
+                mobLevel,
+                luckBonus
+            );
+        } else {
+            // Fallback: drop simples de gold
+            this.createLootDrop({
+                x: mob.x + (mob.width || 32) / 2,
+                y: mob.y + (mob.height || 32) / 2,
+                item: {
+                    name: 'Gold',
+                    rarity: 'common',
+                    quantity: Math.floor(Math.random() * 10) + 5
+                }
+            });
+        }
     }
     
     /**
