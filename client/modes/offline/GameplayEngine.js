@@ -154,6 +154,9 @@ class IntegratedGameplayEngine {
         this.animationManager = null;
         this.tooltipManager = null;
         this.toastManager = null;
+        this.settingsManager = null;
+        this.settingsUI = null;
+        this.responsiveManager = null;
         
         // Equipamento
         this.equipment = {
@@ -1181,6 +1184,40 @@ class IntegratedGameplayEngine {
                     8000
                 );
             }, 2000);
+        }
+        
+        // Inicializar Settings
+        if (window.SettingsManager) {
+            this.settingsManager = new SettingsManager();
+            this.settingsManager.init();
+            window.settingsManager = this.settingsManager;
+            console.log('⚙️ SettingsManager inicializado');
+            
+            if (window.SettingsUI) {
+                this.settingsUI = new SettingsUI(this.settingsManager);
+                this.settingsUI.init();
+                window.settingsUI = this.settingsUI;
+                console.log('⚙️ SettingsUI inicializada (tecla O)');
+            }
+        }
+        
+        // Inicializar Responsive Manager
+        if (window.ResponsiveManager) {
+            this.responsiveManager = new ResponsiveManager();
+            this.responsiveManager.init();
+            window.responsiveManager = this.responsiveManager;
+            console.log('📱 ResponsiveManager inicializado');
+            
+            // Aplicar responsividade aos painéis existentes
+            if (this.inventoryUI) {
+                this.responsiveManager.makePanelResponsive(this.inventoryUI.elements?.panel, { sheetMode: true });
+            }
+            if (this.questUI) {
+                this.responsiveManager.makePanelResponsive(this.questUI.elements?.panel, { sheetMode: true });
+            }
+            if (this.craftingUI) {
+                this.responsiveManager.makePanelResponsive(this.craftingUI.elements?.panel, { sheetMode: true });
+            }
         }
         
         // Transição de entrada
