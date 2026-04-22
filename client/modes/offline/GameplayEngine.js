@@ -142,6 +142,10 @@ class IntegratedGameplayEngine {
         this.economyManager = null;
         this.economyUI = null;
         
+        // Guild System
+        this.guildManager = null;
+        this.guildUI = null;
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -1099,6 +1103,22 @@ class IntegratedGameplayEngine {
             
             console.log('💹 Economy System inicializado');
             console.log('   - Itens rastreados:', this.economyManager?.basePrices?.size || 0);
+        }
+        
+        // Inicializar Guild System
+        if (window.GuildManager) {
+            this.guildManager = new GuildManager(this.playerId || 'player_1');
+            this.guildManager.init();
+            window.guildManager = this.guildManager;
+            
+            if (window.GuildUI) {
+                this.guildUI = new GuildUI(this.guildManager);
+                this.guildUI.init();
+                window.guildUI = this.guildUI;
+            }
+            
+            console.log('🏰 Guild System inicializado');
+            console.log('   - Guildas disponíveis:', this.guildManager?.guilds?.size || 0);
         }
         
         // Transição de entrada
