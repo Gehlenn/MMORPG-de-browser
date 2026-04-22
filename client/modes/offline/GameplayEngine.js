@@ -134,6 +134,10 @@ class IntegratedGameplayEngine {
         // Loot Drop System
         this.lootDropManager = null;
         
+        // Party System
+        this.partyManager = null;
+        this.partyUI = null;
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -1060,6 +1064,21 @@ class IntegratedGameplayEngine {
             
             console.log('💰 Loot Drop System inicializado');
             console.log('   - Mobs com tabela de loot:', window.LootDatabase ? Object.keys(window.LootDatabase).length - 5 : 0); // -5 para funções helper
+        }
+        
+        // Inicializar Party System
+        if (window.PartyManager) {
+            this.partyManager = new PartyManager(this.playerId || 'player_1');
+            this.partyManager.init();
+            window.partyManager = this.partyManager;
+            
+            if (window.PartyUI) {
+                this.partyUI = new PartyUI(this.partyManager);
+                this.partyUI.init();
+                window.partyUI = this.partyUI;
+            }
+            
+            console.log('👥 Party System inicializado');
         }
         
         // Transição de entrada
