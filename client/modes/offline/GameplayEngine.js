@@ -150,6 +150,11 @@ class IntegratedGameplayEngine {
         this.pvpManager = null;
         this.pvpUI = null;
         
+        // UI/UX Managers
+        this.animationManager = null;
+        this.tooltipManager = null;
+        this.toastManager = null;
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -1140,6 +1145,42 @@ class IntegratedGameplayEngine {
             console.log('⚔️ PvP System inicializado');
             console.log('   - Rating:', this.pvpManager?.myRank?.rating || 1000);
             console.log('   - Título:', this.pvpManager?.myRank?.title || 'Novato');
+        }
+        
+        // Inicializar UI/UX Managers
+        if (window.AnimationManager) {
+            this.animationManager = new AnimationManager();
+            this.animationManager.init();
+            window.animationManager = this.animationManager;
+            console.log('✨ AnimationManager inicializado');
+        }
+        
+        if (window.TooltipManager) {
+            this.tooltipManager = new TooltipManager();
+            this.tooltipManager.init();
+            window.tooltipManager = this.tooltipManager;
+            console.log('💬 TooltipManager inicializado');
+            
+            // Auto-attach tooltips aos painéis existentes
+            setTimeout(() => {
+                this.tooltipManager.autoAttach();
+            }, 1000);
+        }
+        
+        if (window.ToastManager) {
+            this.toastManager = new ToastManager();
+            this.toastManager.init();
+            window.toastManager = this.toastManager;
+            console.log('🍞 ToastManager inicializado');
+            
+            // Toast de boas-vindas
+            setTimeout(() => {
+                this.toastManager.info(
+                    'Pressione I, Q, C, M, T, P, G ou V para abrir os painéis de jogo',
+                    'Dica de Controles',
+                    8000
+                );
+            }, 2000);
         }
         
         // Transição de entrada
