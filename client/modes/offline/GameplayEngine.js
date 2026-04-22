@@ -146,6 +146,10 @@ class IntegratedGameplayEngine {
         this.guildManager = null;
         this.guildUI = null;
         
+        // PvP System
+        this.pvpManager = null;
+        this.pvpUI = null;
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -1119,6 +1123,23 @@ class IntegratedGameplayEngine {
             
             console.log('🏰 Guild System inicializado');
             console.log('   - Guildas disponíveis:', this.guildManager?.guilds?.size || 0);
+        }
+        
+        // Inicializar PvP System
+        if (window.PvPManager) {
+            this.pvpManager = new PvPManager(this.playerId || 'player_1');
+            this.pvpManager.init();
+            window.pvpManager = this.pvpManager;
+            
+            if (window.PvPUI) {
+                this.pvpUI = new PvPUI(this.pvpManager);
+                this.pvpUI.init();
+                window.pvpUI = this.pvpUI;
+            }
+            
+            console.log('⚔️ PvP System inicializado');
+            console.log('   - Rating:', this.pvpManager?.myRank?.rating || 1000);
+            console.log('   - Título:', this.pvpManager?.myRank?.title || 'Novato');
         }
         
         // Transição de entrada
