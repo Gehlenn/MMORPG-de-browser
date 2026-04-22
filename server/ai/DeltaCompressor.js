@@ -10,10 +10,10 @@ class DeltaCompressor {
         
         // Statistics
         this.stats = {
+            totalCompressed: 0,
+            totalSavings: 0,
             fullSends: 0,
-            deltaSends: 0,
-            bytesSaved: 0,
-            compressionRatio: 0
+            deltaSends: 0
         };
         
         // Fields to track for delta compression
@@ -30,47 +30,35 @@ class DeltaCompressor {
      * @returns {Object} Compressed state (delta or full)
      */
     compress(entityId, currentState) {
+        if (currentState === null || currentState === undefined) {
+            return currentState;
+        }
+        
         const lastState = this.lastStates.get(entityId);
         
         // First send - must be full state
         if (!lastState) {
             this.lastStates.set(entityId, this.cloneState(currentState));
-            this.stats.fullSends++;
-            return {
-                type: 'full',
-                data: currentState
-            };
+            this.stats.totalCompressed = (this.stats.totalCompressed || 0) + 1;
+            this.stats.fullSends = (this.stats.fullSends || 0) + 1;
+            return currentState;
         }
         
         // Build delta
         const delta = this.buildDelta(lastState, currentState);
         
-        // If nothing changed, send null to skip
+        // If nothing changed, return empty object
         if (delta === null) {
-            return { type: 'skip' };
-        }
-        
-        // If too many fields changed, send full state
-        const deltaKeys = Object.keys(delta);
-        if (deltaKeys.length > this.trackedFields.length * 0.6) {
-            this.lastStates.set(entityId, this.cloneState(currentState));
-            this.stats.fullSends++;
-            return {
-                type: 'full',
-                data: currentState
-            };
+            this.stats.totalCompressed = (this.stats.totalCompressed || 0) + 1;
+            return {};
         }
         
         // Send delta
         this.lastStates.set(entityId, this.cloneState(currentState));
-        this.stats.deltaSends++;
-        this.calculateSavings(currentState, delta);
+        this.stats.deltaSends = (this.stats.deltaSends || 0) + 1;
+        this.stats.totalCompressed = (this.stats.totalCompressed || 0) + 1;
         
-        return {
-            type: 'delta',
-            data: delta,
-            timestamp: Date.now()
-        };
+        return delta;
     }
     
     /**
@@ -83,17 +71,26 @@ class DeltaCompressor {
         const delta = {};
         let hasChanges = false;
         
-        for (const field of this.trackedFields) {
-            if (field === 'intent' || field === 'velocity') {
-                // Deep compare for objects
-                if (!this.deepEqual(last[field], current[field])) {
-                    delta[field] = current[field];
+        // Get all unique keys from both objects
+        const allKeys = new Set([
+            ...Object.keys(last || {}),
+            ...Object.keys(current || {})
+        ]);
+        
+        for (const field of allKeys) {
+            const lastVal = last?.[field];
+            const currentVal = current?.[field];
+            
+            // Deep compare for objects and arrays
+            if (typeof currentVal === 'object' && currentVal !== null) {
+                if (!this.deepEqual(lastVal, currentVal)) {
+                    delta[field] = currentVal;
                     hasChanges = true;
                 }
             } else if (field === 'x' || field === 'y') {
                 // Quantize position to reduce data size
-                const currentQuantized = Math.round(current[field]);
-                const lastQuantized = Math.round(last[field] || 0);
+                const currentQuantized = Math.round(currentVal || 0);
+                const lastQuantized = Math.round(lastVal || 0);
                 
                 if (currentQuantized !== lastQuantized) {
                     delta[field] = currentQuantized;
@@ -101,8 +98,8 @@ class DeltaCompressor {
                 }
             } else {
                 // Simple comparison for primitives
-                if (last[field] !== current[field]) {
-                    delta[field] = current[field];
+                if (lastVal !== currentVal) {
+                    delta[field] = currentVal;
                     hasChanges = true;
                 }
             }
@@ -144,36 +141,33 @@ class DeltaCompressor {
     /**
      * Calculate bytes saved by delta compression
      */
-    calculateSavings(fullState, delta) {
-        const fullSize = JSON.stringify(fullState).length;
-        const deltaSize = JSON.stringify(delta).length;
-        const savings = fullSize - deltaSize;
+    calculateSavings(fullSize, deltaSize) {
+        if (typeof fullSize !== 'number' || typeof deltaSize !== 'number') {
+            return 0;
+        }
         
-        this.stats.bytesSaved += savings;
-        this.stats.compressionRatio = this.stats.bytesSaved / 
-            (this.stats.deltaSends + this.stats.fullSends || 1);
+        const savings = fullSize - deltaSize;
+        this.stats.totalSavings = (this.stats.totalSavings || 0) + savings;
+        
+        return Math.max(0, (savings / fullSize) * 100);
     }
     
     /**
      * Decompress delta on client
-     * @param {Object} compressed 
-     * @param {Object} currentClientState 
+     * @param {string} entityId
+     * @param {Object} delta
+     * @param {Object} clientState 
      * @returns {Object} Full state
      */
-    decompress(compressed, currentClientState) {
-        if (compressed.type === 'full') {
-            return compressed.data;
+    decompress(entityId, delta, clientState) {
+        if (!delta || Object.keys(delta).length === 0) {
+            return clientState;
         }
         
-        if (compressed.type === 'delta') {
-            return {
-                ...currentClientState,
-                ...compressed.data,
-                _deltaTimestamp: compressed.timestamp
-            };
-        }
-        
-        return currentClientState;
+        return {
+            ...clientState,
+            ...delta
+        };
     }
     
     /**
@@ -189,13 +183,11 @@ class DeltaCompressor {
      * @returns {Object}
      */
     getStats() {
-        const total = this.stats.deltaSends + this.stats.fullSends;
         return {
-            ...this.stats,
-            totalSends: total,
-            deltaRatio: total > 0 ? (this.stats.deltaSends / total * 100).toFixed(1) + '%' : '0%',
-            avgSavingsPerDelta: this.stats.deltaSends > 0 ? 
-                (this.stats.bytesSaved / this.stats.deltaSends).toFixed(0) : 0
+            totalCompressed: this.stats.totalCompressed || 0,
+            totalSavings: this.stats.totalSavings || 0,
+            fullSends: this.stats.fullSends || 0,
+            deltaSends: this.stats.deltaSends || 0
         };
     }
     
@@ -205,12 +197,12 @@ class DeltaCompressor {
     clear() {
         this.lastStates.clear();
         this.stats = {
+            totalCompressed: 0,
+            totalSavings: 0,
             fullSends: 0,
-            deltaSends: 0,
-            bytesSaved: 0,
-            compressionRatio: 0
+            deltaSends: 0
         };
     }
 }
 
-export default DeltaCompressor;
+module.exports = DeltaCompressor;
