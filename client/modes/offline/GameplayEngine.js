@@ -138,6 +138,10 @@ class IntegratedGameplayEngine {
         this.partyManager = null;
         this.partyUI = null;
         
+        // Economy System
+        this.economyManager = null;
+        this.economyUI = null;
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -1079,6 +1083,22 @@ class IntegratedGameplayEngine {
             }
             
             console.log('👥 Party System inicializado');
+        }
+        
+        // Inicializar Economy System
+        if (window.EconomyManager) {
+            this.economyManager = new EconomyManager();
+            this.economyManager.init();
+            window.economyManager = this.economyManager;
+            
+            if (window.EconomyUI) {
+                this.economyUI = new EconomyUI(this.economyManager);
+                this.economyUI.init();
+                window.economyUI = this.economyUI;
+            }
+            
+            console.log('💹 Economy System inicializado');
+            console.log('   - Itens rastreados:', this.economyManager?.basePrices?.size || 0);
         }
         
         // Transição de entrada
