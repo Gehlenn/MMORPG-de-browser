@@ -157,6 +157,7 @@ class IntegratedGameplayEngine {
         this.settingsManager = null;
         this.settingsUI = null;
         this.responsiveManager = null;
+        this.achievementsUI = null;
         
         // Equipamento
         this.equipment = {
@@ -1218,6 +1219,14 @@ class IntegratedGameplayEngine {
             if (this.craftingUI) {
                 this.responsiveManager.makePanelResponsive(this.craftingUI.elements?.panel, { sheetMode: true });
             }
+        }
+        
+        // Inicializar Achievements UI
+        if (window.AchievementsUI) {
+            this.achievementsUI = new AchievementsUI(this);
+            this.achievementsUI.initialize();
+            window.achievementsUI = this.achievementsUI;
+            console.log('🏆 AchievementsUI inicializado');
         }
         
         // Transição de entrada
