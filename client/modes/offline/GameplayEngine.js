@@ -123,6 +123,10 @@ class IntegratedGameplayEngine {
         this.craftingManager = null;
         this.craftingUI = null;
         
+        // Merchant System
+        this.merchantManager = null;
+        this.merchantUI = null;
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -1008,6 +1012,22 @@ class IntegratedGameplayEngine {
             }
             
             console.log('⚒️ Crafting System inicializado');
+        }
+        
+        // Inicializar Merchant System
+        if (window.MerchantManager) {
+            this.merchantManager = new MerchantManager();
+            this.merchantManager.init(this.inventoryManager, this.inventoryManager);
+            window.merchantManager = this.merchantManager;
+            
+            if (window.MerchantUI && this.inventoryManager) {
+                this.merchantUI = new MerchantUI(this.merchantManager, this.inventoryManager);
+                this.merchantUI.init();
+                window.merchantUI = this.merchantUI;
+            }
+            
+            console.log('🏪 Merchant System inicializado');
+            console.log('   - Mercadores:', window.MerchantDatabase ? window.MerchantDatabase.getAll().length : 0);
         }
         
         // Transição de entrada

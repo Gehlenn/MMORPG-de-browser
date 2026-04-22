@@ -198,6 +198,63 @@ class InventoryManager {
         return { total: this.getTotalSlots(), used: this.inventory.items.length, free: this.getFreeSlots(), gold: this.inventory.gold, bankGold: this.bank.gold };
     }
 
+    // ===================== MÉTODOS PARA MERCHANT =====================
+    
+    /**
+     * Conta quantidade total de um item específico
+     */
+    countItem(itemId) {
+        return this.inventory.items
+            .filter(i => i.id === itemId)
+            .reduce((sum, i) => sum + (i.quantity || 1), 0);
+    }
+    
+    /**
+     * Encontra todos os slots que contêm o item
+     */
+    findItem(itemId) {
+        return this.inventory.items.filter(i => i.id === itemId);
+    }
+    
+    /**
+     * Retorna gold atual
+     */
+    getGold() {
+        return this.inventory.gold || 0;
+    }
+    
+    /**
+     * Adiciona gold
+     */
+    addGold(amount) {
+        this.inventory.gold = (this.inventory.gold || 0) + amount;
+        this.saveToStorage();
+        return this.inventory.gold;
+    }
+    
+    /**
+     * Remove gold
+     */
+    removeGold(amount) {
+        const current = this.inventory.gold || 0;
+        if (current < amount) return false;
+        this.inventory.gold = current - amount;
+        this.saveToStorage();
+        return true;
+    }
+    
+    /**
+     * Getter para acesso direto aos slots formatados
+     */
+    get slots() {
+        const slots = [];
+        for (let i = 0; i < this.getTotalSlots(); i++) {
+            const item = this.inventory.items.find(it => it.slot === i);
+            slots.push(item ? { item, quantity: item.quantity || 1, slot: i } : null);
+        }
+        return slots;
+    }
+
     clear() {
         this.inventory = { items: [], gold: 0, equipped: { weapon: null, armor: null, helmet: null, boots: null, accessory1: null, accessory2: null } };
         this.bank = { items: [], gold: 0, tabs: this.bank.tabs, activeTab: 'general' };
