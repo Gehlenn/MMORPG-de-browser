@@ -119,6 +119,10 @@ class IntegratedGameplayEngine {
         // Quest UI
         this.questUI = null;
         
+        // Crafting System
+        this.craftingManager = null;
+        this.craftingUI = null;
+        
         // Equipamento
         this.equipment = {
             weapon: null,
@@ -990,6 +994,20 @@ class IntegratedGameplayEngine {
             this.questUI = new QuestUI(window.questManager);
             this.questUI.init();
             console.log('📜 Quest UI inicializado');
+        }
+        
+        // Inicializar Crafting System
+        if (window.CraftingManager) {
+            this.craftingManager = new CraftingManager(this.playerId || 'player_1');
+            this.craftingManager.init();
+            window.craftingManager = this.craftingManager;
+            
+            if (window.CraftingUI && this.inventoryManager) {
+                this.craftingUI = new CraftingUI(this.craftingManager, this.inventoryManager);
+                this.craftingUI.init();
+            }
+            
+            console.log('⚒️ Crafting System inicializado');
         }
         
         // Transição de entrada
