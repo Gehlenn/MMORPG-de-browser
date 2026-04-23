@@ -378,7 +378,7 @@ class PartyManager {
 
     // ============ EXP SHARING ============
 
-    shareExp(partyId, totalExp, mobLevel, killerId) {
+    shareExp(partyId, totalExp, mobLevel, killerId, options = {}) {
         const party = this.parties.get(partyId);
         if (!party || !party.expSharing) return null;
 
@@ -392,8 +392,15 @@ class PartyManager {
         
         if (!killer) return null;
 
-        // Encontrar membros em alcance
+        // Mapa onde o mob morreu
+        const mobMapId = options.mapId || killer.position?.mapId || 'default';
+
+        // Encontrar membros em alcance E no mesmo mapa
         for (const [memberId, member] of party.members) {
+            // Verificar se está no mesmo mapa
+            const memberMapId = member.position?.mapId || 'default';
+            if (memberMapId !== mobMapId) continue;
+
             const distance = this.calculateDistance(killer.position, member.position);
             
             if (distance <= this.EXP_SHARING_RANGE) {
@@ -563,24 +570,42 @@ class PartyManager {
 
     updatePartyBuffs() {
         for (const party of this.parties.values()) {
-            // Só aplica buffs em Party (não em Raid)
-            if (party.groupType === this.GROUP_TYPES.RAID) continue;
-            
             const memberCount = Math.min(party.members.size, 5); // Cap em 5
             if (memberCount < 2) continue;
 
-            // Buffs baseados no tamanho do grupo (só até 5 membros)
+            // Buffs baseados no tamanho do grupo (até 5 membros)
+            // Funciona em Party E Raid (só XP não compartilha em Raid)
             const hpBonus = memberCount * 2; // +2% HP por membro (máx +10%)
+            const damageBonus = memberCount * 1; // +1% Dano por membro (máx +5%)
             const expBonus = memberCount * 2; // +2% EXP por membro (máx +10%)
 
+            // Agrupar membros por mapa
+            const membersByMap = new Map();
             for (const member of party.members.values()) {
                 const char = this.characterPersistence?.getActiveCharacter(member.characterId);
-                if (char?.applyPartyBuff) {
-                    char.applyPartyBuff({
-                        hpBonus,
-                        expBonus,
-                        duration: 15000 // 15 segundos
-                    });
+                if (!char) continue;
+                
+                const mapId = char.data?.position?.mapId || 'default';
+                if (!membersByMap.has(mapId)) {
+                    membersByMap.set(mapId, []);
+                }
+                membersByMap.get(mapId).push({ member, char });
+            }
+
+            // Aplicar buffs só para membros no mesmo mapa
+            for (const [mapId, mapMembers] of membersByMap) {
+                if (mapMembers.length < 2) continue; // Precisa de pelo menos 2 no mesmo mapa
+
+                for (const { char } of mapMembers) {
+                    if (char.applyPartyBuff) {
+                        char.applyPartyBuff({
+                            hpBonus,
+                            damageBonus,
+                            expBonus,
+                            mapId, // Rastrear qual mapa
+                            duration: 15000 // 15 segundos
+                        });
+                    }
                 }
             }
         }
