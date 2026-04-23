@@ -218,60 +218,6 @@ class SimpleMMOServer {
                 }
             });
         }, 1000); // Update every second
-                // Simple AI: move towards nearest player
-                let nearestPlayer = null;
-                let minDistance = Infinity;
-                
-                this.players.forEach(player => {
-                    const dx = player.x - mob.x;
-                    const dy = player.y - mob.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (distance < minDistance && distance < 400) {
-                        minDistance = distance;
-                        nearestPlayer = player;
-                    }
-                });
-                
-                if (nearestPlayer && minDistance > 30) {
-                    const dx = nearestPlayer.x - mob.x;
-                    const dy = nearestPlayer.y - mob.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    
-                    const moveX = (dx / distance) * (mob.speed || 2);
-                    const moveY = (dy / distance) * (mob.speed || 2);
-                    
-                    mob.x += moveX;
-                    mob.y += moveY;
-                    
-                    // Emitir update para todos os jogadores
-                    this.io.emit('mobUpdate', { 
-                        id: mobId, 
-                        x: mob.x, 
-                        y: mob.y,
-                        name: mob.name,
-                        type: mob.type,
-                        hp: mob.hp,
-                        maxHp: mob.maxHp,
-                        color: mob.color
-                    });
-                    
-                    console.log(`🤖 ${mob.name} moving towards player at (${mob.x}, ${mob.y})`);
-                } else {
-                    // Emitir update mesmo se não se mover (para manter sincronizado)
-                    this.io.emit('mobUpdate', { 
-                        id: mobId, 
-                        x: mob.x, 
-                        y: mob.y,
-                        name: mob.name,
-                        type: mob.type,
-                        hp: mob.hp,
-                        maxHp: mob.maxHp,
-                        color: mob.color
-                    });
-                }
-            });
-        }, 1000); // Update every second
     }
     
     async start() {
