@@ -20,6 +20,46 @@ class AchievementManager {
     }
 
     /**
+     * Setup socket event handlers
+     */
+    setupSocketHandlers(io, server) {
+        this.io = io;
+        this.server = server;
+
+        server.on('achievements:get', async (socket, data) => {
+            const achievements = await this.getAchievements(socket.characterId, data?.category);
+            const stats = await this.getAchievementStats(socket.characterId);
+            socket.emit('achievement:list', { achievements, stats });
+        });
+
+        server.on('achievements:request_unlock', async (socket, data) => {
+            await this.requestManualUnlock(socket.characterId, data.achievementId);
+        });
+
+        server.on('achievements:progress', async (socket, data) => {
+            const result = await this.updateProgress(socket.characterId, data.achievementId, data.amount);
+            if (result?.unlocked) {
+                socket.emit('achievement:unlocked', {
+                    id: data.achievementId,
+                    ...result.achievement
+                });
+            }
+        });
+
+        console.log('[AchievementManager] Socket handlers registered');
+    }
+
+    /**
+     * Request manual unlock (for GM/admin commands)
+     */
+    async requestManualUnlock(characterId, achievementId) {
+        const definition = this.definitions[achievementId];
+        if (!definition) return;
+
+        await this.unlockAchievement(characterId, achievementId);
+    }
+
+    /**
      * Create achievement tables
      */
     async createTables() {
