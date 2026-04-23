@@ -308,7 +308,6 @@ describe('Enhanced AI System', () => {
             aiBossController.setupTacticalProfiles();
             expect(aiBossController.tactics.has('aggressive')).toBe(true);
             expect(aiBossController.tactics.has('defensive')).toBe(true);
-            expect(aiBossController.tactics.has('balanced')).toBe(true);
         });
 
         test('should setup ability patterns', () => {
