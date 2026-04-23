@@ -219,9 +219,8 @@ class LoginManager {
             setTimeout(() => {
                 this.loginScreen.style.display = 'none';
                 if (this.characterScreen) {
-                    this.characterScreen.style.display = 'flex';
-                    this.characterScreen.style.opacity = '0';
-                    setTimeout(() => this.characterScreen.style.opacity = '1', 50);
+                    this.characterScreen.classList.add('active');
+                    console.log('✅ Tela de seleção ativada');
                 }
             }, 300);
         }
@@ -446,18 +445,11 @@ class LoginManager {
         
         // Transição para o jogo
         if (this.characterScreen) {
-            this.characterScreen.style.opacity = '0';
-            setTimeout(() => {
-                this.characterScreen.style.display = 'none';
-                if (this.gameContainer) {
-                    this.gameContainer.style.display = 'block';
-                    this.gameContainer.style.opacity = '0';
-                    setTimeout(() => {
-                        this.gameContainer.style.opacity = '1';
-                        this.startGameplay();
-                    }, 50);
-                }
-            }, 300);
+            this.characterScreen.classList.remove('active');
+            if (this.gameContainer) {
+                this.gameContainer.classList.add('active');
+                this.startGameplay();
+            }
         }
     }
     
@@ -506,11 +498,10 @@ class LoginManager {
         
         // Esconder telas de personagem e jogo imediatamente
         if (this.characterScreen) {
-            this.characterScreen.style.display = 'none';
-            this.characterScreen.style.opacity = '0';
+            this.characterScreen.classList.remove('active');
+            console.log('🙈 Tela de seleção escondida');
         }
         if (this.gameContainer) {
-            this.gameContainer.style.display = 'none';
             this.gameContainer.classList.remove('active');
         }
         
@@ -518,6 +509,7 @@ class LoginManager {
         if (this.loginScreen) {
             this.loginScreen.style.display = 'flex';
             this.loginScreen.style.opacity = '1';
+            console.log('👁️ Tela de login mostrada');
         }
         
         // Limpar campos de login
