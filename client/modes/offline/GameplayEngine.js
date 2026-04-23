@@ -159,6 +159,7 @@ class IntegratedGameplayEngine {
         this.responsiveManager = null;
         this.achievementsUI = null;
         this.zoneSelectorUI = null;
+        this.classUI = null;
         
         // Equipamento
         this.equipment = {
@@ -1237,6 +1238,14 @@ class IntegratedGameplayEngine {
             this.zoneSelectorUI.setPlayerLevel(this.player?.level || 1);
             window.zoneSelectorUI = this.zoneSelectorUI;
             console.log('🗺️ ZoneSelectorUI inicializado');
+        }
+        
+        // Inicializar Class UI
+        if (window.ClassUI) {
+            this.classUI = new ClassUI(this);
+            this.classUI.initialize();
+            window.classUI = this.classUI;
+            console.log('⚔️ ClassUI inicializado');
         }
         
         // Transição de entrada
