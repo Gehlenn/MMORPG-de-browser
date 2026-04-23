@@ -344,12 +344,28 @@ class LoginManager {
     }
     
     createCharacter() {
+        console.log('🔍 Debug createCharacter - currentUser:', this.currentUser);
+        
         // Verificar se usuário está logado
         if (!this.currentUser) {
-            console.error('❌ Nenhum usuário logado');
-            this.showMessage('characterMessage', 'Erro: Faça login novamente', 'error');
-            setTimeout(() => this.logout(), 2000);
-            return;
+            console.error('❌ Nenhum usuário logado, tentando recuperar do localStorage...');
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                try {
+                    this.currentUser = JSON.parse(savedUser);
+                    console.log('✅ Usuário recuperado:', this.currentUser.username);
+                } catch (e) {
+                    console.error('❌ Erro ao recuperar usuário:', e);
+                    this.showMessage('characterMessage', 'Erro: Faça login novamente', 'error');
+                    setTimeout(() => this.logout(), 2000);
+                    return;
+                }
+            } else {
+                console.error('❌ Nenhum usuário em localStorage');
+                this.showMessage('characterMessage', 'Erro: Faça login novamente', 'error');
+                setTimeout(() => this.logout(), 2000);
+                return;
+            }
         }
         
         const name = this.characterName?.value?.trim();
@@ -458,10 +474,6 @@ class LoginManager {
     
     // ===== LOGOUT =====
     logout() {
-        // Prevenir múltiplos logouts simultâneos
-        if (this._isLoggingOut) return;
-        this._isLoggingOut = true;
-        
         console.log('🚪 Fazendo logout...');
         
         // Limpar dados da sessão
@@ -479,28 +491,24 @@ class LoginManager {
         }
         window._gameplayEngine = null;
         
-        // Transição de volta para login
-        const screens = [this.characterScreen, this.gameContainer];
-        screens.forEach(screen => {
-            if (screen) {
-                screen.style.opacity = '0';
-                setTimeout(() => screen.style.display = 'none', 300);
-            }
-        });
+        // Esconder telas de personagem e jogo imediatamente
+        if (this.characterScreen) {
+            this.characterScreen.style.display = 'none';
+            this.characterScreen.style.opacity = '0';
+        }
+        if (this.gameContainer) {
+            this.gameContainer.style.display = 'none';
+            this.gameContainer.classList.remove('active');
+        }
         
-        setTimeout(() => {
-            if (this.loginScreen) {
-                this.loginScreen.style.display = 'flex';
-                this.loginScreen.style.opacity = '0';
-                setTimeout(() => this.loginScreen.style.opacity = '1', 50);
-            }
-            
-            // Limpar campos de login
-            if (this.loginPassword) this.loginPassword.value = '';
-            
-            // Liberar flag de logout
-            this._isLoggingOut = false;
-        }, 300);
+        // Mostrar tela de login
+        if (this.loginScreen) {
+            this.loginScreen.style.display = 'flex';
+            this.loginScreen.style.opacity = '1';
+        }
+        
+        // Limpar campos de login
+        if (this.loginPassword) this.loginPassword.value = '';
         
         console.log('✅ Logout completo');
     }
