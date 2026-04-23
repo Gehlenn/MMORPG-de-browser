@@ -344,6 +344,14 @@ class LoginManager {
     }
     
     createCharacter() {
+        // Verificar se usuário está logado
+        if (!this.currentUser) {
+            console.error('❌ Nenhum usuário logado');
+            this.showMessage('characterMessage', 'Erro: Faça login novamente', 'error');
+            setTimeout(() => this.logout(), 2000);
+            return;
+        }
+        
         const name = this.characterName?.value?.trim();
         const race = this.characterRace?.value;
         const charClass = this.characterClass?.value || 'warrior';
@@ -450,6 +458,10 @@ class LoginManager {
     
     // ===== LOGOUT =====
     logout() {
+        // Prevenir múltiplos logouts simultâneos
+        if (this._isLoggingOut) return;
+        this._isLoggingOut = true;
+        
         console.log('🚪 Fazendo logout...');
         
         // Limpar dados da sessão
@@ -485,6 +497,9 @@ class LoginManager {
             
             // Limpar campos de login
             if (this.loginPassword) this.loginPassword.value = '';
+            
+            // Liberar flag de logout
+            this._isLoggingOut = false;
         }, 300);
         
         console.log('✅ Logout completo');
