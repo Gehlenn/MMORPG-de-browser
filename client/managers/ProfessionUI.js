@@ -64,6 +64,11 @@ class ProfessionUI {
         this.createUI();
         this.registerSocketEvents();
         this.registerKeyboardShortcuts();
+        
+        // Criar botão flutuante após um delay para garantir que o DOM está pronto
+        setTimeout(() => {
+            this.createFloatingButton();
+        }, 1000);
     }
     
     createUI() {
@@ -784,6 +789,85 @@ class ProfessionUI {
             this.hide();
         } else {
             this.show();
+        }
+    }
+    
+    // ===== FLOATING BUTTON =====
+    
+    createFloatingButton() {
+        // Verificar se já existe
+        if (document.getElementById('profession-floating-btn')) {
+            return;
+        }
+        
+        const button = document.createElement('button');
+        button.id = 'profession-floating-btn';
+        button.innerHTML = '⚒️';
+        button.title = 'Profissões (P)';
+        button.style.cssText = `
+            position: fixed;
+            bottom: 140px;
+            right: 16px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(45deg, #e94560, #ff6b6b);
+            border: none;
+            border-radius: 50%;
+            font-size: 22px;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+        
+        // Hover effects
+        button.onmouseover = () => {
+            button.style.transform = 'scale(1.1)';
+            button.style.boxShadow = '0 6px 20px rgba(233, 69, 96, 0.6)';
+        };
+        
+        button.onmouseout = () => {
+            button.style.transform = 'scale(1)';
+            button.style.boxShadow = '0 4px 15px rgba(233, 69, 96, 0.4)';
+        };
+        
+        // Click handler
+        button.onclick = () => {
+            this.toggle();
+        };
+        
+        // Badge para XP rested disponível
+        this.buttonBadge = document.createElement('span');
+        this.buttonBadge.id = 'profession-btn-badge';
+        this.buttonBadge.style.cssText = `
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #3b82f6;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+            display: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        `;
+        this.buttonBadge.textContent = '💤';
+        
+        button.appendChild(this.buttonBadge);
+        document.body.appendChild(button);
+        
+        console.log('[ProfessionUI] Botão flutuante criado');
+    }
+    
+    updateButtonBadge(hasRested) {
+        if (this.buttonBadge) {
+            this.buttonBadge.style.display = hasRested ? 'block' : 'none';
         }
     }
 }

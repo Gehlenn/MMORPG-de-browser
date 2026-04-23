@@ -142,11 +142,120 @@ describe('Enhanced AI System', () => {
             expect(Array.isArray(threats)).toBe(true);
         });
 
+        test('should start and stop update loop', () => {
+            aiMobController.initialize();
+            expect(aiMobController.isRunning).toBe(true);
+            aiMobController.stop();
+            expect(aiMobController.isRunning).toBe(false);
+        });
+
+        test('should make decision', () => {
+            const mobData = {
+                id: 'test_mob_1',
+                type: 'goblin',
+                position: { x: 100, y: 100 },
+                stats: { hp: 50, maxHp: 50 }
+            };
+            aiMobController.addMob(mobData);
+            aiMobController.setupDecisionTrees();
+            const context = {
+                has_target: true,
+                target_in_range: true,
+                is_patrolling: false,
+                health_low: false
+            };
+            const decision = aiMobController.makeDecision('test_mob_1', context);
+            expect(decision).toBeDefined();
+        });
+
+        test('should execute decision', () => {
+            const mobData = {
+                id: 'test_mob_1',
+                type: 'goblin',
+                position: { x: 100, y: 100 },
+                stats: { hp: 50, maxHp: 50 }
+            };
+            aiMobController.addMob(mobData);
+            const result = aiMobController.executeDecision('test_mob_1', 'patrol');
+            expect(typeof result).toBe('boolean');
+        });
+
+        test('should enter idle state', () => {
+            const mobData = {
+                id: 'test_mob_1',
+                type: 'goblin',
+                position: { x: 100, y: 100 },
+                stats: { hp: 50, maxHp: 50 }
+            };
+            aiMobController.addMob(mobData);
+            aiMobController.enterIdle('test_mob_1');
+            const aiData = aiMobController.mobs.get('test_mob_1');
+            expect(aiData.stateMachine.currentState).toBe('idle');
+        });
+
+        test('should enter patrol state', () => {
+            const mobData = {
+                id: 'test_mob_1',
+                type: 'goblin',
+                position: { x: 100, y: 100 },
+                stats: { hp: 50, maxHp: 50 }
+            };
+            aiMobController.addMob(mobData);
+            aiMobController.enterPatrol('test_mob_1');
+            const aiData = aiMobController.mobs.get('test_mob_1');
+            expect(aiData.stateMachine.currentState).toBe('patrol');
+        });
+
+        test('should enter chase state', () => {
+            const mobData = {
+                id: 'test_mob_1',
+                type: 'goblin',
+                position: { x: 100, y: 100 },
+                stats: { hp: 50, maxHp: 50 }
+            };
+            aiMobController.addMob(mobData);
+            aiMobController.enterChase('test_mob_1', 'player_1');
+            const aiData = aiMobController.mobs.get('test_mob_1');
+            expect(aiData.stateMachine.currentState).toBe('chase');
+        });
+
+        test('should enter attack state', () => {
+            const mobData = {
+                id: 'test_mob_1',
+                type: 'goblin',
+                position: { x: 100, y: 100 },
+                stats: { hp: 50, maxHp: 50 }
+            };
+            aiMobController.addMob(mobData);
+            aiMobController.enterAttack('test_mob_1', 'player_1');
+            const aiData = aiMobController.mobs.get('test_mob_1');
+            expect(aiData.stateMachine.currentState).toBe('attack');
+        });
+
+        test('should enter flee state', () => {
+            const mobData = {
+                id: 'test_mob_1',
+                type: 'goblin',
+                position: { x: 100, y: 100 },
+                stats: { hp: 50, maxHp: 50 }
+            };
+            aiMobController.addMob(mobData);
+            aiMobController.enterFlee('test_mob_1', 'player_1');
+            const aiData = aiMobController.mobs.get('test_mob_1');
+            expect(aiData.stateMachine.currentState).toBe('flee');
+        });
+
         test('should calculate distance', () => {
             const pos1 = { x: 0, y: 0 };
             const pos2 = { x: 3, y: 4 };
             const distance = aiMobController.calculateDistance(pos1, pos2);
             expect(distance).toBe(5);
+        });
+
+        test('should get mob profile', () => {
+            const profile = aiMobController.getMobProfile('goblin');
+            expect(profile).toBeDefined();
+            expect(profile.personality).toBe('pack');
         });
 
         test('should get mob data', () => {
