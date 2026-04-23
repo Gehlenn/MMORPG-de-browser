@@ -183,5 +183,51 @@ describe('AI Core Tests', () => {
             expect(stats).toHaveProperty('totalBosses');
             expect(stats).toHaveProperty('tactics');
         });
+
+        test('should handle invalid boss ID gracefully', () => {
+            const result = aiBossController.updateBoss('invalid_id', {});
+            expect(result).toBeUndefined();
+        });
+
+        test('should handle multiple bosses', () => {
+            aiBossController.setupAbilityPatterns();
+            aiBossController.addBoss({ id: 'boss1', type: 'dragon', position: { x: 100, y: 100 }, stats: { hp: 1000, maxHp: 1000 } });
+            aiBossController.addBoss({ id: 'boss2', type: 'lich', position: { x: 200, y: 200 }, stats: { hp: 800, maxHp: 800 } });
+            expect(aiBossController.bosses.size).toBe(2);
+        });
+
+        test('should update all bosses', () => {
+            aiBossController.setupAbilityPatterns();
+            aiBossController.addBoss({ id: 'update_all_boss', type: 'dragon', position: { x: 500, y: 500 }, stats: { hp: 1000, maxHp: 1000 } });
+            aiBossController.updateAllBosses();
+            const boss = aiBossController.bosses.get('update_all_boss');
+            expect(boss).toBeDefined();
+        });
+    });
+
+    describe('Edge Cases & Error Handling', () => {
+        test('should handle null mob data', () => {
+            expect(() => aiMobController.addMob(null)).toThrow();
+        });
+
+        test('should handle mob without ID', () => {
+            expect(() => aiMobController.addMob({ type: 'goblin' })).toThrow();
+        });
+
+        test('should handle pathfinding with invalid positions', () => {
+            pathfindingSystem.initialize(100, 100);
+            const path = pathfindingSystem.findSimplePath(null, { x: 20, y: 20 });
+            expect(path).toEqual([]);
+        });
+
+        test('should handle boss removal of non-existent boss', () => {
+            expect(() => aiBossController.removeBoss('non_existent')).not.toThrow();
+        });
+
+        test('should handle empty decision tree evaluation', () => {
+            aiMobController.setupDecisionTrees();
+            const decision = aiMobController.evaluateDecisionTree('non_existent', {});
+            expect(decision).toBeNull();
+        });
     });
 });

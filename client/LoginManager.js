@@ -117,7 +117,14 @@ class LoginManager {
         
         // Login bem-sucedido
         this.currentUser = { username: user.username, id: user.id || Date.now() };
+        console.log('✅ Login bem-sucedido, salvando usuário:', this.currentUser);
+        
         localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
+        console.log('💾 currentUser salvo no localStorage');
+        
+        // Verificar se salvou
+        const saved = localStorage.getItem('currentUser');
+        console.log('🔍 Verificação localStorage:', saved);
         
         // Carregar personagens do usuário
         this.loadUserCharacters();
