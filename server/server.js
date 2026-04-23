@@ -209,6 +209,10 @@ class MMOServer {
         // Setup Enhanced AI System integration
         this.setupAIIntegration();
         
+        // Initialize Profession & Rested XP Systems
+        const ProfessionRestedIntegration = require('./ProfessionRestedIntegration.js');
+        new ProfessionRestedIntegration(this);
+        
         // Simple event emitter
         this.eventEmitter = {
             emit: (event, ...args) => {

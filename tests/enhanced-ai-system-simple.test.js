@@ -205,6 +205,64 @@ describe('Enhanced AI System', () => {
             expect(pathfindingSystem.nodeCache.size).toBe(0);
             expect(pathfindingSystem.obstacleCache.size).toBe(0);
         });
+
+        test('should remove static obstacle', () => {
+            pathfindingSystem.initialize(200, 200);
+            pathfindingSystem.addStaticObstacle({ x: 50, y: 50 }, 20, 20);
+            pathfindingSystem.removeStaticObstacle({ x: 50, y: 50 }, 20, 20);
+            const gridPos = pathfindingSystem.worldToGrid({ x: 50, y: 50 });
+            const node = pathfindingSystem.grid[gridPos.y][gridPos.x];
+            expect(node.walkable).toBe(true);
+        });
+
+        test('should add and remove dynamic obstacle', () => {
+            pathfindingSystem.initialize(200, 200);
+            pathfindingSystem.addDynamicObstacle('mob-1', { x: 60, y: 60 }, 10, 10, 5000);
+            expect(pathfindingSystem.dynamicObstacles.has('mob-1')).toBe(true);
+            pathfindingSystem.removeDynamicObstacle('mob-1');
+            expect(pathfindingSystem.dynamicObstacles.has('mob-1')).toBe(false);
+        });
+
+        test('should get node from grid', () => {
+            pathfindingSystem.initialize(200, 200);
+            const node = pathfindingSystem.getNode(5, 5);
+            expect(node).toBeDefined();
+            expect(node.x).toBe(5);
+            expect(node.y).toBe(5);
+        });
+
+        test('should convert grid to world path', () => {
+            pathfindingSystem.initialize(200, 200);
+            const gridPath = [{ x: 5, y: 5 }, { x: 6, y: 5 }];
+            const worldPath = pathfindingSystem.gridToWorldPath(gridPath);
+            expect(worldPath).toHaveLength(2);
+            expect(worldPath[0].x).toBe(55);
+            expect(worldPath[0].y).toBe(55);
+        });
+
+        test('should generate cache key', () => {
+            const start = { x: 1, y: 1 };
+            const end = { x: 5, y: 5 };
+            const key = pathfindingSystem.generateCacheKey(start, end, 'entity-1');
+            expect(typeof key).toBe('string');
+            expect(key).toContain('1,1');
+            expect(key).toContain('5,5');
+        });
+
+        test('should check if position is valid', () => {
+            pathfindingSystem.initialize(200, 200);
+            expect(pathfindingSystem.isValidPosition({ x: 5, y: 5 })).toBe(true);
+            expect(pathfindingSystem.isValidPosition({ x: -1, y: 5 })).toBe(false);
+            expect(pathfindingSystem.isValidPosition({ x: 5, y: 25 })).toBe(false);
+        });
+
+        test('should calculate heuristic', () => {
+            const pos1 = { x: 0, y: 0 };
+            const pos2 = { x: 3, y: 4 };
+            const h = pathfindingSystem.heuristic(pos1, pos2);
+            expect(typeof h).toBe('number');
+            expect(h).toBeGreaterThan(0);
+        });
     });
 
     describe('AIBossController', () => {
@@ -270,6 +328,104 @@ describe('Enhanced AI System', () => {
             expect(difficulty).toHaveProperty('damageMultiplier');
         });
 
+        test('should get tactical profile', () => {
+            const profile = aiBossController.getTacticalProfile('dragon');
+            expect(profile).toBeDefined();
+        });
+
+        test('should get target count with multiple targets', () => {
+            const bossData = {
+                id: 'test_boss',
+                name: 'Dragon Lord',
+                type: 'dragon',
+                position: { x: 400, y: 300 }
+            };
+            aiBossController.addBoss(bossData);
+            aiBossController.addTarget('test_boss', 'player_1');
+            aiBossController.addTarget('test_boss', 'player_2');
+            const count = aiBossController.getTargetCount('test_boss');
+            expect(count).toBe(2);
+        });
+
+        test('should initialize boss AI', () => {
+            const bossData = {
+                id: 'test_boss_init',
+                name: 'Dragon Lord',
+                type: 'dragon',
+                position: { x: 400, y: 300 }
+            };
+            aiBossController.addBoss(bossData);
+            const bossAI = aiBossController.bosses.get('test_boss_init');
+            expect(bossAI).toBeDefined();
+            expect(bossAI.id).toBe('test_boss_init');
+        });
+
+        test('should update boss target', () => {
+            const bossData = {
+                id: 'test_boss_target',
+                name: 'Dragon Lord',
+                type: 'dragon',
+                position: { x: 400, y: 300 }
+            };
+            aiBossController.addBoss(bossData);
+            aiBossController.updateBossTarget('test_boss_target', { x: 500, y: 500 });
+            const bossAI = aiBossController.bosses.get('test_boss_target');
+            expect(bossAI.target).toBeDefined();
+        });
+
+        test('should handle boss death', () => {
+            const bossData = {
+                id: 'test_boss_death',
+                name: 'Dragon Lord',
+                type: 'dragon',
+                position: { x: 400, y: 300 }
+            };
+            aiBossController.addBoss(bossData);
+            aiBossController.handleBossDeath('test_boss_death');
+            expect(aiBossController.bosses.has('test_boss_death')).toBe(false);
+        });
+
+        test('should add and remove target', () => {
+            const bossData = {
+                id: 'test_boss',
+                name: 'Dragon Lord',
+                type: 'dragon',
+                position: { x: 400, y: 300 }
+            };
+            aiBossController.addBoss(bossData);
+            aiBossController.addTarget('test_boss', 'player_1');
+            expect(aiBossController.targets.has('test_boss')).toBe(true);
+            aiBossController.removeTarget('test_boss', 'player_1');
+            expect(aiBossController.targets.has('test_boss')).toBe(false);
+        });
+
+        test('should update boss difficulty', () => {
+            const bossData = {
+                id: 'test_boss',
+                name: 'Dragon Lord',
+                type: 'dragon',
+                position: { x: 400, y: 300 }
+            };
+            aiBossController.addBoss(bossData);
+            const difficulty = aiBossController.createDifficultyData('test_boss');
+            aiBossController.updateBossDifficulty('test_boss', difficulty);
+            const updatedDifficulty = aiBossController.getBossDifficulty('test_boss');
+            expect(updatedDifficulty).toEqual(difficulty);
+        });
+
+        test('should get boss difficulty', () => {
+            const bossData = {
+                id: 'test_boss',
+                name: 'Dragon Lord',
+                type: 'dragon',
+                position: { x: 400, y: 300 }
+            };
+            aiBossController.addBoss(bossData);
+            const difficulty = aiBossController.createDifficultyData('test_boss');
+            aiBossController.updateBossDifficulty('test_boss', difficulty);
+            const updatedDifficulty = aiBossController.getBossDifficulty('test_boss');
+            expect(updatedDifficulty).toEqual(difficulty);
+        });
     });
 
     test('should add and remove boss', () => {
