@@ -81,16 +81,22 @@ class LoginManager {
     }
     
     checkExistingSession() {
+        console.log('🔍 Verificando sessão existente...');
         const savedUser = localStorage.getItem('currentUser');
+        console.log('📦 Dados no localStorage:', savedUser);
+        
         if (savedUser) {
             try {
                 this.currentUser = JSON.parse(savedUser);
                 console.log('👤 Sessão existente encontrada:', this.currentUser.username);
+                console.log('✅ currentUser setado:', this.currentUser);
                 this.showCharacterSelect();
             } catch (e) {
                 console.error('Erro ao carregar sessão:', e);
                 localStorage.removeItem('currentUser');
             }
+        } else {
+            console.log('ℹ️ Nenhuma sessão encontrada no localStorage');
         }
     }
     
