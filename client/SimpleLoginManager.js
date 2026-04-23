@@ -818,6 +818,54 @@ class SimpleLoginManager {
     }
   }
   
+  // Métodos para criação de personagem e entrada no mundo
+  enterWorld() {
+    this.handleEnterWorld();
+  }
+  
+  handleCreateNewCharacter() {
+    console.log('👤 Mostrando formulário de criação de personagem');
+    if (this.characterList) this.characterList.style.display = 'none';
+    if (this.characterCreation) this.characterCreation.style.display = 'block';
+    if (this.enterWorldBtn) this.enterWorldBtn.style.display = 'none';
+    if (this.createNewCharacterBtn) this.createNewCharacterBtn.style.display = 'none';
+    if (this.logoutBtn) this.logoutBtn.style.display = 'none';
+  }
+  
+  handleCreateCharacter() {
+    const name = this.characterName ? this.characterName.value.trim() : '';
+    const race = this.characterRace ? this.characterRace.value : 'human';
+    
+    if (!name) {
+      this.showMessage('characterMessage', 'Digite um nome para o personagem', 'error');
+      return;
+    }
+    
+    if (name.length < 2 || name.length > 20) {
+      this.showMessage('characterMessage', 'Nome deve ter entre 2 e 20 caracteres', 'error');
+      return;
+    }
+    
+    // Classe padrão se não houver seleção
+    const characterClass = 'warrior';
+    
+    console.log('🎭 Criando personagem:', { name, race, class: characterClass });
+    this.createCharacter(name, race, characterClass);
+  }
+  
+  handleCancelCreation() {
+    console.log('❌ Cancelando criação de personagem');
+    if (this.characterList) this.characterList.style.display = 'block';
+    if (this.characterCreation) this.characterCreation.style.display = 'none';
+    if (this.createNewCharacterBtn) this.createNewCharacterBtn.style.display = 'inline-block';
+    if (this.logoutBtn) this.logoutBtn.style.display = 'inline-block';
+    
+    // Limpar campos
+    if (this.characterName) this.characterName.value = '';
+    
+    this.clearMessage('characterMessage');
+  }
+
   getFPS() {
     const now = global.performance.now();
     const delta = now - (this.lastFrameTime || now);
