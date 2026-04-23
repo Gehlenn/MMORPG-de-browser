@@ -30,13 +30,20 @@ describe('Aurelia Zone System', () => {
     let transition;
     let crafting;
     let integration;
+    
+    // Increase timeout for async initialization
+    jest.setTimeout(10000);
 
-    beforeEach(() => {
+    beforeEach(async () => {
         zone = new AureliaZone({ database: mockDb });
+        await zone.initialize();
         environment = new AureliaEnvironment(mockDb, zone);
+        await environment.initialize();
         transition = new AureliaTransition(zone, mockDb);
         crafting = new AureliaCrafting(mockDb);
+        await crafting.initialize();
         integration = new AureliaIntegration(mockDb, mockIo);
+        await integration.initialize();
     });
 
     afterEach(() => {

@@ -455,6 +455,30 @@ class PharaohAnub {
         });
     }
     
+    performSummonConstruct(ability) {
+        const construct = {
+            id: `anub_construct_${Date.now()}`,
+            type: 'construct',
+            hp: ability.hp || 2000,
+            maxHp: ability.hp || 2000,
+            damage: ability.damage || 60,
+            owner: this.id,
+            x: this.x + (Math.random() - 0.5) * 80,
+            y: this.y + (Math.random() - 0.5) * 80
+        };
+        
+        if (!this.summonedConstructs) {
+            this.summonedConstructs = [];
+        }
+        this.summonedConstructs.push(construct);
+        
+        this.broadcastToRaid({
+            type: 'boss_summon',
+            ability: 'summonConstruct',
+            constructId: construct.id
+        });
+    }
+    
     performCurseOfAging(target, ability) {
         if (target.applyStatusEffect) {
             target.applyStatusEffect({
@@ -628,11 +652,25 @@ class PharaohAnub {
             pillarsRemaining: this.pillars.filter(p => !p.destroyed).length
         });
         
-        // Start channeling
+        // Start wipe timer
         setTimeout(() => {
-            const intactPillars = this.pillars.filter(p => !p.destroyed).length;
-            
-            if (intactPillars > 0) {
+            this.checkWipe();
+        }, this.abilities.eternalRest.wipeTimer || 12000);
+    }
+    
+    checkWipe() {
+        const intactPillars = this.pillars.filter(p => !p.destroyed).length;
+        if (intactPillars > 0) {
+            // Pillars not destroyed, perform raid wipe
+            this.wipeRaid();
+        } else {
+            // Pillars destroyed, eternal rest prevented
+            this.eternalRestPrevented = true;
+            this.broadcastToRaid({
+                type: 'boss_weakened',
+                message: 'The pillars have fallen! Pharaoh is weakened!'
+            });
+        }
                 // Wipe raid
                 this.wipeRaid();
             } else {

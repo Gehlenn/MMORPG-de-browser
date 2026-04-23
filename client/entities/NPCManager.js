@@ -71,6 +71,154 @@ class NPCManager {
                     count: 5,
                     reward: { gold: 100, exp: 50 }
                 }
+            },
+            // Guild Masters - NPCs de Job Change
+            guild_master_warrior: {
+                id: 'guild_master_warrior',
+                name: 'Mestre Thorvald',
+                type: 'guild_master',
+                subtype: 'warrior',
+                x: 150,
+                y: 250,
+                icon: '⚔️',
+                color: '#8B0000',
+                dialogue: [
+                    'Saudações, jovem! Deseja seguir o caminho do Guerreiro?',
+                    'Nossa guilda forja os guerreiros mais fortes!',
+                    'Volte no nível 10 para sua primeira evolução.'
+                ],
+                jobInfo: {
+                    baseClass: 'warrior',
+                    availableAt: 10,
+                    firstJobs: ['cavaleiro', 'berserker', 'templario'],
+                    description: 'Especialistas em combate corpo a corpo e defesa.'
+                }
+            },
+            guild_master_mage: {
+                id: 'guild_master_mage',
+                name: 'Arquimago Elara',
+                type: 'guild_master',
+                subtype: 'mage',
+                x: 650,
+                y: 250,
+                icon: '🔮',
+                color: '#4B0082',
+                dialogue: [
+                    'Bem-vindo à Torre Mística. Sente o poder?',
+                    'A magia flui através de nós.',
+                    'No nível 10, você poderá escolher sua especialização.'
+                ],
+                jobInfo: {
+                    baseClass: 'mage',
+                    availableAt: 10,
+                    firstJobs: ['elementalista', 'arcano', 'conjurador'],
+                    description: 'Mestres da magia arcana e elemental.'
+                }
+            },
+            guild_master_rogue: {
+                id: 'guild_master_rogue',
+                name: 'Sombra Kaelen',
+                type: 'guild_master',
+                subtype: 'rogue',
+                x: 400,
+                y: 150,
+                icon: '🗡️',
+                color: '#2F4F4F',
+                dialogue: [
+                    'Shh... vem pelas sombras.',
+                    'Procura as artes secretas?',
+                    'No nível 10, você poderá se tornar Assassino, Ninja ou Ladrão Mestre.'
+                ],
+                jobInfo: {
+                    baseClass: 'rogue',
+                    availableAt: 10,
+                    firstJobs: ['assassino', 'ninja', 'ladrao_mestre'],
+                    description: 'Especialistas em furtividade e ataques surpresa.'
+                }
+            },
+            guild_master_archer: {
+                id: 'guild_master_archer',
+                name: 'Ranger Sylas',
+                type: 'guild_master',
+                subtype: 'archer',
+                x: 250,
+                y: 350,
+                icon: '🏹',
+                color: '#228B22',
+                dialogue: [
+                    'A floresta me enviou.',
+                    'Busca dominar o arco?',
+                    'No nível 10, você poderá se tornar Caçador, Atirador ou Bardo.'
+                ],
+                jobInfo: {
+                    baseClass: 'archer',
+                    availableAt: 10,
+                    firstJobs: ['cacador', 'atirador', 'bardo'],
+                    description: 'Mestres do arco e da precisão à distância.'
+                }
+            },
+            guild_master_druid: {
+                id: 'guild_master_druid',
+                name: 'Anciã Ysera',
+                type: 'guild_master',
+                subtype: 'druid',
+                x: 550,
+                y: 350,
+                icon: '🌿',
+                color: '#006400',
+                dialogue: [
+                    'A natureza sussurra seu nome.',
+                    'Ouve a chamada da floresta?',
+                    'No nível 10, você poderá se tornar Guardião, Feiticeiro Natural ou Xamã.'
+                ],
+                jobInfo: {
+                    baseClass: 'druid',
+                    availableAt: 10,
+                    firstJobs: ['guardiao_florestal', 'feiticeiro_natural', 'xama'],
+                    description: 'Guardiões da natureza e curandeiros.'
+                }
+            },
+            guild_master_priest: {
+                id: 'guild_master_priest',
+                name: 'Alto Sacerdote Lucius',
+                type: 'guild_master',
+                subtype: 'priest',
+                x: 200,
+                y: 150,
+                icon: '✨',
+                color: '#FFD700',
+                dialogue: [
+                    'A luz divina brilha em você.',
+                    'Busca servir aos deuses?',
+                    'No nível 10, você poderá se tornar Santo, Paladino Sagrado ou Oráculo.'
+                ],
+                jobInfo: {
+                    baseClass: 'priest',
+                    availableAt: 10,
+                    firstJobs: ['santo', 'paladino_sagrado', 'oraculo'],
+                    description: 'Curandeiros e defensores da fé.'
+                }
+            },
+            guild_master_warlock: {
+                id: 'guild_master_warlock',
+                name: 'Warlock Morvath',
+                type: 'guild_master',
+                subtype: 'warlock',
+                x: 600,
+                y: 150,
+                icon: '💀',
+                color: '#4B0082',
+                dialogue: [
+                    'Hehehe... deseja poder?',
+                    'Poder tem seu preço...',
+                    'No nível 10, você poderá se tornar Necromante, Mago Sombrio ou Invocador.'
+                ],
+                jobInfo: {
+                    baseClass: 'warlock',
+                    availableAt: 10,
+                    firstJobs: ['necromante', 'mago_sombrio', 'invocador'],
+                    description: 'Usuários de magia negra e invocações.'
+                }
             }
         };
         
@@ -123,22 +271,69 @@ class NPCManager {
             const screenX = npc.x - camera.x + camera.width / 2;
             const screenY = npc.y - camera.y + camera.height / 2;
             
-            // Desenhar sprite do NPC
-            this.spritesheetManager.drawSprite(ctx, 'npcs', npc.type, screenX - 16, screenY - 16);
+            // Desenhar sprite do NPC ou ícone especial para Guild Masters
+            if (npc.type === 'guild_master') {
+                this.renderGuildMaster(ctx, npc, screenX, screenY);
+            } else {
+                this.spritesheetManager.drawSprite(ctx, 'npcs', npc.type, screenX - 16, screenY - 16);
+            }
             
             // Desenhar nome do NPC
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = '12px Arial';
+            ctx.fillStyle = npc.color || '#FFFFFF';
+            ctx.font = npc.type === 'guild_master' ? 'bold 12px Arial' : '12px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(npc.name, screenX, screenY - 20);
+            ctx.fillText(npc.name, screenX, screenY - 25);
+            
+            // Desenhar tipo/título para Guild Masters
+            if (npc.type === 'guild_master' && npc.jobInfo) {
+                ctx.fillStyle = '#888';
+                ctx.font = '10px Arial';
+                ctx.fillText(`[${npc.jobInfo.availableAt}+] ${npc.jobInfo.baseClass}`, screenX, screenY - 38);
+            }
             
             // Desenhar indicador de interação
             if (npc.canInteract) {
                 ctx.fillStyle = '#FFD700';
                 ctx.font = 'bold 16px Arial';
-                ctx.fillText('!', screenX, screenY - 30);
+                ctx.fillText('!', screenX, screenY - 45);
             }
         });
+    }
+    
+    renderGuildMaster(ctx, npc, x, y) {
+        const size = 24;
+        const color = npc.color || '#888';
+        
+        // Aura glow effect
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, color + '44'); // 25% opacity
+        gradient.addColorStop(0.5, color + '22'); // 13% opacity
+        gradient.addColorStop(1, 'transparent');
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw icon background circle
+        ctx.fillStyle = color + '33';
+        ctx.beginPath();
+        ctx.arc(x, y, size/2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw border
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y, size/2, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Draw icon
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = color;
+        ctx.fillText(npc.icon || '👤', x, y);
     }
     
     interact(npcId, player) {

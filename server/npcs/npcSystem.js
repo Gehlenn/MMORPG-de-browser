@@ -261,6 +261,210 @@ class NPCSystem {
             ai: 'guard'
         });
         
+        // Job Change NPCs - Guild Masters
+        this.npcTemplates.set('guild_master_warrior', {
+            id: 'guild_master_warrior',
+            name: 'Mestre dos Guerreiros Thorvald',
+            type: 'trainer',
+            subtype: 'job_change',
+            jobBranch: 'warrior',
+            level: 50,
+            health: 500,
+            maxHealth: 500,
+            faction: 'neutral',
+            appearance: {
+                sprite: 'npc_warrior_master',
+                color: '#8B0000'
+            },
+            dialogue: {
+                greeting: 'Saudações, jovem! Deseja seguir o caminho do Guerreiro?',
+                farewell: 'Volte quando estiver pronto para a batalha!',
+                jobChange: 'Você quer se tornar um Guerreiro? Precisa estar no nível 10.',
+                notReady: 'Você ainda não está pronto. Volte no nível 10.',
+                firstJob: 'Parabéns! Você evoluiu para uma nova classe!',
+                secondJob: 'Sua dedicação é notável! Aqui está sua próxima evolução!',
+                masterTitle: 'Você atingiu o ápice! Receba seu título de Mestre!'
+            },
+            availableJobs: ['warrior'],
+            firstJobs: ['cavaleiro', 'berserker', 'templario'],
+            secondJobs: ['lorde_cavaleiro', 'paladino', 'templario_anciao', 'guerreiro_selvagem', 'destruidor', 'executor', 'cruzado_sagrado', 'guardiao_divino', 'inquisidor'],
+            ai: 'job_change'
+        });
+
+        this.npcTemplates.set('guild_master_mage', {
+            id: 'guild_master_mage',
+            name: 'Arquimago Elara',
+            type: 'trainer',
+            subtype: 'job_change',
+            jobBranch: 'mage',
+            level: 50,
+            health: 400,
+            maxHealth: 400,
+            faction: 'neutral',
+            appearance: {
+                sprite: 'npc_mage_master',
+                color: '#4B0082'
+            },
+            dialogue: {
+                greeting: 'Bem-vindo à Torre Mística. Sente o poder da magia?',
+                farewell: 'Que a magia guie seus passos.',
+                jobChange: 'O caminho do Mago exige sabedoria e nível 10.',
+                notReady: 'Estude mais, jovem. Volte no nível 10.',
+                firstJob: 'Excelente! Sua magia cresce poderosa!',
+                secondJob: 'Você transcendeu os limites mortais!',
+                masterTitle: 'Você é agora uma lenda viva da magia!'
+            },
+            availableJobs: ['mage'],
+            firstJobs: ['elementalista', 'arcano', 'conjurador'],
+            secondJobs: ['archimago', 'avatar_elemental', 'feiticeiro_caos', 'grande_sabio', 'runomante', 'mistico', 'invocador_lendarios', 'evocador_titas', 'ligante_almas'],
+            ai: 'job_change'
+        });
+
+        this.npcTemplates.set('guild_master_rogue', {
+            id: 'guild_master_rogue',
+            name: 'Sombra Kaelen',
+            type: 'trainer',
+            subtype: 'job_change',
+            jobBranch: 'rogue',
+            level: 50,
+            health: 450,
+            maxHealth: 450,
+            faction: 'neutral',
+            appearance: {
+                sprite: 'npc_rogue_master',
+                color: '#2F4F4F'
+            },
+            dialogue: {
+                greeting: 'Shh... vem pelas sombras. Procura as artes secretas?',
+                farewell: 'Desapareça nas sombras, amigo.',
+                jobChange: 'Para ser Ladino, precisa de agilidade e nível 10.',
+                notReady: 'Ainda não. Treine mais, volte no nível 10.',
+                firstJob: 'Você dança nas sombras agora!',
+                secondJob: 'Até a morte não o verá chegar!',
+                masterTitle: 'Você é a própria sombra encarnada!'
+            },
+            availableJobs: ['rogue'],
+            firstJobs: ['assassino', 'ninja', 'ladrao_mestre'],
+            secondJobs: ['lamina_noturna', 'veneno_mortal', 'sombra_viva', 'kage', 'assassino_sombrio', 'kage_lenda', 'mestre_trapaceiro', 'enganador', 'infiltrador'],
+            ai: 'job_change'
+        });
+
+        this.npcTemplates.set('guild_master_archer', {
+            id: 'guild_master_archer',
+            name: 'Ranger Sylas',
+            type: 'trainer',
+            subtype: 'job_change',
+            jobBranch: 'archer',
+            level: 50,
+            health: 420,
+            maxHealth: 420,
+            faction: 'neutral',
+            appearance: {
+                sprite: 'npc_archer_master',
+                color: '#228B22'
+            },
+            dialogue: {
+                greeting: 'A floresta me enviou. Busca dominar o arco?',
+                farewell: 'Que suas flechas sempre acertem o alvo.',
+                jobChange: 'Precisa de precisão e nível 10 para ser Arqueiro.',
+                notReady: 'Volte quando tiver mais experiência. Nível 10.',
+                firstJob: 'Seu olho agora enxerga além!',
+                secondJob: 'Você é um com a flecha agora!',
+                masterTitle: 'Lenda viva do arco e flecha!'
+            },
+            availableJobs: ['archer'],
+            firstJobs: ['cacador', 'atirador', 'bardo'],
+            secondJobs: ['olho_aguaia', 'senhor_feras', 'rastreador', 'mira_perfeita', 'pistoleiro', 'sniper', 'virtuoso', 'maestro_divino', 'comandante_harmonia'],
+            ai: 'job_change'
+        });
+
+        this.npcTemplates.set('guild_master_druid', {
+            id: 'guild_master_druid',
+            name: 'Anciã Ysera',
+            type: 'trainer',
+            subtype: 'job_change',
+            jobBranch: 'druid',
+            level: 50,
+            health: 480,
+            maxHealth: 480,
+            faction: 'neutral',
+            appearance: {
+                sprite: 'npc_druid_master',
+                color: '#006400'
+            },
+            dialogue: {
+                greeting: 'A natureza sussurra seu nome, jovem. Ouve?',
+                farewell: 'Que as folhas abrem seu caminho.',
+                jobChange: 'Para ser Druida, a natureza deve aceitá-lo. Nível 10.',
+                notReady: 'A natureza ainda não o reconhece. Volte no nível 10.',
+                firstJob: 'A terra o abraça agora!',
+                secondJob: 'Você é parte do ciclo eterno!',
+                masterTitle: 'Guardião eterno da natureza!'
+            },
+            availableJobs: ['druid'],
+            firstJobs: ['guardiao_florestal', 'feiticeiro_natural', 'xama'],
+            secondJobs: ['rei_natureza', 'avatar_verde', 'ancestral', 'druida_supremo', 'toque_vida', 'herbalista', 'xama_lendario', 'mestre_espiritual', 'curandeiro_sagrado'],
+            ai: 'job_change'
+        });
+
+        this.npcTemplates.set('guild_master_priest', {
+            id: 'guild_master_priest',
+            name: 'Alto Sacerdote Lucius',
+            type: 'trainer',
+            subtype: 'job_change',
+            jobBranch: 'priest',
+            level: 50,
+            health: 450,
+            maxHealth: 450,
+            faction: 'neutral',
+            appearance: {
+                sprite: 'npc_priest_master',
+                color: '#FFD700'
+            },
+            dialogue: {
+                greeting: 'A luz divina brilha em você. Busca servir?',
+                farewell: 'Que a luz o guie sempre.',
+                jobChange: 'Para ser Sacerdote, a fé deve ser forte. Nível 10.',
+                notReady: 'Sua fé precisa amadurecer. Volte no nível 10.',
+                firstJob: 'A luz agora flui através de você!',
+                secondJob: 'Você é um instrumento divino!',
+                masterTitle: 'Santo entre os mortais!'
+            },
+            availableJobs: ['priest'],
+            firstJobs: ['santo', 'paladino_sagrado', 'oraculo'],
+            secondJobs: ['santo_milagroso', 'apostolo_divino', 'santo_guerreiro', 'paladino_ouro', 'templario_inquebravel', 'cruzado_dourado', 'vidente_deus', 'olho_tudo_ve', 'bibliotecario_celestial'],
+            ai: 'job_change'
+        });
+
+        this.npcTemplates.set('guild_master_warlock', {
+            id: 'guild_master_warlock',
+            name: 'Warlock Morvath',
+            type: 'trainer',
+            subtype: 'job_change',
+            jobBranch: 'warlock',
+            level: 50,
+            health: 470,
+            maxHealth: 470,
+            faction: 'neutral',
+            appearance: {
+                sprite: 'npc_warlock_master',
+                color: '#4B0082'
+            },
+            dialogue: {
+                greeting: 'Hehehe... deseja poder? Poder tem seu preço...',
+                farewell: 'Não se esqueça: toda magia tem custo.',
+                jobChange: 'Ser Bruxo é trilhar o caminho sombrio. Nível 10.',
+                notReady: 'Fraco demais. Volte mais forte, nível 10.',
+                firstJob: 'A escuridão o abraça! Bem-vindo!',
+                secondJob: 'Poder imenso! Cuidado para não se perder!',
+                masterTitle: 'Senhor das trevas reconhecido!'
+            },
+            availableJobs: ['warlock'],
+            firstJobs: ['necromante', 'mago_sombrio', 'invocador'],
+            secondJobs: ['rei_mortos', 'lich_imortal', 'ceifador_almas', 'senhor_sombras', 'principe_inferno', 'vazio_ambulante', 'invocador_demoniaco', 'deus_demonio', 'imperador_infernal'],
+            ai: 'job_change'
+        });
+
         // Hostile NPCs
         this.npcTemplates.set('bandit', {
             id: 'bandit',
@@ -358,6 +562,13 @@ class NPCSystem {
             states: ['idle', 'patrolling', 'chasing', 'fighting', 'fleeing'],
             defaultState: 'patrolling'
         });
+        
+        // Job Change AI - Guild Masters
+        this.aiBehaviors.set('job_change', {
+            update: (npc) => this.jobChangeAI(npc),
+            states: ['idle', 'consulting', 'performing_ritual'],
+            defaultState: 'idle'
+        });
     }
     
     setupEventHandlers() {
@@ -415,6 +626,18 @@ class NPCSystem {
             const y = cityCenter.y + Math.sin(angle) * distance;
             this.spawnNPC('town_guard', x, y);
         }
+        
+        // Spawn Guild Masters (Job Change NPCs) - Arena de Classes
+        const guildHallX = cityCenter.x - 200;
+        const guildHallY = cityCenter.y - 200;
+        
+        this.spawnNPC('guild_master_warrior', guildHallX - 60, guildHallY - 40);
+        this.spawnNPC('guild_master_mage', guildHallX + 60, guildHallY - 40);
+        this.spawnNPC('guild_master_rogue', guildHallX, guildHallY);
+        this.spawnNPC('guild_master_archer', guildHallX - 60, guildHallY + 40);
+        this.spawnNPC('guild_master_druid', guildHallX + 60, guildHallY + 40);
+        this.spawnNPC('guild_master_priest', guildHallX - 30, guildHallY + 80);
+        this.spawnNPC('guild_master_warlock', guildHallX + 30, guildHallY + 80);
         
         console.log('Spawned initial NPCs in starter city');
     }
@@ -541,6 +764,55 @@ class NPCSystem {
                 type: 'npc_dialogue',
                 npcId: npc.id,
                 message: npc.dialogue.service
+            });
+        }
+    }
+    
+    jobChangeAI(npc) {
+        const now = Date.now();
+        
+        // Guild Masters stay mostly idle but greet potential adventurers
+        if (npc.ai.state === 'idle') {
+            const nearbyPlayers = this.server.worldManager.getNearbyPlayers(
+                npc.x, npc.y, this.config.interactionRadius * 2
+            );
+            
+            if (nearbyPlayers.length > 0 && Math.random() < 0.08) { // 8% chance to greet
+                // Check for eligible players (level 10+, not in combat)
+                const eligiblePlayers = nearbyPlayers.filter(p => {
+                    const playerLevel = p.level || 1;
+                    const isInCombat = p.combat?.inCombat || false;
+                    return playerLevel >= 10 && !isInCombat;
+                });
+                
+                if (eligiblePlayers.length > 0) {
+                    // Special greeting for eligible players
+                    this.broadcastToNearbyPlayers(npc, {
+                        type: 'npc_dialogue',
+                        npcId: npc.id,
+                        message: npc.dialogue.greeting,
+                        subtype: 'job_change_available'
+                    });
+                    
+                    // Emit particle effect for visibility
+                    this.server.worldManager.broadcastToZone(npc.x, npc.y, {
+                        type: 'npc_effect',
+                        npcId: npc.id,
+                        effect: 'guild_master_aura',
+                        color: npc.appearance.color
+                    });
+                }
+            }
+        }
+        
+        // Occasionally show class-specific effects
+        if (Math.random() < 0.02) { // 2% chance
+            this.server.worldManager.broadcastToZone(npc.x, npc.y, {
+                type: 'npc_effect',
+                npcId: npc.id,
+                effect: 'class_aura',
+                jobBranch: npc.jobBranch,
+                color: npc.appearance.color
             });
         }
     }
