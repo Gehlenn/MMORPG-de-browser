@@ -1,14 +1,15 @@
 /**
- * PartyManager - Sistema de Grupos Estilo Ragnarök
+ * PartyManager - Sistema de Grupos Estilo WoW
  * 
  * Features:
- * - Grupos de até 12 membros
- * - Compartilhamento de EXP
- * - Distribuição de loot (cada um pega o seu / rodízio / lider)
- * - Buffs de grupo
- * - Chat de party
+ * - Party: até 5 membros (XP compartilhado)
+ * - Raid: até 12 membros (XP individual)
+ * - Bônus de XP: +20% para 2 players, +40% para 3, +60% para 4, +80% para 5
+ * - Distribuição de loot (need/greed, master, free-for-all)
+ * - Buffs de grupo (só em party, não em raid)
+ * - Chat de party/raid
  * - Marcação de alvo
- * - Follow leader
+ * - Convert Party <-> Raid
  */
 
 class PartyManager {
@@ -19,16 +20,34 @@ class PartyManager {
         this.parties = new Map(); // partyId -> Party
         this.invites = new Map(); // characterId -> { partyId, invitedBy, expiresAt }
         
-        this.MAX_PARTY_SIZE = 12;
+        // Limites de grupo estilo WoW
+        this.MAX_PARTY_SIZE = 5;   // Party normal (XP compartilhado)
+        this.MAX_RAID_SIZE = 12;   // Raid (XP individual)
+        this.RAID_THRESHOLD = 5;   // A partir de 6 membros vira raid
+        
         this.MAX_LEVEL_GAP = 30; // Máxima diferença de nível para compartilhar EXP
         this.INVITE_EXPIRY_MS = 60000; // 1 minuto
         this.EXP_SHARING_RANGE = 600; // Distância em pixels
         
+        // Bônus de XP estilo WoW (só até 5 players)
+        this.EXP_BONUS = {
+            1: 0,    // Solo
+            2: 20,   // +20%
+            3: 40,   // +40%
+            4: 60,   // +60%
+            5: 80    // +80% (máximo)
+        };
+        
         this.LOOT_MODES = {
-            FREE: 'free',           // Cada um pega o que quiser
-            RANDOM: 'random',       // Sorteio entre membros
-            MASTER: 'master',       // Líder decide
-            TURN: 'turn'            // Rodízio
+            FREE: 'free',           // Cada um pega o que quiser (FFA)
+            RANDOM: 'random',       // Sorteio entre membros (Round Robin)
+            MASTER: 'master',       // Líder decide (Master Looter)
+            NEED_GREED: 'need_greed' // Sistema Need Before Greed (estilo WoW)
+        };
+        
+        this.GROUP_TYPES = {
+            PARTY: 'party',  // Até 5 membros, XP compartilhado
+            RAID: 'raid'     // 6-12 membros, XP individual
         };
     }
 
@@ -52,18 +71,24 @@ class PartyManager {
 
         const partyId = `party_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
+        // Determinar tipo de grupo
+        const groupType = options.groupType || this.GROUP_TYPES.PARTY;
+        const maxSize = groupType === this.GROUP_TYPES.RAID ? this.MAX_RAID_SIZE : this.MAX_PARTY_SIZE;
+        
         const party = {
             id: partyId,
             name: options.name || `Grupo de ${leader.data.name}`,
             leaderId: leaderId,
+            groupType: groupType, // 'party' ou 'raid'
             members: new Map(),
             createdAt: Date.now(),
             lootMode: options.lootMode || this.LOOT_MODES.FREE,
             lootTurnIndex: 0, // Para modo rodízio
-            expSharing: options.expSharing !== false, // Default true
+            expSharing: groupType === this.GROUP_TYPES.PARTY, // Só compartilha XP em party
             targetId: null, // Alvo marcado
-            buffs: new Map(), // Buffs ativos
+            buffs: new Map(), // Buffs ativos (só em party)
             chatHistory: [], // Histórico de chat
+            maxSize: maxSize,
             settings: {
                 autoShareQuests: options.autoShareQuests || false,
                 allowInvite: options.allowInvite !== false, // Default true
@@ -107,9 +132,11 @@ class PartyManager {
             return { success: false, error: 'Apenas o líder pode convidar' };
         }
 
-        // Verificar limite
-        if (party.members.size >= this.MAX_PARTY_SIZE) {
-            return { success: false, error: 'Grupo está cheio (máx 12)' };
+        // Verificar limite (5 para party, 12 para raid)
+        if (party.members.size >= party.maxSize) {
+            const groupTypeName = party.groupType === this.GROUP_TYPES.RAID ? 'Raid' : 'Grupo';
+            const maxSize = party.maxSize;
+            return { success: false, error: `${groupTypeName} está cheio (máx ${maxSize})` };
         }
 
         const target = this.characterPersistence?.getActiveCharacter(targetId);
@@ -355,6 +382,11 @@ class PartyManager {
         const party = this.parties.get(partyId);
         if (!party || !party.expSharing) return null;
 
+        // Em raids (6+ membros), não compartilha XP
+        if (party.groupType === this.GROUP_TYPES.RAID) {
+            return null; // XP individual em raid
+        }
+
         const membersInRange = [];
         const killer = party.members.get(killerId);
         
@@ -375,9 +407,15 @@ class PartyManager {
 
         if (membersInRange.length === 0) return null;
 
-        // Bônus de grupo
-        const partyBonus = 1 + (membersInRange.length * 0.05); // +5% por membro
-        const expPerMember = Math.floor((totalExp * partyBonus) / membersInRange.length);
+        // Bônus de grupo estilo WoW (só até 5 membros)
+        // 1 player = 100%, 2 = 120%, 3 = 140%, 4 = 160%, 5 = 180%
+        const memberCount = Math.min(membersInRange.length, 5); // Cap em 5
+        const bonusPercent = this.EXP_BONUS[memberCount] || 0;
+        const partyBonus = 1 + (bonusPercent / 100);
+        
+        // XP total com bônus dividido entre todos
+        const totalExpWithBonus = Math.floor(totalExp * partyBonus);
+        const expPerMember = Math.floor(totalExpWithBonus / membersInRange.length);
 
         const distribution = {};
         for (const member of membersInRange) {
@@ -399,7 +437,13 @@ class PartyManager {
             }
         }
 
-        return { totalExp, partyBonus, distribution };
+        return { 
+            totalExp, 
+            partyBonus, 
+            bonusPercent,
+            memberCount: membersInRange.length,
+            distribution 
+        };
     }
 
     setExpSharing(leaderId, enabled) {
@@ -415,6 +459,65 @@ class PartyManager {
         this.notifyExpSharingChanged(party, enabled);
 
         return { success: true };
+    }
+
+    // ============ PARTY/RAID CONVERSION ============
+
+    convertToRaid(leaderId) {
+        const party = this.findPartyByMember(leaderId);
+        if (!party) return { success: false, error: 'Você não está em um grupo' };
+
+        if (party.leaderId !== leaderId) {
+            return { success: false, error: 'Apenas o líder pode converter' };
+        }
+
+        if (party.groupType === this.GROUP_TYPES.RAID) {
+            return { success: false, error: 'Já é um Raid' };
+        }
+
+        // Converter para raid
+        party.groupType = this.GROUP_TYPES.RAID;
+        party.maxSize = this.MAX_RAID_SIZE;
+        party.expSharing = false; // Raids não compartilham XP
+        party.name = party.name.replace('Grupo', 'Raid');
+
+        // Notificar todos
+        this.notifyGroupTypeChanged(party, this.GROUP_TYPES.RAID);
+
+        console.log(`[PartyManager] Grupo ${party.id} convertido para Raid`);
+        
+        return { success: true, groupType: this.GROUP_TYPES.RAID, maxSize: this.MAX_RAID_SIZE };
+    }
+
+    convertToParty(leaderId) {
+        const party = this.findPartyByMember(leaderId);
+        if (!party) return { success: false, error: 'Você não está em um grupo' };
+
+        if (party.leaderId !== leaderId) {
+            return { success: false, error: 'Apenas o líder pode converter' };
+        }
+
+        if (party.groupType === this.GROUP_TYPES.PARTY) {
+            return { success: false, error: 'Já é um Party' };
+        }
+
+        // Verificar se pode reduzir (só se tiver 5 ou menos membros)
+        if (party.members.size > this.MAX_PARTY_SIZE) {
+            return { success: false, error: `Não pode converter: Raid tem ${party.members.size} membros (máx ${this.MAX_PARTY_SIZE} para Party)` };
+        }
+
+        // Converter para party
+        party.groupType = this.GROUP_TYPES.PARTY;
+        party.maxSize = this.MAX_PARTY_SIZE;
+        party.expSharing = true; // Parties compartilham XP
+        party.name = party.name.replace('Raid', 'Grupo');
+
+        // Notificar todos
+        this.notifyGroupTypeChanged(party, this.GROUP_TYPES.PARTY);
+
+        console.log(`[PartyManager] Raid ${party.id} convertido para Party`);
+        
+        return { success: true, groupType: this.GROUP_TYPES.PARTY, maxSize: this.MAX_PARTY_SIZE };
     }
 
     // ============ TARGET MARKING ============
@@ -460,12 +563,15 @@ class PartyManager {
 
     updatePartyBuffs() {
         for (const party of this.parties.values()) {
-            const memberCount = party.members.size;
+            // Só aplica buffs em Party (não em Raid)
+            if (party.groupType === this.GROUP_TYPES.RAID) continue;
+            
+            const memberCount = Math.min(party.members.size, 5); // Cap em 5
             if (memberCount < 2) continue;
 
-            // Buffs baseados no tamanho do grupo
-            const hpBonus = memberCount * 2; // +2% HP por membro
-            const expBonus = memberCount * 3; // +3% EXP por membro
+            // Buffs baseados no tamanho do grupo (só até 5 membros)
+            const hpBonus = memberCount * 2; // +2% HP por membro (máx +10%)
+            const expBonus = memberCount * 2; // +2% EXP por membro (máx +10%)
 
             for (const member of party.members.values()) {
                 const char = this.characterPersistence?.getActiveCharacter(member.characterId);
@@ -552,9 +658,13 @@ class PartyManager {
             id: party.id,
             name: party.name,
             leaderId: party.leaderId,
+            groupType: party.groupType || 'party',
+            maxSize: party.maxSize || this.MAX_PARTY_SIZE,
+            memberCount: party.members.size,
             members: Array.from(party.members.values()),
             lootMode: party.lootMode,
             expSharing: party.expSharing,
+            expBonus: party.groupType === this.GROUP_TYPES.PARTY ? this.EXP_BONUS[Math.min(party.members.size, 5)] : 0,
             targetId: party.targetId,
             settings: party.settings
         };
@@ -670,6 +780,26 @@ class PartyManager {
             if (char?.socket) {
                 char.socket.emit('party:leader_changed', {
                     newLeaderId,
+                    party: this.sanitizePartyForClient(party)
+                });
+            }
+        }
+    }
+
+    notifyGroupTypeChanged(party, newGroupType) {
+        const isRaid = newGroupType === this.GROUP_TYPES.RAID;
+        const message = isRaid 
+            ? `Grupo convertido para Raid! (máx ${this.MAX_RAID_SIZE} membros, XP individual)`
+            : `Raid convertido para Grupo! (máx ${this.MAX_PARTY_SIZE} membros, XP compartilhado)`;
+        
+        for (const memberId of party.members.keys()) {
+            const char = this.characterPersistence?.getActiveCharacter(memberId);
+            if (char?.socket) {
+                char.socket.emit('party:group_type_changed', {
+                    groupType: newGroupType,
+                    maxSize: party.maxSize,
+                    expSharing: party.expSharing,
+                    message,
                     party: this.sanitizePartyForClient(party)
                 });
             }

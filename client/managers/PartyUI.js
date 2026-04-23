@@ -177,23 +177,35 @@ class PartyUI {
         const isLeader = status.isLeader;
         const members = status.members || [];
         const lootMode = status.lootMode || 'free-for-all';
+        const groupType = status.groupType || 'party';
+        const maxSize = status.maxSize || 5;
+        const isRaid = groupType === 'raid';
+        
+        // Bônus de XP estilo WoW (só até 5 membros)
+        const memberCount = Math.min(members.length, 5);
+        const xpBonus = members.length >= 2 ? (memberCount - 1) * 20 : 0; // 20%, 40%, 60%, 80%
         
         this.elements.panel.innerHTML = `
             <div class="party-header">
                 <div class="party-title">
-                    <div class="party-title-icon">👥</div>
-                    <div class="party-title-text">Grupo (${members.length}/${this.partyManager?.maxPartySize || 5})</div>
+                    <div class="party-title-icon">${isRaid ? '⚔️' : '👥'}</div>
+                    <div>
+                        <div class="party-title-text">${isRaid ? 'RAID' : 'GRUPO'} (${members.length}/${maxSize})</div>
+                        <div style="font-size: 11px; color: ${isRaid ? '#e74c3c' : '#2ecc71'};">
+                            ${isRaid ? 'XP Individual • Máx 12 membros' : `XP Compartilhado • +${xpBonus}% bônus`}
+                        </div>
+                    </div>
                 </div>
                 <button class="party-close" id="party-close">×</button>
             </div>
             
             <div class="party-stats">
                 <div class="party-stat">
-                    <div class="party-stat-value">${status.onlineCount || 1}</div>
-                    <div class="party-stat-label">Online</div>
+                    <div class="party-stat-value">${members.length}</div>
+                    <div class="party-stat-label">Membros</div>
                 </div>
                 <div class="party-stat">
-                    <div class="party-stat-value">+${Math.min(members.length * 10, 50)}%</div>
+                    <div class="party-stat-value">+${xpBonus}%</div>
                     <div class="party-stat-label">XP Bonus</div>
                 </div>
                 <div class="party-stat">
@@ -206,24 +218,45 @@ class PartyUI {
             <div class="party-section">
                 <div class="party-section-title">🎲 Modo de Loot</div>
                 <div class="party-loot-mode">
-                    <button class="party-loot-btn ${lootMode === 'free-for-all' ? 'active' : ''}" data-mode="free-for-all">FFA</button>
-                    <button class="party-loot-btn ${lootMode === 'round-robin' ? 'active' : ''}" data-mode="round-robin">Round</button>
-                    <button class="party-loot-btn ${lootMode === 'master-looter' ? 'active' : ''}" data-mode="master-looter">Master</button>
-                    <button class="party-loot-btn ${lootMode === 'need-before-greed' ? 'active' : ''}" data-mode="need-before-greed">Need</button>
+                    <button class="party-loot-btn ${lootMode === 'free' ? 'active' : ''}" data-mode="free">FFA</button>
+                    <button class="party-loot-btn ${lootMode === 'random' ? 'active' : ''}" data-mode="random">Round</button>
+                    <button class="party-loot-btn ${lootMode === 'master' ? 'active' : ''}" data-mode="master">Master</button>
+                    <button class="party-loot-btn ${lootMode === 'need_greed' ? 'active' : ''}" data-mode="need_greed">Need</button>
                 </div>
+            </div>
+            
+            <div class="party-section">
+                <div class="party-section-title">🔄 Converter Grupo</div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="party-btn ${isRaid ? 'secondary' : 'primary'}" id="convert-party" ${isRaid ? '' : 'disabled'}>
+                        👥 Party (5)
+                    </button>
+                    <button class="party-btn ${isRaid ? 'primary' : 'secondary'}" id="convert-raid" ${!isRaid && members.length <= 5 ? '' : 'disabled'}>
+                        ⚔️ Raid (12)
+                    </button>
+                </div>
+                ${!isRaid && members.length > 5 ? '<div style="font-size: 11px; color: #e74c3c; margin-top: 8px;">Não pode converter: grupo tem +5 membros</div>' : ''}
             </div>
             ` : ''}
             
             <div class="party-section">
-                <div class="party-section-title">👤 Membros</div>
+                <div class="party-section-title">👤 Membros ${isRaid ? '(Raid)' : ''}</div>
                 <div id="party-members-list">
                     ${members.map(m => this.renderMember(m, isLeader)).join('')}
                 </div>
             </div>
             
-            ${isLeader ? `
+            ${isLeader && !isRaid && members.length < maxSize ? `
             <div class="party-section">
                 <div class="party-section-title">📨 Convidar Jogador</div>
+                <div class="party-invite">
+                    <input type="text" class="party-invite-input" id="invite-player-name" placeholder="Nome do jogador...">
+                    <button class="party-btn primary" id="invite-btn">Convidar</button>
+                </div>
+            </div>
+            ` : isLeader && isRaid && members.length < maxSize ? `
+            <div class="party-section">
+                <div class="party-section-title">📨 Convidar para Raid</div>
                 <div class="party-invite">
                     <input type="text" class="party-invite-input" id="invite-player-name" placeholder="Nome do jogador...">
                     <button class="party-btn primary" id="invite-btn">Convidar</button>
@@ -232,7 +265,7 @@ class PartyUI {
             ` : ''}
             
             <div class="party-actions">
-                <button class="party-btn danger" id="party-leave">${isLeader ? 'Desfazer Grupo' : 'Sair do Grupo'}</button>
+                <button class="party-btn danger" id="party-leave">${isLeader ? 'Desfazer ' + (isRaid ? 'Raid' : 'Grupo') : 'Sair do ' + (isRaid ? 'Raid' : 'Grupo')}</button>
             </div>
         `;
         
@@ -318,6 +351,19 @@ class PartyUI {
                     const mode = e.target.dataset.mode;
                     this.partyManager?.setLootMode(mode);
                 });
+            });
+            
+            // Convert buttons
+            document.getElementById('convert-party')?.addEventListener('click', () => {
+                if (confirm('Converter Raid para Party? Isso limitará o grupo a 5 membros.')) {
+                    this.partyManager?.convertToParty();
+                }
+            });
+            
+            document.getElementById('convert-raid')?.addEventListener('click', () => {
+                if (confirm('Converter Party para Raid? Isso desativará o compartilhamento de XP.')) {
+                    this.partyManager?.convertToRaid();
+                }
             });
             
             // Invite
