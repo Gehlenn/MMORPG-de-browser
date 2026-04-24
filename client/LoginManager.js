@@ -238,10 +238,10 @@ class LoginManager {
     updateCharacterList() {
         // Resetar cards
         const cards = document.querySelectorAll('.character-card');
-        const charactersArray = Object.values(this.characters);
         
         cards.forEach((card, index) => {
-            const charData = charactersArray[index];
+            // Buscar personagem neste slot específico
+            const charData = Object.values(this.characters).find(c => c.slot === index);
             
             // Atualizar visual do card
             const existingBadge = card.querySelector('.char-level');
@@ -289,13 +289,13 @@ class LoginManager {
     selectSlot(slotIndex) {
         console.log('🎲 Slot selecionado:', slotIndex);
         
-        // Verificar se existe personagem neste slot
-        const charactersArray = Object.values(this.characters);
-        if (charactersArray[slotIndex]) {
+        // Verificar se existe personagem neste slot específico
+        const charInSlot = Object.values(this.characters).find(c => c.slot === slotIndex);
+        
+        if (charInSlot) {
             // Selecionar personagem existente
-            const char = charactersArray[slotIndex];
-            this.selectedCharacter = char;
-            console.log('✅ Personagem selecionado:', char.name);
+            this.selectedCharacter = charInSlot;
+            console.log('✅ Personagem selecionado:', charInSlot.name);
             
             // Destacar card
             const cards = document.querySelectorAll('.character-card');
@@ -311,7 +311,7 @@ class LoginManager {
             }
             
             // Salvar seleção
-            localStorage.setItem('selectedCharacter', JSON.stringify(char));
+            localStorage.setItem('selectedCharacter', JSON.stringify(charInSlot));
         } else {
             // Slot vazio - abrir criação
             console.log('📭 Slot vazio, abrindo criação...');
