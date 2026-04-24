@@ -400,6 +400,20 @@ class IntegratedGameplayEngine {
         
         // NOVOS: Botões de Talentos (BLOCO 13)
         this.setupTalentButtons();
+        
+        // NOVOS: Mobile Support (BLOCO NÍVEL 10)
+        this.setupMobileSupport();
+    }
+    
+    setupMobileSupport() {
+        if (typeof MobileSupport !== 'undefined') {
+            this.mobileSupport = new MobileSupport(this);
+            this.isMobile = this.mobileSupport.isMobile.isMobile;
+            
+            console.log('📱 Mobile Support configurado');
+            console.log(`   Mobile: ${this.isMobile ? 'SIM' : 'NÃO'}`);
+            console.log(`   Plataforma: ${this.mobileSupport.isMobile.platform}`);
+        }
     }
     
     setupManagers() {
@@ -2026,81 +2040,181 @@ class IntegratedGameplayEngine {
         ctx.lineWidth = 1;
         ctx.strokeRect(legendX - 10, legendY - 10, 140, 110);
 
-// Legenda
-this.renderWorldMapLegend(ctx, width, height);
-}
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('Legenda:', legendX, legendY);
 
-renderWorldMapLegend(ctx, width, height) {
-    const legendX = width - 150;
-    const legendY = 20;
+        const items = [
+            {color: '#4CAF50', text: 'Você', y: 20},
+            {color: '#f44336', text: 'Mobs', y: 35},
+            {color: '#2196F3', text: 'NPCs', y: 50},
+            {color: '#FFD54F', text: 'Loot', y: 65},
+            {color: '#fff', text: 'Viewport', y: 80}
+        ];
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(legendX - 10, legendY - 10, 140, 110);
+        items.forEach(item => {
+            ctx.fillStyle = item.color;
+            ctx.beginPath();
+            ctx.arc(legendX + 8, legendY + item.y, 4, 0, Math.PI * 2);
+            ctx.fill();
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(legendX - 10, legendY - 10, 140, 110);
+            ctx.fillStyle = '#aaa';
+            ctx.font = '10px Arial';
+            ctx.fillText(item.text, legendX + 18, legendY + item.y + 3);
+        });
+        
+        // NOVO: Render mobile controls
+        if (this.mobileSupport) {
+            this.mobileSupport.render(ctx);
+        }
+    }
 
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 11px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText('Legenda:', legendX, legendY);
-
-    const items = [
-        {color: '#4CAF50', text: 'Você', y: 20},
-        {color: '#f44336', text: 'Mobs', y: 35},
-        {color: '#2196F3', text: 'NPCs', y: 50},
-        {color: '#FFD54F', text: 'Loot', y: 65},
-        {color: '#fff', text: 'Viewport', y: 80}
-    ];
-
-    items.forEach(item => {
-        ctx.fillStyle = item.color;
-        ctx.beginPath();
-        ctx.arc(legendX + 8, legendY + item.y, 4, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#aaa';
-        ctx.font = '10px Arial';
-        ctx.fillText(item.text, legendX + 18, legendY + item.y + 3);
-    });
-}
-
-// ... (restante do código permanece igual)
-
-useSkill(skillIndex) {
-    console.log(' Usando skill ' + (skillIndex + 1));
-
-    // DESATIVADO: NPCs de teste removidos - usar NPCSystem quando implementado
-    this.entities = []; // Array vazio - aguardando NPCSystem completo
-    console.log(' NPCs: aguardando implementação do NPCSystem');
-    // ... (restante do código permanece igual)
-}
-            let minDistance = Infinity;
+    // NOVOS MÉTODOS: Mobile Support Input Handling (NÍVEL 10)
+    
+    onJoystickInput(dx, dy, force) {
+        // Move player based on joystick input
+        if (this.player && this.player.speed) {
+            const speed = this.player.speed * force;
+            this.player.vx = dx * speed;
+            this.player.vy = dy * speed;
             
+            // Emit movement to server if online
+            if (this.socket && this.socket.connected) {
+                this.socket.emit('playerMove', {
+                    x: this.player.x,
+                    y: this.player.y,
+                    vx: this.player.vx,
+                    vy: this.player.vy
+                });
+            }
+        }
+    }
+    
+    onDoubleTap(x, y) {
+        // Double tap = dash/dodge
+        console.log('👆 Double tap at', x, y);
+        
+        if (this.player) {
+            // Dash in direction of movement
+            const dashDistance = 100;
+            const angle = Math.atan2(this.player.vy, this.player.vx);
+            
+            this.player.x += Math.cos(angle) * dashDistance;
+            this.player.y += Math.sin(angle) * dashDistance;
+            
+            // Show dash effect
+            this.showSkillEffect('Dash', this.player.x, this.player.y);
+            
+            // Vibration feedback
+            if (this.mobileSupport) {
+                this.mobileSupport.vibrate(50);
+            }
+        }
+    }
+    
+    onLongPress(x, y) {
+        // Long press = charged attack or context menu
+        console.log('⏱️ Long press at', x, y);
+        
+        // Could show context menu or charged attack
+        this.showNotification('Charged attack ready!', '#f39c12');
+    }
+    
+    onSwipe(direction, distance) {
+        // Swipe gesture handling
+        console.log('👋 Swipe', direction, distance);
+        
+        switch(direction) {
+            case 'up':
+                // Jump or interact
+                this.interact();
+                break;
+            case 'down':
+                // Crouch or back
+                break;
+            case 'left':
+            case 'right':
+                // Quick turn
+                break;
+        }
+    }
+    
+    setZoom(scale) {
+        // Pinch zoom
+        this.camera.zoom = Math.max(0.5, Math.min(2.0, scale));
+        console.log('🔍 Zoom:', this.camera.zoom);
+    }
+
+    useSkill(skillIndex) {
+        console.log(' Usando skill ' + (skillIndex + 1));
+
+        // DESATIVADO: NPCs de teste removidos - usar NPCSystem quando implementado
+        this.entities = []; // Array vazio - aguardando NPCSystem completo
+        console.log(' NPCs: aguardando implementação do NPCSystem');
+
+        // Buscar skill do player
+        const skill = this.player?.skills?.[skillIndex];
+        if (!skill) {
+            console.log('❌ Skill não encontrada no slot ' + (skillIndex + 1));
+            return;
+        }
+
+        // Verificar cooldown
+        const now = Date.now();
+        if (skill.lastUsed && now - skill.lastUsed < (skill.cooldown || 1000)) {
+            const remaining = Math.ceil(((skill.lastUsed + (skill.cooldown || 1000)) - now) / 1000);
+            this.showErrorNotification('cooldown', { remainingTime: remaining });
+            return;
+        }
+
+        // Verificar mana
+        if (skill.manaCost && this.player.mana < skill.manaCost) {
+            this.showErrorNotification('mana', {
+                manaNeeded: skill.manaCost,
+                currentMana: this.player.mana
+            });
+            return;
+        }
+
+        // Consumir mana
+        if (skill.manaCost) {
+            this.player.mana -= skill.manaCost;
+            this.updateHUD();
+        }
+
+        // Executar skill
+        skill.lastUsed = now;
+
+        if (skill.damage) {
+            // Skill de dano - encontrar alvo mais próximo
+            let nearestMob = null;
+            let minDistance = Infinity;
+
             this.mobs.forEach(mob => {
                 const dx = mob.x - this.player.x;
                 const dy = mob.y - this.player.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance < minDistance && distance < skill.range) {
+
+                if (distance < minDistance && distance < (skill.range || 200)) {
                     minDistance = distance;
                     nearestMob = mob;
                 }
             });
-            
+
             if (nearestMob) {
                 console.log('🔥 Usando ' + skill.name + ' em ' + nearestMob.name);
-                
-                this.socket.emit('attackMob', {
+
+                this.socket?.emit('attackMob', {
                     mobId: nearestMob.id,
                     damage: skill.damage
                 });
-                
+
                 this.showDamage(nearestMob.x, nearestMob.y, skill.damage);
                 this.showSkillEffect(skill.name, nearestMob.x, nearestMob.y);
             } else {
-                console.log('❌ Nenhum mob no alcance da skill ' + skill.range + 'px');
+                console.log('❌ Nenhum mob no alcance da skill ' + (skill.range || 200) + 'px');
+                this.showNotification('❌ Nenhum alvo no alcance!', '#e74c3c');
             }
         } else if (skill.healing) {
             // Skill de cura
@@ -2110,7 +2224,7 @@ useSkill(skillIndex) {
             this.showSkillEffect(skill.name, this.player.x, this.player.y);
         }
     }
-    
+
     handlePlayerDeath() {
         console.log('💀 Player died - implementing death mechanics...');
         
