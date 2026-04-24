@@ -665,10 +665,34 @@ class LoginManager {
     
     // ===== ENTRAR NO JOGO =====
     enterWorld() {
-        console.log('🌍 Entrando no mundo...', this.selectedCharacter);
+        console.log('🌍 ===== ENTER WORLD =====');
+        console.log('🌍 Personagem selecionado:', this.selectedCharacter);
+        console.log('🌍 CurrentUser:', this.currentUser);
         
         if (!this.selectedCharacter) {
+            console.error('❌ Nenhum personagem selecionado');
             this.showMessage('characterMessage', 'Selecione um personagem', 'error');
+            return;
+        }
+        
+        // Verificar se usuário ainda está logado - tentar recuperar do localStorage se necessário
+        if (!this.currentUser) {
+            console.warn('⚠️ currentUser não está em memória, tentando recuperar do localStorage...');
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                try {
+                    this.currentUser = JSON.parse(savedUser);
+                    console.log('✅ Usuário recuperado do localStorage:', this.currentUser.username);
+                } catch (e) {
+                    console.error('❌ Erro ao recuperar usuário:', e);
+                }
+            }
+        }
+        
+        if (!this.currentUser) {
+            console.error('❌ Usuário não está logado!');
+            this.showMessage('characterMessage', 'Erro: Faça login novamente', 'error');
+            // NÃO fazer logout automático - deixar o usuário tentar novamente
             return;
         }
         
@@ -676,6 +700,8 @@ class LoginManager {
         const charId = this.selectedCharacter.id;
         const charExists = this.characters[charId] || 
                           Object.values(this.characters).find(c => c.slot === this.selectedCharacter.slot);
+        
+        console.log('🌍 Verificando personagem:', { charId, charExists: !!charExists });
         
         if (!charExists) {
             console.error('❌ Personagem não encontrado:', charId);
@@ -692,22 +718,30 @@ class LoginManager {
         
         // Salvar personagem atual
         localStorage.setItem('currentCharacter', JSON.stringify(this.selectedCharacter));
+        console.log('💾 Personagem salvo no localStorage');
         
         // Esconder tela de seleção
         if (this.characterScreen) {
             this.characterScreen.style.display = 'none';
             this.characterScreen.classList.remove('active');
+            console.log('🙈 Tela de seleção escondida');
         }
         
         // Mostrar tela do jogo
+        console.log('🎮 Verificando gameContainer:', this.gameContainer);
         if (this.gameContainer) {
             this.gameContainer.style.display = 'block';
             this.gameContainer.classList.add('active');
+            console.log('✅ GameContainer ativado');
             
             // Iniciar gameplay com delay para garantir renderização
             setTimeout(() => {
+                console.log('⏰ Iniciando startGameplay...');
                 this.startGameplay();
             }, 100);
+        } else {
+            console.error('❌ GameContainer não encontrado!');
+            this.showMessage('characterMessage', 'Erro: Container do jogo não encontrado', 'error');
         }
     }
     
@@ -721,32 +755,46 @@ class LoginManager {
     }
     
     startGameplay() {
-        console.log('🎮 Iniciando gameplay...');
+        console.log('🎮 ===== START GAMEPLAY =====');
+        console.log('🎮 Character data:', this.selectedCharacter);
         
         // Inicializar GameplayEngine se disponível
         if (typeof IntegratedGameplayEngine !== 'undefined') {
+            console.log('✅ IntegratedGameplayEngine disponível');
             try {
-                window._gameplayEngine = new IntegratedGameplayEngine('gameCanvas', {
-                    class: this.selectedCharacter.class,
-                    name: this.selectedCharacter.name,
-                    race: this.selectedCharacter.race,
-                    level: this.selectedCharacter.level
-                });
-                window._gameplayEngine.start();
-                console.log('✅ GameplayEngine iniciado');
+                const config = {
+                    class: this.selectedCharacter?.class || 'warrior',
+                    name: this.selectedCharacter?.name || 'Unknown',
+                    race: this.selectedCharacter?.race || 'human',
+                    level: this.selectedCharacter?.level || 1
+                };
+                console.log('🎮 Config:', config);
+                
+                window._gameplayEngine = new IntegratedGameplayEngine('gameCanvas', config);
+                console.log('✅ GameplayEngine instanciado');
+                
+                if (window._gameplayEngine && window._gameplayEngine.start) {
+                    window._gameplayEngine.start();
+                    console.log('✅ GameplayEngine.start() chamado');
+                } else {
+                    console.error('❌ GameplayEngine não tem método start');
+                }
             } catch (e) {
                 console.error('❌ Erro ao iniciar GameplayEngine:', e);
-                // Fallback - mostrar mensagem mas não travar
-                this.showMessage('characterMessage', 'Erro ao iniciar jogo, recarregue a página', 'error');
+                console.error('❌ Stack:', e.stack);
+                // NÃO fazer logout em caso de erro - apenas mostrar mensagem
+                this.showMessage('characterMessage', 'Erro ao iniciar jogo: ' + e.message, 'error');
             }
         } else {
             console.warn('⚠️ IntegratedGameplayEngine não disponível');
+            this.showMessage('characterMessage', 'Motor de jogo não disponível', 'error');
         }
     }
     
     // ===== LOGOUT =====
     logout() {
-        console.log('🚪 Fazendo logout...');
+        console.log('🚪 ===== LOGOUT =====');
+        console.log('🚪 Stack trace:', new Error().stack);
         
         // Limpar dados da sessão
         this.currentUser = null;
