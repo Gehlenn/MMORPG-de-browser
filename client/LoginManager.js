@@ -9,6 +9,7 @@ class LoginManager {
         this.currentUser = null;
         this.selectedCharacter = null;
         this.characters = {};
+        this._isEnteringWorld = false; // Flag para prevenir logout acidental
         
         this.init();
     }
@@ -97,7 +98,8 @@ class LoginManager {
                 console.log('✅ currentUser setado:', this.currentUser);
                 this.showCharacterSelect();
             } catch (e) {
-                console.error('Erro ao carregar sessão:', e);
+                console.error('❌ Erro ao carregar sessão:', e);
+                console.log('🗑️ REMOVENDO currentUser do localStorage devido a erro de parse');
                 localStorage.removeItem('currentUser');
             }
         } else {
@@ -129,9 +131,10 @@ class LoginManager {
         // Login bem-sucedido
         this.currentUser = { username: user.username, id: user.id || Date.now() };
         console.log('✅ Login bem-sucedido, salvando usuário:', this.currentUser);
-        
+        // Salvar no localStorage
+        console.log('💾 SALVANDO currentUser no localStorage:', this.currentUser.username);
         localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-        console.log('💾 currentUser salvo no localStorage');
+        console.log('✅ currentUser salvo no localStorage');
         
         // Verificar se salvou
         const saved = localStorage.getItem('currentUser');
@@ -336,12 +339,23 @@ class LoginManager {
             }
         });
         
-        // Resetar seleção
-        this.selectedCharacter = null;
-        const enterBtn = document.getElementById('enterWorldBtn');
-        if (enterBtn) {
-            enterBtn.disabled = true;
-            enterBtn.style.opacity = '0.5';
+        // NÃO resetar seleção aqui - apenas atualizar visual
+        // A seleção deve ser mantida entre atualizações
+        if (this.selectedCharacter) {
+            // Manter botão habilitado se há personagem selecionado
+            const enterBtn = document.getElementById('enterWorldBtn');
+            if (enterBtn) {
+                enterBtn.disabled = false;
+                enterBtn.style.opacity = '1';
+            }
+            
+            // Manter highlight no card selecionado
+            const cards = document.querySelectorAll('.character-card');
+            cards.forEach((card, index) => {
+                if (this.selectedCharacter.slot === index) {
+                    card.classList.add('selected');
+                }
+            });
         }
     }
     
@@ -663,26 +677,19 @@ class LoginManager {
         }, 500);
     }
     
-    // ===== ENTRAR NO JOGO =====
+    // ===== ENTRAR NO MUNDO =====
     enterWorld() {
-        console.log('🌍 ===== ENTER WORLD =====');
-        console.log('🌍 Personagem selecionado:', this.selectedCharacter);
-        console.log('🌍 CurrentUser:', this.currentUser);
+        console.log('🌍 ENTRANDO NO MUNDO...');
         
-        if (!this.selectedCharacter) {
-            console.error('❌ Nenhum personagem selecionado');
-            this.showMessage('characterMessage', 'Selecione um personagem', 'error');
-            return;
-        }
+        // FLAG: Estamos entrando no mundo - prevenir logout acidental
+        this._isEnteringWorld = true;
         
         // Verificar se usuário ainda está logado - tentar recuperar do localStorage se necessário
         if (!this.currentUser) {
-            console.warn('⚠️ currentUser não está em memória, tentando recuperar do localStorage...');
             const savedUser = localStorage.getItem('currentUser');
             if (savedUser) {
                 try {
                     this.currentUser = JSON.parse(savedUser);
-                    console.log('✅ Usuário recuperado do localStorage:', this.currentUser.username);
                 } catch (e) {
                     console.error('❌ Erro ao recuperar usuário:', e);
                 }
@@ -691,17 +698,15 @@ class LoginManager {
         
         if (!this.currentUser) {
             console.error('❌ Usuário não está logado!');
+            this._isEnteringWorld = false;
             this.showMessage('characterMessage', 'Erro: Faça login novamente', 'error');
-            // NÃO fazer logout automático - deixar o usuário tentar novamente
             return;
         }
         
         // Verificar se personagem ainda existe (por ID ou por slot)
-        const charId = this.selectedCharacter.id;
+        const charId = this.selectedCharacter?.id;
         const charExists = this.characters[charId] || 
-                          Object.values(this.characters).find(c => c.slot === this.selectedCharacter.slot);
-        
-        console.log('🌍 Verificando personagem:', { charId, charExists: !!charExists });
+                          Object.values(this.characters).find(c => c.slot === this.selectedCharacter?.slot);
         
         if (!charExists) {
             console.error('❌ Personagem não encontrado:', charId);
@@ -738,9 +743,15 @@ class LoginManager {
             setTimeout(() => {
                 console.log('⏰ Iniciando startGameplay...');
                 this.startGameplay();
+                // Resetar flag após tentativa (sucesso ou falha)
+                setTimeout(() => {
+                    this._isEnteringWorld = false;
+                    console.log('🚩 Flag _isEnteringWorld resetada para false');
+                }, 1000);
             }, 100);
         } else {
             console.error('❌ GameContainer não encontrado!');
+            this._isEnteringWorld = false; // Resetar flag em caso de erro
             this.showMessage('characterMessage', 'Erro: Container do jogo não encontrado', 'error');
         }
     }
@@ -755,12 +766,10 @@ class LoginManager {
     }
     
     startGameplay() {
-        console.log('🎮 ===== START GAMEPLAY =====');
-        console.log('🎮 Character data:', this.selectedCharacter);
+        console.log('🎮 Iniciando gameplay...');
         
         // Inicializar GameplayEngine se disponível
         if (typeof IntegratedGameplayEngine !== 'undefined') {
-            console.log('✅ IntegratedGameplayEngine disponível');
             try {
                 const config = {
                     class: this.selectedCharacter?.class || 'warrior',
@@ -768,33 +777,36 @@ class LoginManager {
                     race: this.selectedCharacter?.race || 'human',
                     level: this.selectedCharacter?.level || 1
                 };
-                console.log('🎮 Config:', config);
                 
                 window._gameplayEngine = new IntegratedGameplayEngine('gameCanvas', config);
-                console.log('✅ GameplayEngine instanciado');
                 
                 if (window._gameplayEngine && window._gameplayEngine.start) {
                     window._gameplayEngine.start();
-                    console.log('✅ GameplayEngine.start() chamado');
+                    console.log('✅ Jogo iniciado!');
                 } else {
                     console.error('❌ GameplayEngine não tem método start');
                 }
             } catch (e) {
-                console.error('❌ Erro ao iniciar GameplayEngine:', e);
-                console.error('❌ Stack:', e.stack);
-                // NÃO fazer logout em caso de erro - apenas mostrar mensagem
+                console.error('❌ Erro ao iniciar jogo:', e.message);
+                this._isEnteringWorld = false;
                 this.showMessage('characterMessage', 'Erro ao iniciar jogo: ' + e.message, 'error');
             }
         } else {
-            console.warn('⚠️ IntegratedGameplayEngine não disponível');
+            console.warn('⚠️ Motor de jogo não disponível');
+            this._isEnteringWorld = false;
             this.showMessage('characterMessage', 'Motor de jogo não disponível', 'error');
         }
     }
     
     // ===== LOGOUT =====
     logout() {
-        console.log('🚪 ===== LOGOUT =====');
-        console.log('🚪 Stack trace:', new Error().stack);
+        // PROTEÇÃO: Se estamos no meio de entrar no mundo, NÃO fazer logout
+        if (this._isEnteringWorld) {
+            console.warn('🚫 Logout bloqueado: entrando no mundo');
+            return;
+        }
+        
+        console.log('🚪 Logout...');
         
         // Limpar dados da sessão
         this.currentUser = null;

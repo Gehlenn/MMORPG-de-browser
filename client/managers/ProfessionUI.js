@@ -13,7 +13,7 @@
 class ProfessionUI {
     constructor(game) {
         this.game = game;
-        this.socket = game.socket;
+        this.socket = game?.socket || null;
         this.isVisible = false;
         this.selectedProfession = null;
         this.professionData = {};
@@ -550,6 +550,12 @@ class ProfessionUI {
     // ===== SOCKET EVENTS =====
     
     registerSocketEvents() {
+        // Verificar se socket existe (modo offline)
+        if (!this.socket) {
+            console.warn('⚠️ ProfessionUI: Socket não disponível, modo offline');
+            return;
+        }
+        
         // Receber dados de profissões
         this.socket.on('profession:info', (data) => {
             if (data.success) {

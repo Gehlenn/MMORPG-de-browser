@@ -32,12 +32,19 @@ function initProfessionSystems(gameEngine) {
         return;
     }
     
+    // Verificar se gameEngine existe
+    if (!gameEngine) {
+        console.error('[Professions] gameEngine não disponível');
+        return;
+    }
+    
     // Inicializar ProfessionUI
     try {
         gameEngine.professionUI = new ProfessionUI(gameEngine);
         console.log('✅ ProfessionUI inicializado');
     } catch (e) {
-        console.error('[Professions] Erro ao inicializar ProfessionUI:', e);
+        console.warn('[Professions] Erro ao inicializar ProfessionUI (modo offline):', e.message);
+        // Não crashar o jogo - continuar sem ProfessionUI
     }
     
     // Inicializar ResourceNodeManager

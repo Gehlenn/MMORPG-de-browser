@@ -1091,33 +1091,49 @@ class IntegratedGameplayEngine {
         
         // Inicializar Party System
         if (window.PartyManager) {
-            this.partyManager = new PartyManager(this.playerId || 'player_1');
-            this.partyManager.init();
-            window.partyManager = this.partyManager;
-            
-            if (window.PartyUI) {
-                this.partyUI = new PartyUI(this.partyManager);
-                this.partyUI.init();
-                window.partyUI = this.partyUI;
+            try {
+                this.partyManager = new PartyManager(this.playerId || 'player_1');
+                this.partyManager.init();
+                window.partyManager = this.partyManager;
+                
+                if (window.PartyUI) {
+                    try {
+                        this.partyUI = new PartyUI(this.partyManager);
+                        this.partyUI.init();
+                        window.partyUI = this.partyUI;
+                    } catch (e) {
+                        console.warn('⚠️ PartyUI não inicializou:', e.message);
+                    }
+                }
+                
+                console.log('👥 Party System inicializado');
+            } catch (e) {
+                console.warn('⚠️ PartyManager não inicializou:', e.message);
             }
-            
-            console.log('👥 Party System inicializado');
         }
         
         // Inicializar Economy System
         if (window.EconomyManager) {
-            this.economyManager = new EconomyManager();
-            this.economyManager.init();
-            window.economyManager = this.economyManager;
-            
-            if (window.EconomyUI) {
-                this.economyUI = new EconomyUI(this.economyManager);
-                this.economyUI.init();
-                window.economyUI = this.economyUI;
+            try {
+                this.economyManager = new EconomyManager();
+                this.economyManager.init();
+                window.economyManager = this.economyManager;
+                
+                if (window.EconomyUI) {
+                    try {
+                        this.economyUI = new EconomyUI(this.economyManager);
+                        this.economyUI.init();
+                        window.economyUI = this.economyUI;
+                    } catch (e) {
+                        console.warn('⚠️ EconomyUI não inicializou:', e.message);
+                    }
+                }
+                
+                console.log('💹 Economy System inicializado');
+                console.log('   - Itens rastreados:', this.economyManager?.basePrices?.size || 0);
+            } catch (e) {
+                console.warn('⚠️ EconomyManager não inicializou:', e.message);
             }
-            
-            console.log('💹 Economy System inicializado');
-            console.log('   - Itens rastreados:', this.economyManager?.basePrices?.size || 0);
         }
         
         // Inicializar Guild System
@@ -1995,21 +2011,21 @@ class IntegratedGameplayEngine {
         this.ctx.fillStyle = '#2a2a2a';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // DEBUG: Verificar estado dos assets
-        if (this.frameCount % 60 === 0) { // A cada 1 segundo
-            const assetsLoaded = window.assetManager && window.assetManager.assets;
-            const playerSprite = assetsLoaded ? window.assetManager.assets.get('characters_human_adventurer') : null;
-            const mobSprite = assetsLoaded ? window.assetManager.assets.get('monsters_goblin_raider') : null;
-            
-            console.log('🔍 DEBUG Assets:', {
-                assetManager: !!window.assetManager,
-                assetsLoaded: !!assetsLoaded,
-                playerSprite: !!playerSprite,
-                mobSprite: !!mobSprite,
-                mobsCount: this.mobs.length,
-                entitiesCount: this.entities.length
-            });
-        }
+        // DEBUG: Verificar estado dos assets (comentado para não poluir console)
+        // if (this.frameCount % 60 === 0) { // A cada 1 segundo
+        //     const assetsLoaded = window.assetManager && window.assetManager.assets;
+        //     const playerSprite = assetsLoaded ? window.assetManager.assets.get('characters_human_adventurer') : null;
+        //     const mobSprite = assetsLoaded ? window.assetManager.assets.get('monsters_goblin_raider') : null;
+        //     
+        //     console.log('🔍 DEBUG Assets:', {
+        //         assetManager: !!window.assetManager,
+        //         assetsLoaded: !!assetsLoaded,
+        //         playerSprite: !!playerSprite,
+        //         mobSprite: !!mobSprite,
+        //         mobsCount: this.mobs.length,
+        //         entitiesCount: this.entities.length
+        //     });
+        // }
         
         // Salvar contexto
         this.ctx.save();
