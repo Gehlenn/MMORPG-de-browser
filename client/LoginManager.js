@@ -71,10 +71,15 @@ class LoginManager {
         if (cancelCreationBtn) cancelCreationBtn.onclick = () => this.cancelCharacterCreation();
         if (createCharacterBtn) createCharacterBtn.onclick = () => this.createCharacter();
         
-        // Cards de personagem
+        // Cards de personagem - apenas 3 slots
         const cards = document.querySelectorAll('.character-card');
-        cards.forEach(card => {
-            card.onclick = (e) => this.selectCharacter(card.dataset.class, card);
+        cards.forEach((card, index) => {
+            if (index < 3) {
+                card.onclick = (e) => this.selectSlot(index);
+                card.setAttribute('data-slot', index);
+            } else {
+                card.style.display = 'none'; // Esconder slots extras
+            }
         });
         
         console.log('🎯 Event listeners configurados');
@@ -232,6 +237,29 @@ class LoginManager {
     loadUserCharacters() {
         const allCharacters = JSON.parse(localStorage.getItem('characters') || '{}');
         this.characters = allCharacters[this.currentUser?.username] || {};
+        
+        // Migrar personagens antigos (sem slot property) para o sistema de slots
+        let needsMigration = false;
+        const charactersArray = Object.values(this.characters);
+        
+        charactersArray.forEach((char, index) => {
+            if (char.slot === undefined) {
+                // Atribuir slot baseado na ordem, mas garantir máximo de 3
+                if (index < 3) {
+                    char.slot = index;
+                    needsMigration = true;
+                    console.log(`🔄 Migrando personagem ${char.name} para slot ${index}`);
+                }
+            }
+        });
+        
+        // Se migrou, salvar de volta
+        if (needsMigration) {
+            allCharacters[this.currentUser.username] = this.characters;
+            localStorage.setItem('characters', JSON.stringify(allCharacters));
+            console.log('💾 Personagens migrados e salvos');
+        }
+        
         console.log('📋 Personagens carregados:', Object.keys(this.characters));
     }
     
@@ -252,7 +280,7 @@ class LoginManager {
             if (oldInfo) oldInfo.remove();
             
             if (charData) {
-                // Personagem existe - mostrar info do personagem
+                // Personagem existe - mostrar info do personagem com botão de deletar
                 card.classList.add('has-character');
                 card.classList.remove('empty', 'empty-slot');
                 card.innerHTML = `
@@ -262,6 +290,20 @@ class LoginManager {
                         <span>❤️ ${charData.hp}/${charData.maxHp}</span>
                         <span>⚔️ ${charData.class}</span>
                     </div>
+                    <button class="delete-btn" onclick="event.stopPropagation(); deleteCharacter(${index})" style="
+                        position: absolute;
+                        top: 5px;
+                        right: 5px;
+                        background: #ff4444;
+                        color: white;
+                        border: none;
+                        border-radius: 50%;
+                        width: 25px;
+                        height: 25px;
+                        cursor: pointer;
+                        font-size: 12px;
+                        z-index: 10;
+                    " title="Excluir personagem">✕</button>
                 `;
             } else {
                 // Slot vazio
@@ -289,12 +331,15 @@ class LoginManager {
     selectSlot(slotIndex) {
         console.log('🎲 Slot selecionado:', slotIndex);
         
+        if (slotIndex >= 3) return; // Segurança: máximo 3 slots
+        
         // Verificar se existe personagem neste slot específico
         const charInSlot = Object.values(this.characters).find(c => c.slot === slotIndex);
         
         if (charInSlot) {
             // Selecionar personagem existente
             this.selectedCharacter = charInSlot;
+            this.selectedSlot = slotIndex;
             console.log('✅ Personagem selecionado:', charInSlot.name);
             
             // Destacar card
@@ -310,14 +355,79 @@ class LoginManager {
                 enterBtn.style.opacity = '1';
             }
             
+            // Mostrar botão deletar
+            this.showDeleteButton(true, charInSlot);
+            
             // Salvar seleção
             localStorage.setItem('selectedCharacter', JSON.stringify(charInSlot));
         } else {
             // Slot vazio - abrir criação
             console.log('📭 Slot vazio, abrindo criação...');
             this.selectedSlot = slotIndex;
+            this.showDeleteButton(false); // Esconder botão deletar
             this.showCharacterCreation('warrior'); // Classe padrão
         }
+    }
+    
+    showDeleteButton(show, character = null) {
+        let deleteBtn = document.getElementById('deleteCharacterBtn');
+        
+        if (!deleteBtn) {
+            // Criar botão se não existir
+            deleteBtn = document.createElement('button');
+            deleteBtn.id = 'deleteCharacterBtn';
+            deleteBtn.className = 'btn btn-danger';
+            deleteBtn.innerHTML = '🗑️ Deletar Personagem';
+            deleteBtn.style.cssText = 'margin-top: 10px; background: #d32f2f;';
+            
+            const container = document.querySelector('.character-actions');
+            if (container) {
+                container.appendChild(deleteBtn);
+            }
+        }
+        
+        if (deleteBtn) {
+            deleteBtn.style.display = show ? 'inline-block' : 'none';
+            deleteBtn.onclick = () => {
+                if (character && confirm(`Tem certeza que deseja deletar ${character.name}?`)) {
+                    this.deleteCharacter(character.id || character.slot);
+                }
+            };
+        }
+    }
+    
+    deleteCharacter(charIdOrSlot) {
+        console.log('🗑️ Deletando personagem:', charIdOrSlot);
+        
+        // Encontrar personagem por ID ou slot
+        let charId = charIdOrSlot;
+        const charBySlot = Object.values(this.characters).find(c => c.slot === charIdOrSlot);
+        if (charBySlot) {
+            charId = charBySlot.id;
+        }
+        
+        if (!charId || !this.characters[charId]) {
+            console.error('Personagem não encontrado:', charIdOrSlot);
+            return;
+        }
+        
+        // Remover personagem
+        delete this.characters[charId];
+        
+        // Salvar
+        const allCharacters = JSON.parse(localStorage.getItem('characters') || '{}');
+        allCharacters[this.currentUser.username] = this.characters;
+        localStorage.setItem('characters', JSON.stringify(allCharacters));
+        
+        // Resetar seleção
+        this.selectedCharacter = null;
+        localStorage.removeItem('selectedCharacter');
+        
+        // Atualizar UI
+        this.showDeleteButton(false);
+        this.updateCharacterList();
+        
+        this.showMessage('characterMessage', 'Personagem deletado!', 'success');
     }
     
     selectCharacter(className, cardElement) {
@@ -392,6 +502,47 @@ class LoginManager {
         if (this.characterName) this.characterName.value = '';
     }
     
+    deleteCharacter(slotIndex) {
+        console.log('🗑️ Deletando personagem do slot:', slotIndex);
+        
+        // Confirmar com o usuário
+        if (!confirm('Tem certeza que deseja excluir este personagem? Esta ação não pode ser desfeita.')) {
+            return;
+        }
+        
+        // Encontrar personagem neste slot
+        const charToDelete = Object.values(this.characters).find(c => c.slot === slotIndex);
+        
+        if (!charToDelete) {
+            console.log('ℹ️ Nenhum personagem neste slot');
+            return;
+        }
+        
+        // Remover personagem
+        delete this.characters[charToDelete.id || Object.keys(this.characters).find(key => this.characters[key] === charToDelete)];
+        
+        // Salvar no localStorage
+        const allCharacters = JSON.parse(localStorage.getItem('characters') || '{}');
+        allCharacters[this.currentUser.username] = this.characters;
+        localStorage.setItem('characters', JSON.stringify(allCharacters));
+        
+        console.log('✅ Personagem deletado:', charToDelete.name);
+        this.showMessage('characterMessage', `Personagem ${charToDelete.name} excluído`, 'success');
+        
+        // Resetar seleção se era o personagem selecionado
+        if (this.selectedCharacter && this.selectedCharacter.slot === slotIndex) {
+            this.selectedCharacter = null;
+            const enterBtn = document.getElementById('enterWorldBtn');
+            if (enterBtn) {
+                enterBtn.disabled = true;
+                enterBtn.style.opacity = '0.5';
+            }
+        }
+        
+        // Atualizar lista
+        this.updateCharacterList();
+    }
+    
     createCharacter() {
         console.log('🔍 Debug createCharacter - currentUser:', this.currentUser);
         
@@ -433,21 +584,29 @@ class LoginManager {
             return;
         }
         
+        // Verificar limite de 3 slots
+        const charCount = Object.keys(this.characters).length;
+        if (charCount >= 3) {
+            this.showMessage('characterMessage', 'Limite máximo de 3 personagens atingido', 'error');
+            return;
+        }
+        
         // Verificar se slot está ocupado
-        const charactersArray = Object.values(this.characters);
-        if (this.selectedSlot !== undefined && charactersArray[this.selectedSlot]) {
+        const slotToUse = this.selectedSlot !== undefined ? this.selectedSlot : this.findFirstEmptySlot();
+        const charInSlot = Object.values(this.characters).find(c => c.slot === slotToUse);
+        if (charInSlot) {
             this.showMessage('characterMessage', 'Slot já ocupado', 'error');
             return;
         }
         
         // Criar personagem com ID único baseado no slot
-        const charId = `char_${this.selectedSlot || 0}_${Date.now()}`;
-        this.characters[charId] = {
+        const charId = `char_${slotToUse}_${Date.now()}`;
+        const newCharacter = {
             id: charId,
             name,
             race,
             class: charClass,
-            slot: this.selectedSlot || 0,
+            slot: slotToUse,
             level: 1,
             xp: 0,
             hp: 100,
@@ -455,10 +614,14 @@ class LoginManager {
             createdAt: new Date().toISOString()
         };
         
-        // Salvar
+        // Adicionar ao objeto de personagens
+        this.characters[charId] = newCharacter;
+        
+        // Salvar no localStorage
         const allCharacters = JSON.parse(localStorage.getItem('characters') || '{}');
         allCharacters[this.currentUser.username] = this.characters;
         localStorage.setItem('characters', JSON.stringify(allCharacters));
+        console.log('💾 Personagem salvo:', newCharacter);
         
         this.showMessage('characterMessage', 'Personagem criado!', 'success');
         
@@ -466,9 +629,12 @@ class LoginManager {
             this.cancelCharacterCreation();
             this.updateCharacterList();
             
-            // Auto-selecionar o personagem criado
-            this.selectSlot(this.selectedSlot || 0);
-        }, 1000);
+            // Auto-selecionar o personagem criado no slot correto
+            const createdChar = Object.values(this.characters).find(c => c.name === name);
+            if (createdChar) {
+                this.selectSlot(createdChar.slot);
+            }
+        }, 500);
     }
     
     // ===== ENTRAR NO JOGO =====
@@ -480,17 +646,43 @@ class LoginManager {
             return;
         }
         
+        // Verificar se personagem ainda existe
+        const charId = this.selectedCharacter.id;
+        if (!this.characters[charId]) {
+            console.error('❌ Personagem não encontrado:', charId);
+            this.showMessage('characterMessage', 'Erro: personagem não encontrado', 'error');
+            this.updateCharacterList();
+            return;
+        }
+        
         // Salvar personagem atual
         localStorage.setItem('currentCharacter', JSON.stringify(this.selectedCharacter));
         
-        // Transição para o jogo
+        // Esconder tela de seleção
         if (this.characterScreen) {
+            this.characterScreen.style.display = 'none';
             this.characterScreen.classList.remove('active');
-            if (this.gameContainer) {
-                this.gameContainer.classList.add('active');
-                this.startGameplay();
-            }
         }
+        
+        // Mostrar tela do jogo
+        if (this.gameContainer) {
+            this.gameContainer.style.display = 'block';
+            this.gameContainer.classList.add('active');
+            
+            // Iniciar gameplay com delay para garantir renderização
+            setTimeout(() => {
+                this.startGameplay();
+            }, 100);
+        }
+    }
+    
+    findFirstEmptySlot() {
+        const slots = [0, 1, 2];
+        for (const slot of slots) {
+            const charInSlot = Object.values(this.characters).find(c => c.slot === slot);
+            if (!charInSlot) return slot;
+        }
+        return -1;
     }
     
     startGameplay() {
