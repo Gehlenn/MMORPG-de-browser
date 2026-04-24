@@ -236,31 +236,62 @@ class LoginManager {
     
     loadUserCharacters() {
         const allCharacters = JSON.parse(localStorage.getItem('characters') || '{}');
-        this.characters = allCharacters[this.currentUser?.username] || {};
+        let userCharacters = allCharacters[this.currentUser?.username] || {};
         
-        // Migrar personagens antigos (sem slot property) para o sistema de slots
-        let needsMigration = false;
-        const charactersArray = Object.values(this.characters);
+        console.log('📋 Personagens brutos:', Object.keys(userCharacters));
         
-        charactersArray.forEach((char, index) => {
-            if (char.slot === undefined) {
-                // Atribuir slot baseado na ordem, mas garantir máximo de 3
-                if (index < 3) {
-                    char.slot = index;
-                    needsMigration = true;
-                    console.log(`🔄 Migrando personagem ${char.name} para slot ${index}`);
+        // Limpar e normalizar personagens
+        const normalizedChars = {};
+        let slotAssignment = 0;
+        
+        Object.entries(userCharacters).forEach(([key, char]) => {
+            // Pular personagens inválidos
+            if (!char || !char.name) return;
+            
+            // Garantir que tenha um ID
+            if (!char.id) {
+                char.id = `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            }
+            
+            // Se não tem slot, atribuir um disponível (máximo 3)
+            if (char.slot === undefined || char.slot === null) {
+                if (slotAssignment < 3) {
+                    // Verificar se este slot já está ocupado
+                    const existingSlot = Object.values(normalizedChars).find(c => c.slot === slotAssignment);
+                    if (!existingSlot) {
+                        char.slot = slotAssignment;
+                        slotAssignment++;
+                    } else {
+                        // Procurar próximo slot livre
+                        for (let i = 0; i < 3; i++) {
+                            if (!Object.values(normalizedChars).find(c => c.slot === i)) {
+                                char.slot = i;
+                                slotAssignment = i + 1;
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    // Mais de 3 personagens, pular (não mostrar)
+                    console.log(`⚠️ Personagem ${char.name} ignorado (limite de 3 atingido)`);
+                    return;
                 }
             }
+            
+            normalizedChars[char.id] = char;
         });
         
-        // Se migrou, salvar de volta
-        if (needsMigration) {
-            allCharacters[this.currentUser.username] = this.characters;
+        this.characters = normalizedChars;
+        
+        // Salvar se houve mudanças
+        if (Object.keys(userCharacters).length !== Object.keys(normalizedChars).length) {
+            allCharacters[this.currentUser.username] = normalizedChars;
             localStorage.setItem('characters', JSON.stringify(allCharacters));
-            console.log('💾 Personagens migrados e salvos');
+            console.log('💾 Personagens normalizados e salvos');
         }
         
-        console.log('📋 Personagens carregados:', Object.keys(this.characters));
+        console.log('📋 Personagens carregados:', Object.keys(this.characters), 
+            Object.values(this.characters).map(c => `${c.name}(slot:${c.slot})`));
     }
     
     updateCharacterList() {
@@ -518,8 +549,16 @@ class LoginManager {
             return;
         }
         
-        // Remover personagem
-        delete this.characters[charToDelete.id || Object.keys(this.characters).find(key => this.characters[key] === charToDelete)];
+        console.log('🗑️ Deletando:', charToDelete.name, 'ID:', charToDelete.id);
+        
+        // Remover personagem pelo ID
+        if (charToDelete.id && this.characters[charToDelete.id]) {
+            delete this.characters[charToDelete.id];
+        } else {
+            // Fallback: procurar pela chave
+            const keyToDelete = Object.keys(this.characters).find(key => this.characters[key].slot === slotIndex);
+            if (keyToDelete) delete this.characters[keyToDelete];
+        }
         
         // Salvar no localStorage
         const allCharacters = JSON.parse(localStorage.getItem('characters') || '{}');
@@ -527,6 +566,7 @@ class LoginManager {
         localStorage.setItem('characters', JSON.stringify(allCharacters));
         
         console.log('✅ Personagem deletado:', charToDelete.name);
+        console.log('📋 Personagens restantes:', Object.keys(this.characters));
         this.showMessage('characterMessage', `Personagem ${charToDelete.name} excluído`, 'success');
         
         // Resetar seleção se era o personagem selecionado
@@ -646,13 +686,22 @@ class LoginManager {
             return;
         }
         
-        // Verificar se personagem ainda existe
+        // Verificar se personagem ainda existe (por ID ou por slot)
         const charId = this.selectedCharacter.id;
-        if (!this.characters[charId]) {
+        const charExists = this.characters[charId] || 
+                          Object.values(this.characters).find(c => c.slot === this.selectedCharacter.slot);
+        
+        if (!charExists) {
             console.error('❌ Personagem não encontrado:', charId);
             this.showMessage('characterMessage', 'Erro: personagem não encontrado', 'error');
+            this.selectedCharacter = null;
             this.updateCharacterList();
             return;
+        }
+        
+        // Atualizar selectedCharacter se necessário (caso o ID tenha mudado)
+        if (!this.characters[charId] && charExists) {
+            this.selectedCharacter = charExists;
         }
         
         // Salvar personagem atual

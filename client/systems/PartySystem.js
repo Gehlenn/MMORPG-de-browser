@@ -207,6 +207,12 @@ class PartySystem {
     }
     
     setupSocketEvents() {
+        // Verificar se socket existe
+        if (!this.game || !this.game.socket) {
+            console.warn('⚠️ Socket não disponível, modo offline ativado');
+            return;
+        }
+        
         // Party updates
         this.game.socket.on('partyUpdate', (data) => {
             this.updateParty(data);
@@ -387,29 +393,20 @@ class PartySystem {
         list.innerHTML = html;
     }
     
-    updateNearbyPlayers() {
-        // Request nearby players from server
-        this.game.socket.emit('getNearbyPlayers');
-    }
-    
-    setNearbyPlayers(players) {
-        this.nearbyPlayers = players;
-        if (this.invitePanel.style.display === 'block') {
-            this.renderNearbyPlayers();
-        }
-    }
-    
     createParty() {
-        this.game.socket.emit('createParty', {
-            settings: this.partySettings
-        });
+        if (!this.game.socket) {
+            this.showNotification('Modo offline - grupos indisponíveis', '#e74c3c');
+            return;
+        }
+        this.game.socket.emit('createParty', {});
+        this.showNotification('Grupo criado!', '#27ae60');
     }
     
     invitePlayer(playerId) {
-        if (!this.currentParty) {
-            this.createParty();
+        if (!this.game.socket) {
+            this.showNotification('Modo offline - convites indisponíveis', '#e74c3c');
+            return;
         }
-        
         this.game.socket.emit('inviteToParty', { playerId });
         this.showNotification('Convite enviado!', '#3498db');
     }
@@ -420,6 +417,11 @@ class PartySystem {
         
         if (!name) {
             this.showNotification('Digite um nome de jogador', '#e74c3c');
+            return;
+        }
+        
+        if (!this.game.socket) {
+            this.showNotification('Modo offline - convites indisponíveis', '#e74c3c');
             return;
         }
         
@@ -481,11 +483,15 @@ class PartySystem {
     }
     
     acceptInvite(partyId) {
-        this.game.socket.emit('acceptPartyInvite', { partyId });
+        if (this.game.socket) {
+            this.game.socket.emit('acceptPartyInvite', { partyId });
+        }
     }
     
     declineInvite(partyId) {
-        this.game.socket.emit('declinePartyInvite', { partyId });
+        if (this.game.socket) {
+            this.game.socket.emit('declinePartyInvite', { partyId });
+        }
     }
     
     updateParty(partyData) {
@@ -523,7 +529,9 @@ class PartySystem {
     
     leaveParty() {
         if (this.currentParty) {
-            this.game.socket.emit('leaveParty');
+            if (this.game.socket) {
+                this.game.socket.emit('leaveParty');
+            }
             this.currentParty = null;
             this.renderPartyMembers();
         }
@@ -535,12 +543,16 @@ class PartySystem {
     }
     
     promoteToLeader(memberId) {
-        this.game.socket.emit('promotePartyLeader', { memberId });
+        if (this.game.socket) {
+            this.game.socket.emit('promotePartyLeader', { memberId });
+        }
     }
     
     kickMember(memberId) {
         if (confirm('Tem certeza que deseja expulsar este membro?')) {
-            this.game.socket.emit('kickPartyMember', { memberId });
+            if (this.game.socket) {
+                this.game.socket.emit('kickPartyMember', { memberId });
+            }
         }
     }
     
@@ -555,7 +567,9 @@ class PartySystem {
             autoInvite
         };
         
-        this.game.socket.emit('updatePartySettings', this.partySettings);
+        if (this.game.socket) {
+            this.game.socket.emit('updatePartySettings', this.partySettings);
+        }
         this.toggleSettingsPanel();
         this.renderPartyMembers();
         this.showNotification('Configurações salvas!', '#27ae60');
