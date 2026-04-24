@@ -10,6 +10,7 @@ class LoginManager {
         this.selectedCharacter = null;
         this.characters = {};
         this._isEnteringWorld = false; // Flag para prevenir logout acidental
+        this._isGameActive = false; // Flag para indicar que o jogo está rodando
         
         this.init();
     }
@@ -88,6 +89,13 @@ class LoginManager {
     
     checkExistingSession() {
         console.log('🔍 Verificando sessão existente...');
+        
+        // Se o jogo está ativo, não verificar sessão
+        if (this._isGameActive) {
+            console.log('🎮 Jogo ativo, pulando verificação de sessão');
+            return;
+        }
+        
         const savedUser = localStorage.getItem('currentUser');
         console.log('📦 Dados no localStorage:', savedUser);
         
@@ -162,6 +170,12 @@ class LoginManager {
     }
     
     showLogin() {
+        // PROTEÇÃO: Não mostrar login se o jogo está ativo
+        if (this._isGameActive) {
+            console.warn('🚫 showLogin bloqueado: jogo está ativo');
+            return;
+        }
+        
         console.log('🔙 Voltando para login');
         if (this.createAccountForm) {
             this.createAccountForm.style.opacity = '0';
@@ -221,6 +235,12 @@ class LoginManager {
     // ===== SELEÇÃO DE PERSONAGEM =====
     showCharacterSelect() {
         console.log('🎭 Mostrando seleção de personagem');
+        
+        // Se o jogo está ativo, não mostrar tela de seleção
+        if (this._isGameActive) {
+            console.log('🎮 Jogo ativo, pulando showCharacterSelect');
+            return;
+        }
         
         if (this.loginScreen) {
             this.loginScreen.style.opacity = '0';
@@ -784,10 +804,11 @@ class LoginManager {
     }
     
     startGameplay() {
-        console.log('🎮 Iniciando gameplay...');
+        console.log('🎮 ===== START GAMEPLAY =====');
         
         // Inicializar GameplayEngine se disponível
         if (typeof IntegratedGameplayEngine !== 'undefined') {
+            console.log('✅ IntegratedGameplayEngine disponível');
             try {
                 const config = {
                     class: this.selectedCharacter?.class || 'warrior',
@@ -795,22 +816,29 @@ class LoginManager {
                     race: this.selectedCharacter?.race || 'human',
                     level: this.selectedCharacter?.level || 1
                 };
+                console.log('🎮 Config:', config);
                 
+                console.log('🏗️ Criando GameplayEngine...');
                 window._gameplayEngine = new IntegratedGameplayEngine('gameCanvas', config);
+                console.log('✅ GameplayEngine criado:', window._gameplayEngine);
                 
                 if (window._gameplayEngine && window._gameplayEngine.start) {
+                    console.log('▶️ Chamando GameplayEngine.start()...');
                     window._gameplayEngine.start();
-                    console.log('✅ Jogo iniciado!');
+                    this._isGameActive = true; // Marcar jogo como ativo
+                    console.log('✅ Jogo iniciado com sucesso! _isGameActive = true');
                 } else {
-                    console.error('❌ GameplayEngine não tem método start');
+                    console.error('❌ GameplayEngine não tem método start:', window._gameplayEngine);
                 }
             } catch (e) {
-                console.error('❌ Erro ao iniciar jogo:', e.message);
+                console.error('❌ ===== ERRO NO START GAMEPLAY =====');
+                console.error('❌ Mensagem:', e.message);
+                console.error('❌ Stack:', e.stack);
                 this._isEnteringWorld = false;
                 this.showMessage('characterMessage', 'Erro ao iniciar jogo: ' + e.message, 'error');
             }
         } else {
-            console.warn('⚠️ Motor de jogo não disponível');
+            console.warn('⚠️ IntegratedGameplayEngine NÃO disponível');
             this._isEnteringWorld = false;
             this.showMessage('characterMessage', 'Motor de jogo não disponível', 'error');
         }
@@ -818,13 +846,25 @@ class LoginManager {
     
     // ===== LOGOUT =====
     logout() {
+        console.log('🚪 ===== LOGOUT CHAMADO =====');
+        console.log('🚪 _isEnteringWorld:', this._isEnteringWorld);
+        console.log('🚪 _isGameActive:', this._isGameActive);
+        console.log('🚪 Stack trace:', new Error().stack);
+        
         // PROTEÇÃO: Se estamos no meio de entrar no mundo, NÃO fazer logout
         if (this._isEnteringWorld) {
             console.warn('🚫 Logout bloqueado: entrando no mundo');
             return;
         }
         
-        console.log('🚪 Logout...');
+        // PROTEÇÃO EXTRA: Se o jogo está ativo, confirmar antes de fazer logout
+        if (this._isGameActive && window._gameplayEngine) {
+            console.warn('🚫 Logout bloqueado: jogo está ativo!');
+            console.log('🎮 _isGameActive =', this._isGameActive);
+            return;
+        }
+        
+        console.log('🚪 Executando logout...');
         
         // Limpar dados da sessão
         this.currentUser = null;
