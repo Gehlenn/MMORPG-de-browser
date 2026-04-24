@@ -61,8 +61,15 @@ function initProfessionSystems(gameEngine) {
             const originalRender = gameEngine.render.bind(gameEngine);
             gameEngine.render = function() {
                 originalRender();
-                if (gameEngine.resourceNodeManager) {
+                // Renderizar nós de recursos COM offset de câmera
+                if (gameEngine.resourceNodeManager && gameEngine.ctx) {
+                    gameEngine.ctx.save();
+                    gameEngine.ctx.translate(
+                        -gameEngine.camera.x,
+                        -gameEngine.camera.y
+                    );
                     gameEngine.resourceNodeManager.render(gameEngine.ctx);
+                    gameEngine.ctx.restore();
                 }
             };
             

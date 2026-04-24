@@ -93,7 +93,7 @@ class GameHUD {
         
         this.createPlayerInfoBox();
         this.createMinimap();
-        this.createMuteButton();
+        // this.createMuteButton(); // Removido - controle de volume já está no minimap
         this.createQuestTracker();
         this.createBottomButtons();
         this.createSkillBar();
@@ -162,8 +162,8 @@ class GameHUD {
         const btn = document.createElement('div');
         btn.id = 'hud-mute-btn';
         btn.style.cssText = `
-            position: absolute; top: 55px; right: 10px;
-            width: 32px; height: 32px;
+            position: absolute; top: 50px; right: 10px;
+            width: 30px; height: 30px;
             background: rgba(0, 0, 0, 0.85);
             border: 2px solid #5c3a21;
             border-radius: 50%;
@@ -1230,17 +1230,12 @@ class GameHUD {
         if (goldEl) goldEl.textContent = this.player.gold || 0;
         
         if (iconEl) {
-            const icons = { 
-                'Guerreiro': '⚔️', 'Arqueiro': '🏹', 'Mago': '🔮', 'Ladino': '🗡️',
-                'Sacerdote': '✝️', 'Druida': '🌿', 'Bruxo': '☠️', 'Monge': '🥋',
-                'Aprendiz': '📖'
-            };
             const classColors = {
                 'Guerreiro': '#C79C6E', 'Arqueiro': '#A9D271', 'Mago': '#3FC7EB',
                 'Ladino': '#FFF569', 'Sacerdote': '#FFFFFF', 'Druida': '#FF7D0A',
                 'Bruxo': '#9482C9', 'Monge': '#00FF96', 'Aprendiz': '#9D9D9D'
             };
-            iconEl.textContent = icons[this.player.class] || '⚔️';
+            iconEl.textContent = this.getClassIcon(this.player.class);
             iconEl.style.color = classColors[this.player.class] || '#ffd700';
         }
         
@@ -1250,12 +1245,23 @@ class GameHUD {
         const charClass = document.getElementById('char-class');
         const invGold = document.getElementById('inv-gold');
         
-        if (charIcon) charIcon.textContent = icons[this.player.class] || '⚔️';
+        if (charIcon) charIcon.textContent = this.getClassIcon(this.player.class);
         if (charName) charName.textContent = this.player.name || 'Player';
         if (charClass) charClass.textContent = `${this.player.class || 'Aprendiz'} Nível ${this.player.level || 1}`;
         if (invGold) invGold.textContent = this.player.gold || 0;
         
         this.updateMinimap();
+    }
+    
+    getClassIcon(className) {
+        const icons = { 
+            'Guerreiro': '⚔️', 'Arqueiro': '🏹', 'Mago': '🔮', 'Ladino': '🗡️',
+            'Sacerdote': '✝️', 'Druida': '🌿', 'Bruxo': '☠️', 'Monge': '🥋',
+            'Aprendiz': '📖', 'Apprentice': '📖', 'Warrior': '⚔️', 'Archer': '🏹', 
+            'Mage': '🔮', 'Rogue': '🗡️', 'Priest': '✝️', 'Druid': '🌿', 
+            'Warlock': '☠️', 'Monk': '🥋'
+        };
+        return icons[className] || '⚔️';
     }
     
     updateMinimap() {
