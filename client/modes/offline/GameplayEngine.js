@@ -1439,6 +1439,11 @@ class IntegratedGameplayEngine {
         if (this.keys['a'] || this.keys['arrowleft']) dx = -1;
         if (this.keys['d'] || this.keys['arrowright']) dx = 1;
         
+        // DEBUG: Mostrar quando teclas são pressionadas
+        if (dx !== 0 || dy !== 0) {
+            console.log('🎮 Movimento detectado:', { dx, dy, keys: this.keys });
+        }
+        
         // Normalizar movimento diagonal
         if (dx !== 0 && dy !== 0) {
             dx *= 0.707;
