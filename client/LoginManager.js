@@ -725,11 +725,14 @@ class LoginManager {
         localStorage.setItem('currentCharacter', JSON.stringify(this.selectedCharacter));
         console.log('💾 Personagem salvo no localStorage');
         
-        // Esconder tela de seleção
+        // Esconder telas de login e seleção
+        if (this.loginScreen) {
+            this.loginScreen.style.display = 'none';
+            this.loginScreen.style.opacity = '0';
+        }
         if (this.characterScreen) {
             this.characterScreen.style.display = 'none';
             this.characterScreen.classList.remove('active');
-            console.log('🙈 Tela de seleção escondida');
         }
         
         // Mostrar tela do jogo
@@ -738,6 +741,21 @@ class LoginManager {
             this.gameContainer.style.display = 'block';
             this.gameContainer.classList.add('active');
             console.log('✅ GameContainer ativado');
+            
+            // Mostrar gameScreen (HUD) também
+            const gameScreen = document.getElementById('gameScreen');
+            if (gameScreen) {
+                gameScreen.style.display = 'block';
+                gameScreen.classList.add('active');
+                console.log('✅ GameScreen ativado');
+            }
+            
+            // Garantir que loginScreen fique escondida
+            if (this.loginScreen) {
+                this.loginScreen.style.display = 'none';
+                this.loginScreen.classList.remove('active');
+                console.log('✅ LoginScreen escondida');
+            }
             
             // Iniciar gameplay com delay para garantir renderização
             setTimeout(() => {

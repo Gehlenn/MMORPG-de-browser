@@ -30,6 +30,12 @@ function initAchievementsSystem(gameEngine) {
         return;
     }
     
+    // Verificar se gameEngine existe
+    if (!gameEngine) {
+        console.error('[Achievements] gameEngine não disponível');
+        return;
+    }
+    
     // Inicializar AchievementsUI
     try {
         if (!gameEngine.achievementsUI) {
@@ -39,7 +45,8 @@ function initAchievementsSystem(gameEngine) {
             console.log('✅ AchievementsUI inicializado');
         }
     } catch (e) {
-        console.error('[Achievements] Erro ao inicializar AchievementsUI:', e);
+        console.warn('[Achievements] Erro ao inicializar AchievementsUI (modo offline):', e.message);
+        // Não crashar o jogo - continuar sem AchievementsUI
     }
 }
 

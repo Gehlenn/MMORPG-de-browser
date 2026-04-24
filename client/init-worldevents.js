@@ -30,12 +30,19 @@ function initWorldEventSystem(gameEngine) {
         return;
     }
     
+    // Verificar se gameEngine existe
+    if (!gameEngine) {
+        console.error('[WorldEvents] gameEngine não disponível');
+        return;
+    }
+    
     // Inicializar WorldEventUI
     try {
         gameEngine.worldEventUI = new WorldEventUI(gameEngine);
         console.log('✅ WorldEventUI inicializado');
     } catch (e) {
-        console.error('[WorldEvents] Erro ao inicializar WorldEventUI:', e);
+        console.warn('[WorldEvents] Erro ao inicializar WorldEventUI (modo offline):', e.message);
+        // Não crashar o jogo - continuar sem WorldEventUI
     }
 }
 
