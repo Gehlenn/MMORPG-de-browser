@@ -238,39 +238,42 @@ class LoginManager {
     updateCharacterList() {
         // Resetar cards
         const cards = document.querySelectorAll('.character-card');
-        cards.forEach(card => {
-            const className = card.dataset.class;
-            const charData = this.characters[className];
+        const charactersArray = Object.values(this.characters);
+        
+        cards.forEach((card, index) => {
+            const charData = charactersArray[index];
             
             // Atualizar visual do card
             const existingBadge = card.querySelector('.char-level');
             if (existingBadge) existingBadge.remove();
             
+            // Limpar conteúdo antigo
+            const oldInfo = card.querySelector('.char-info');
+            if (oldInfo) oldInfo.remove();
+            
             if (charData) {
-                // Personagem existe
+                // Personagem existe - mostrar info do personagem
                 card.classList.add('has-character');
-                card.classList.remove('empty');
-                
-                // Adicionar info
-                const info = document.createElement('div');
-                info.className = 'char-info';
-                info.innerHTML = `
-                    <div class="char-name">${charData.name}</div>
-                    <div class="char-level">Nv. ${charData.level}</div>
+                card.classList.remove('empty', 'empty-slot');
+                card.innerHTML = `
+                    <h3>👤 ${charData.name}</h3>
+                    <p>${charData.race} • Nv. ${charData.level}</p>
+                    <div class="character-stats">
+                        <span>❤️ ${charData.hp}/${charData.maxHp}</span>
+                        <span>⚔️ ${charData.class}</span>
+                    </div>
                 `;
-                
-                // Limpar info antiga se existir
-                const oldInfo = card.querySelector('.char-info');
-                if (oldInfo) oldInfo.remove();
-                
-                card.appendChild(info);
             } else {
                 // Slot vazio
                 card.classList.remove('has-character');
-                card.classList.add('empty');
-                
-                const oldInfo = card.querySelector('.char-info');
-                if (oldInfo) oldInfo.remove();
+                card.classList.add('empty', 'empty-slot');
+                card.innerHTML = `
+                    <h3>📭 Slot Vazio</h3>
+                    <p>Clique para criar um personagem</p>
+                    <div class="character-stats">
+                        <span>-</span>
+                    </div>
+                `;
             }
         });
         
@@ -280,6 +283,40 @@ class LoginManager {
         if (enterBtn) {
             enterBtn.disabled = true;
             enterBtn.style.opacity = '0.5';
+        }
+    }
+    
+    selectSlot(slotIndex) {
+        console.log('🎲 Slot selecionado:', slotIndex);
+        
+        // Verificar se existe personagem neste slot
+        const charactersArray = Object.values(this.characters);
+        if (charactersArray[slotIndex]) {
+            // Selecionar personagem existente
+            const char = charactersArray[slotIndex];
+            this.selectedCharacter = char;
+            console.log('✅ Personagem selecionado:', char.name);
+            
+            // Destacar card
+            const cards = document.querySelectorAll('.character-card');
+            cards.forEach(c => c.classList.remove('selected'));
+            const selectedCard = document.querySelector(`[data-slot="${slotIndex}"]`);
+            if (selectedCard) selectedCard.classList.add('selected');
+            
+            // Habilitar botão entrar
+            const enterBtn = document.getElementById('enterWorldBtn');
+            if (enterBtn) {
+                enterBtn.disabled = false;
+                enterBtn.style.opacity = '1';
+            }
+            
+            // Salvar seleção
+            localStorage.setItem('selectedCharacter', JSON.stringify(char));
+        } else {
+            // Slot vazio - abrir criação
+            console.log('📭 Slot vazio, abrindo criação...');
+            this.selectedSlot = slotIndex;
+            this.showCharacterCreation('warrior'); // Classe padrão
         }
     }
     
@@ -396,17 +433,21 @@ class LoginManager {
             return;
         }
         
-        // Verificar se já existe personagem nesta classe
-        if (this.characters[charClass]) {
-            this.showMessage('characterMessage', 'Já existe personagem nesta classe', 'error');
+        // Verificar se slot está ocupado
+        const charactersArray = Object.values(this.characters);
+        if (this.selectedSlot !== undefined && charactersArray[this.selectedSlot]) {
+            this.showMessage('characterMessage', 'Slot já ocupado', 'error');
             return;
         }
         
-        // Criar personagem
-        this.characters[charClass] = {
+        // Criar personagem com ID único baseado no slot
+        const charId = `char_${this.selectedSlot || 0}_${Date.now()}`;
+        this.characters[charId] = {
+            id: charId,
             name,
             race,
             class: charClass,
+            slot: this.selectedSlot || 0,
             level: 1,
             xp: 0,
             hp: 100,
@@ -426,8 +467,7 @@ class LoginManager {
             this.updateCharacterList();
             
             // Auto-selecionar o personagem criado
-            const card = document.querySelector(`[data-class="${charClass}"]`);
-            if (card) this.selectCharacter(charClass, card);
+            this.selectSlot(this.selectedSlot || 0);
         }, 1000);
     }
     
