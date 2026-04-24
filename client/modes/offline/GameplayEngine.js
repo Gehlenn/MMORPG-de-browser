@@ -267,11 +267,21 @@ class IntegratedGameplayEngine {
     }
     
     setupInput() {
-        // Keyboard
+        // Keyboard - ATENÇÃO: NÃO usar capture phase para não interceptar antes do keydown
         document.addEventListener('keydown', (e) => {
-            this.keys[e.key.toLowerCase()] = true;
-            this.handleKeyDown(e.key.toLowerCase());
-        });
+            const key = e.key.toLowerCase();
+            
+            // PRIMEIRO: Registrar a tecla para o jogo funcionar
+            this.keys[key] = true;
+            this.handleKeyDown(key);
+            
+            // DEPOIS: Prevenir comportamento padrão APENAS se for tecla de jogo
+            const gameKeys = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ',
+                              'm', 'i', 'c', 'l', 'g', 'h', 'o', 'r', 'e', 'f'];
+            if (gameKeys.includes(key)) {
+                e.preventDefault();
+            }
+        }); // SEM capture phase
         
         document.addEventListener('keyup', (e) => {
             this.keys[e.key.toLowerCase()] = false;
@@ -288,13 +298,6 @@ class IntegratedGameplayEngine {
         this.canvas.addEventListener('click', (e) => {
             this.mouse.clicked = true;
             this.handleClick(e);
-        });
-        
-        // Prevenir scroll com setas
-        window.addEventListener('keydown', (e) => {
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
-                e.preventDefault();
-            }
         });
     }
     
@@ -447,6 +450,12 @@ class IntegratedGameplayEngine {
         if (typeof PartySystem !== 'undefined') {
             this.partySystem = new PartySystem(this);
             console.log('✅ PartySystem inicializado');
+        }
+        
+        // AutoCombatSystem - Sistema de combate automático
+        if (typeof AutoCombatSystem !== 'undefined') {
+            this.autoCombatSystem = new AutoCombatSystem(this);
+            console.log('✅ AutoCombatSystem inicializado');
         }
         
         console.log('✅ Todos os sistemas v0.4.0 inicializados');
@@ -1064,6 +1073,23 @@ class IntegratedGameplayEngine {
             console.log('   - Mercadores:', window.MerchantDatabase ? window.MerchantDatabase.getAll().length : 0);
         }
         
+        // Inicializar GameHUD (novo sistema de interface)
+        if (typeof GameHUD !== 'undefined') {
+            this.gameHUD = new GameHUD(this);
+            this.gameHUD.initialize(this.player);
+            window.gameHUD = this.gameHUD;
+            console.log('🎮 GameHUD inicializado');
+        }
+        
+        // Inicializar AutoCombatSystem com dados do player
+        if (this.autoCombatSystem && this.player) {
+            // Passar dados do personagem atual
+            const currentChar = window.loginManager?.selectedCharacter || {};
+            this.currentCharacter = currentChar;
+            this.autoCombatSystem.initialize(this.player);
+            console.log('⚔️ AutoCombatSystem ativado');
+        }
+        
         // Inicializar Trading System
         if (window.TradeManager) {
             this.tradeManager = new TradeManager(this.playerId || 'player_1');
@@ -1354,6 +1380,16 @@ class IntegratedGameplayEngine {
         // NOVO: Update NPCSystem (animações e speech bubbles)
         if (this.npcSystem) {
             this.npcSystem.updateNPCs(deltaTime);
+        }
+        
+        // NOVO: Update AutoCombatSystem
+        if (this.autoCombatSystem) {
+            this.autoCombatSystem.update(deltaTime * 1000);
+        }
+        
+        // NOVO: Update GameHUD
+        if (this.gameHUD) {
+            this.gameHUD.update(deltaTime * 1000);
         }
         
         // Update HUD
@@ -2069,6 +2105,11 @@ class IntegratedGameplayEngine {
         
         // NOVO: Renderizar efeitos de combate (swings, flashes, impactos)
         this.renderCombatEffects();
+        
+        // NOVO: Renderizar AutoCombatSystem (damage numbers, target indicator)
+        if (this.autoCombatSystem) {
+            this.autoCombatSystem.render(this.ctx, this.camera.x, this.camera.y);
+        }
         
         // NOVO: Renderizar AdvancedMobSystem mobs
         if (this.advancedMobSystem) {
@@ -3763,9 +3804,12 @@ class IntegratedGameplayEngine {
     }
 
     tryCollectLoot() {
-        if (!this.player || !Array.isArray(this.lootDrops)) return;
+        if (!this.player || !Array.isArray(this.lootDrops)) {
+            console.log('❌ Coleta falhou: player ou lootDrops inválido');
+            return;
+        }
 
-        const range = 60; // Aumentado de 50 para 60
+        const range = 100; // Aumentado para 100px para facilitar coleta
         let nearest = null;
         let nearestDistance = Infinity;
 
@@ -3780,7 +3824,12 @@ class IntegratedGameplayEngine {
             }
         }
 
-        if (!nearest) return;
+        if (!nearest) {
+            console.log('ℹ️ Nenhum loot próximo para coletar');
+            return;
+        }
+
+        console.log('✅ Coletando loot:', nearest.name || nearest.itemName, 'distância:', Math.floor(nearestDistance));
 
         // Usar LootManager se disponível
         if (this.lootManager && typeof this.lootManager.tryCollectLoot === 'function') {
@@ -3797,8 +3846,6 @@ class IntegratedGameplayEngine {
                 playerId: this.player.id,
                 dropId: nearest.id
             });
-
-            Logger.info('Tentativa de coleta enviada:', nearest.id);
         } else {
             // Modo offline: coletar diretamente
             this.collectLootOffline(nearest);
