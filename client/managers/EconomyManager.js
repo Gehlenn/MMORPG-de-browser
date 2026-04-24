@@ -451,8 +451,8 @@ class EconomyManager {
         }
         
         // Emitir evento
-        if (window.EventBus) {
-            window.EventBus.emit('priceUpdate', updates);
+        if (window.eventBus) {
+            window.eventBus.emit('priceUpdate', updates);
         }
     }
     

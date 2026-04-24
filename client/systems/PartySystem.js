@@ -207,8 +207,12 @@ class PartySystem {
     }
     
     setupSocketEvents() {
-        // Verificar se socket existe
-        if (!this.game || !this.game.socket) {
+        // Verificar se game e socket existem
+        if (!this.game) {
+            console.warn('⚠️ Game não disponível, modo offline ativado');
+            return;
+        }
+        if (!this.game.socket) {
             console.warn('⚠️ Socket não disponível, modo offline ativado');
             return;
         }
@@ -391,6 +395,25 @@ class PartySystem {
         
         html += '</div>';
         list.innerHTML = html;
+    }
+    
+    updateNearbyPlayers() {
+        // Verificar se game existe
+        if (!this.game) return;
+        
+        // Get nearby players from game state
+        const nearby = this.game.getNearbyPlayers ? this.game.getNearbyPlayers(500) : [];
+        this.nearbyPlayers = nearby.filter(p => p.id !== this.game.playerId);
+        
+        // Update UI if visible
+        if (this.invitePanel && this.invitePanel.style.display === 'block') {
+            this.renderNearbyPlayers();
+        }
+        
+        // Emit to server (se socket disponível)
+        if (this.game && this.game.socket && this.nearbyPlayers.length > 0) {
+            this.game.socket.emit('nearbyPlayers', { players: this.nearbyPlayers.map(p => p.id) });
+        }
     }
     
     createParty() {

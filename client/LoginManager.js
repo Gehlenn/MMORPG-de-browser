@@ -311,7 +311,7 @@ class LoginManager {
             if (oldInfo) oldInfo.remove();
             
             if (charData) {
-                // Personagem existe - mostrar info do personagem com botão de deletar
+                // Personagem existe - mostrar info do personagem
                 card.classList.add('has-character');
                 card.classList.remove('empty', 'empty-slot');
                 card.innerHTML = `
@@ -321,20 +321,6 @@ class LoginManager {
                         <span>❤️ ${charData.hp}/${charData.maxHp}</span>
                         <span>⚔️ ${charData.class}</span>
                     </div>
-                    <button class="delete-btn" onclick="event.stopPropagation(); deleteCharacter(${index})" style="
-                        position: absolute;
-                        top: 5px;
-                        right: 5px;
-                        background: #ff4444;
-                        color: white;
-                        border: none;
-                        border-radius: 50%;
-                        width: 25px;
-                        height: 25px;
-                        cursor: pointer;
-                        font-size: 12px;
-                        z-index: 10;
-                    " title="Excluir personagem">✕</button>
                 `;
             } else {
                 // Slot vazio

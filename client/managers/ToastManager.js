@@ -614,8 +614,8 @@ class ToastManager {
             duration: 6000,
             actions: [
                 { id: 'view', label: 'Ver Status', type: 'primary', callback: () => {
-                    if (window.EventBus) {
-                        window.EventBus.emit('showCharacterStatus');
+                    if (window.eventBus) {
+                        window.eventBus.emit('showCharacterStatus');
                     }
                 }}
             ]

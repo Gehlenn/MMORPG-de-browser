@@ -124,8 +124,8 @@ class SettingsManager {
         }
 
         // Emit event
-        if (window.EventBus) {
-            window.EventBus.emit('settingChanged', { key, value, oldValue });
+        if (window.eventBus) {
+            window.eventBus.emit('settingChanged', { key, value, oldValue });
         }
 
         return value;
@@ -234,8 +234,8 @@ class SettingsManager {
         this.saveSettings();
         this.applySettings();
 
-        if (window.EventBus) {
-            window.EventBus.emit('settingsReset');
+        if (window.eventBus) {
+            window.eventBus.emit('settingsReset');
         }
 
         console.log('🔄 Configurações resetadas para padrão');

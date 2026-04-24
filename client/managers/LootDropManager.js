@@ -360,8 +360,8 @@ class LootDropManager {
         }
         
         // Evento
-        if (window.EventBus) {
-            window.EventBus.emit('lootCollected', { items, autoLoot });
+        if (window.eventBus) {
+            window.eventBus.emit('lootCollected', { items, autoLoot });
         }
     }
     

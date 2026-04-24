@@ -28,8 +28,8 @@ class EconomyUI {
         // Bind events
         if (this.economyManager) {
             // Atualizar quando preços mudarem
-            if (window.EventBus) {
-                window.EventBus.on('priceUpdate', () => {
+            if (window.eventBus) {
+                window.eventBus.on('priceUpdate', () => {
                     if (this.visible) this.render();
                 });
             }
