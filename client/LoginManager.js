@@ -774,8 +774,14 @@ class LoginManager {
             if (this.loginScreen) {
                 this.loginScreen.style.display = 'none';
                 this.loginScreen.classList.remove('active');
+                this.loginScreen.style.visibility = 'hidden';
+                this.loginScreen.style.zIndex = '-99999';
                 console.log('✅ LoginScreen escondida');
             }
+            
+            // Adicionar classe game-active ao body para CSS
+            document.body.classList.add('game-active');
+            console.log('✅ Classe game-active adicionada ao body');
             
             // Iniciar gameplay com delay para garantir renderização
             setTimeout(() => {
@@ -893,9 +899,15 @@ class LoginManager {
         // Mostrar tela de login
         if (this.loginScreen) {
             this.loginScreen.style.display = 'flex';
+            this.loginScreen.style.visibility = 'visible';
+            this.loginScreen.style.zIndex = '99998';
             this.loginScreen.style.opacity = '1';
             console.log('👁️ Tela de login mostrada');
         }
+        
+        // Remover classe game-active do body
+        document.body.classList.remove('game-active');
+        console.log('✅ Classe game-active removida do body');
         
         // Limpar campos de login
         if (this.loginPassword) this.loginPassword.value = '';
